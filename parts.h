@@ -22,12 +22,24 @@ enum class PartType {
     UNKNOWN
 };
 
+static bool isEngine(PartType type) {
+    return type == PartType::LFEngine || type == PartType::LOXEngine || type == PartType::MPEngine || type == PartType::XenonEngine || type == PartType::SolidBooster;
+}
+
 struct ResourceContainer {
     double liquidFuel = 0.0;
     double oxidizer = 0.0;
     double monoPropellant = 0.0;
     double solidFuel = 0.0;
     double xenonGas = 0.0;
+    bool hasResources() const {
+        return liquidFuel > 0 || oxidizer > 0 || monoPropellant > 0 || solidFuel > 0 || xenonGas > 0;
+    }
+};
+
+struct EngineISPInfo {
+    std::vector<std::pair<double, double>> isp; // pairs of (atm pressure, ISP)
+    double fuelConsumptionRate = 0.0f;
 };
 
 class Part {
@@ -41,10 +53,8 @@ public:
          float part_length,
          int maxCrew, 
          ResourceContainer res,
-         double thrustkN, 
-         double fuelConsumption) :
-        type(part_type), name(partname), mass(emptymass), attTop(att_top), attBottom(att_bot), length(part_length),
-        MaxCrew(maxCrew), resources(res), ThrustkN(thrustkN), FuelConsumption(fuelConsumption) { }
+         double thrustkN,
+         EngineISPInfo isp);
 
     const PartType type;
     const std::string name;
@@ -56,13 +66,14 @@ public:
     // Resource capacities
     const int MaxCrew = 0;
     ResourceContainer resources;
+    const double MaxThrustkN  = 0.0;
+    EngineISPInfo ispCurve;
 
     int crewAmount = 0;
 
-    const double ThrustkN  = 0.0;
-    const double FuelConsumption = 0.0; // kg per second
+    double getMass(double fillPercent=1.0) const;
 
-    double getMass() const;
+    void print() const;
 };
 
 

@@ -3,6 +3,7 @@
 
 #include <filesystem>
 #include <optional>
+#include <tuple>
 
 #include "parts.h"
 
@@ -17,7 +18,8 @@ struct KSPPart {
     ResourceContainer resources;
 };
 struct Engine : public KSPPart {
-    double Thrust = 0.0;
+    EngineISPInfo ispCurve;
+    double VacThrust = 0.0;
 };
 struct CmdPod : public KSPPart {
     int crewCapacity = 0;
@@ -27,7 +29,7 @@ enum ResourceType { LF, OX, MP, SOLID, XE, UNKNOWN };
 
 std::string trimString(const std::string& str);
 
-int parseNodeSize(const std::string& line);
+std::tuple<int, float> parseNodeSize(const std::string& line);
 
 void loadPartCatalogueFromKSP(const std::filesystem::path& ksp_path, std::vector<Part>& partCatalogue);
 

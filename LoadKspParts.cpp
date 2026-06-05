@@ -1,6 +1,9 @@
 #include "LoadKspParts.h"
 #include <iostream>
 #include <fstream>
+#include <sstream>
+
+#include "kspConstants.h"
 
 std::string trimString (const std::string& str) {
     size_t start = str.find_first_not_of(" \t");
@@ -8,19 +11,46 @@ std::string trimString (const std::string& str) {
     return (start == std::string::npos) ? "" : str.substr(start, end - start + 1);
 };
 
-int parseNodeSize(const std::string& line) {
+std::tuple<int, float> parseNodeSize(const std::string& line) {
     auto eq = line.find(" = ");
-    if (eq == std::string::npos) return 0;
+    if (eq == std::string::npos) return {0, 0.0f};
     std::string vals = trimString(line.substr(eq + 3));
     size_t pos = 0;
-    for (int i = 0; i < 6; ++i) {
-        pos = vals.find(',', pos);
-        if (pos == std::string::npos) return 0;
-        ++pos;
-    }
+
+    // value 0: x — skip
     size_t end = vals.find(',', pos);
-    return std::stoi(trimString(vals.substr(pos, end - pos)));
+    if (end == std::string::npos) return {0, 0.0f};
+    pos = end + 1;
+
+    // value 1: y — read
+    end = vals.find(',', pos);
+    if (end == std::string::npos) return {0, 0.0f};
+    float yPos = std::stof(trimString(vals.substr(pos, end - pos)));
+    pos = end + 1;
+
+    // values 2-5: z, dir_x, dir_y, dir_z — skip
+    for (int i = 0; i < 4; ++i) {
+        end = vals.find(',', pos);
+        if (end == std::string::npos) return {0, 0.0f};
+        pos = end + 1;
+    }
+
+    // value 6: size
+    end = vals.find(',', pos);
+    int size = std::stoi(trimString(vals.substr(pos, end - pos)));
+
+    return {size, yPos};
 };
+
+std::tuple<float, float> parseISP(const std::string& line) {
+    auto pos = line.find("key = ");
+    if (pos == std::string::npos) return {0.0f, 0.0f};
+    std::istringstream iss(trimString(line.substr(pos + 6)));
+    float atm, isp;
+    iss >> atm >> isp;
+    return {atm, isp};
+};
+
 
 ResourceType parseResourceType(const std::string& resName) {
     if (resName == "MonoPropellant")  { return ResourceType::MP; }
@@ -64,16 +94,22 @@ std::optional<KSPPart> loadFuelTankPart(const std::filesystem::path& filePath) {
     while (std::getline(file, line)) {
         // Simple
         if (line.find("name = ") != std::string::npos) {
-             tank.name = getStringValue(line);
+            if (tank.name.empty()) {
+                tank.name = getStringValue(line); // Part Name is usually the first field
+            }
         }
         else if (line.find("mass = ") != std::string::npos) {
             tank.mass = getNumberInLine(line);
         }
         else if (line.find("node_stack_top") != std::string::npos) {
-            tank.attTop = parseNodeSize(line);
+            auto [attSize, yPos] = parseNodeSize(line);
+            tank.attTop = attSize;
+            tank.attTopY = yPos;
         }
         else if (line.find("node_stack_bottom") != std::string::npos) {
-            tank.attBottom = parseNodeSize(line);
+            auto [attSize, yPos] = parseNodeSize(line);
+            tank.attBottom = attSize;
+            tank.attBottomY = yPos;
         }
         else if (line.find("RESOURCE") != std::string::npos) {
             while (std::getline(file, line) && line.find("}") == std::string::npos) {
@@ -135,14 +171,17 @@ std::optional<Engine> loadEnginePart(const std::filesystem::path& filePath) {
             engine.mass = getNumberInLine(line);
         }
         else if (line.find("node_stack_top") != std::string::npos) {
-            engine.attTop = parseNodeSize(line);
+            auto [attSize, yPos] = parseNodeSize(line);
+            engine.attTop = attSize;
+            engine.attTopY = yPos;
         }
         else if (line.find("node_stack_bottom") != std::string::npos) {
-            engine.attBottom = parseNodeSize(line);
+            auto [attSize, yPos] = parseNodeSize(line);
+            engine.attBottom = attSize;
+            engine.attBottomY = yPos;
         }
         else if (line.find("maxThrust = ") != std::string::npos) {
-            std::string thrustStr = line.substr(line.find("maxThrust = ") + 12);
-            engine.Thrust = getNumberInLine(line);
+            engine.VacThrust = getNumberInLine(line);
         }
         else if (line.find("PROPELLANT") != std::string::npos) {
             while (std::getline(file, line) && line.find("}") == std::string::npos) {
@@ -177,6 +216,14 @@ std::optional<Engine> loadEnginePart(const std::filesystem::path& filePath) {
                 }
             }
         }
+        else if (line.find("atmosphereCurve") != std::string::npos) {
+            while (std::getline(file, line) && line.find("}") == std::string::npos) {
+                if (line.find("key = ") != std::string::npos) {
+                    auto [atm, isp] = parseISP(line);
+                    engine.ispCurve.isp.emplace_back(atm, isp);
+                }
+            }
+        }
     }
     return engine;
 }
@@ -201,14 +248,17 @@ std::optional<CmdPod> loadCommandPodPart(const std::filesystem::path& filePath) 
             pod.mass = getNumberInLine(line);
         }
         else if (line.find("node_stack_top") != std::string::npos) {
-            pod.attTop = parseNodeSize(line);
+            auto [attSize, yPos] = parseNodeSize(line);
+            pod.attTop = attSize;
+            pod.attTopY = yPos;
         }
         else if (line.find("node_stack_bottom") != std::string::npos) {
-            pod.attBottom = parseNodeSize(line);
+            auto [attSize, yPos] = parseNodeSize(line);
+            pod.attBottom = attSize;
+            pod.attBottomY = yPos;
         }
         else if (line.find("CrewCapacity = ") != std::string::npos) {
-            std::string crewStr = line.substr(line.find("CrewCapacity = ") + 15);
-            pod.crewCapacity = std::stoi(crewStr);
+            pod.crewCapacity = getNumberInLine(line);
             if (pod.crewCapacity > 0) {
                 pod.type = PartType::CrewedCommandPod;
             }
@@ -246,7 +296,6 @@ void loadPartCatalogueFromKSP(const std::filesystem::path& ksp_path, std::vector
         if (!entry.is_regular_file() || entry.path().extension() != ".cfg") { continue; }
         auto tankOpt = loadFuelTankPart(entry.path());
         if (tankOpt.has_value()) {
-            std::cout << "Loaded fuel tank part from " << entry.path() << std::endl;
             auto tank = tankOpt.value();
             partCatalogue.emplace_back(tank.type,
                                        tank.name, 
@@ -257,7 +306,7 @@ void loadPartCatalogueFromKSP(const std::filesystem::path& ksp_path, std::vector
                                        0, // crew
                                        tank.resources,
                                        0.0, // thrust
-                                       0.0); // consumption
+                                       EngineISPInfo{}); // consumption
         }
     }
 
@@ -265,7 +314,6 @@ void loadPartCatalogueFromKSP(const std::filesystem::path& ksp_path, std::vector
         if (!entry.is_regular_file() || entry.path().extension() != ".cfg") { continue; }
         auto engineOpt = loadEnginePart(entry.path());
         if (engineOpt.has_value()) {
-            std::cout << "Loaded engine part from " << entry.path() << std::endl;
             auto engine = engineOpt.value();
             partCatalogue.emplace_back(engine.type,
                                        engine.name,
@@ -275,8 +323,8 @@ void loadPartCatalogueFromKSP(const std::filesystem::path& ksp_path, std::vector
                                        engine.attTopY - engine.attBottomY,
                                        0, // crew
                                        engine.resources,
-                                       engine.Thrust,
-                                       0.0); // fuel consumption (can be calculated later)
+                                       engine.VacThrust,
+                                       engine.ispCurve);
         }
     }
 
@@ -284,7 +332,6 @@ void loadPartCatalogueFromKSP(const std::filesystem::path& ksp_path, std::vector
         if (!entry.is_regular_file() || entry.path().extension() != ".cfg") { continue; }
         auto podOpt = loadCommandPodPart(entry.path());
         if (podOpt.has_value()) {
-            std::cout << "Loaded command pod part from " << entry.path() << std::endl;
             auto pod = podOpt.value();
 
             partCatalogue.emplace_back(pod.type,
@@ -296,7 +343,7 @@ void loadPartCatalogueFromKSP(const std::filesystem::path& ksp_path, std::vector
                                        pod.crewCapacity,
                                        pod.resources,
                                        0.0, // thrust
-                                       0.0); // fuelConsumption
+                                       EngineISPInfo{}); // ISP
         }
     }
 }
