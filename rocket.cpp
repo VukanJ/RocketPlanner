@@ -19,7 +19,15 @@ std::string partTypeToString(PartType type) {
     }
 }
 
-
+void Rocket::setRootPart(std::string_view partName) {
+    for (auto& part : partCatalogue) {
+        if (part.name == partName) {
+            root = &part;
+            return;
+        }
+    }
+    throw std::runtime_error("Part not found in catalogue: " + std::string(partName));
+}
 
 Rocket::Rocket(const std::string& name) : name(name) { }
 
@@ -27,6 +35,7 @@ void Rocket::loadPartCatalogue(const std::filesystem::path& path) {
     loadPartCatalogueFromKSP(path, partCatalogue);
 
     for (const auto& part : partCatalogue) {
-        std::cout << partTypeToString(part.type) << " \"" << part.name << "\"" ", Mass: " << part.mass << " tons)" << std::endl;
+        std::cout << partTypeToString(part.type) << " \"" << part.name << "\"" ", Mass: " 
+            << part.mass << " tons)" << "[" << part.attTop << part.attBottom << ']' << std::endl;
     }
 }

@@ -15,6 +15,20 @@ void loadPartCatalogueFromKSP(const std::filesystem::path& ksp_path, std::vector
         return (start == std::string::npos) ? "" : str.substr(start, end - start + 1);
     };
 
+    auto parseNodeSize = [&trimString](const std::string& line) -> int {
+        auto eq = line.find(" = ");
+        if (eq == std::string::npos) return 0;
+        std::string vals = trimString(line.substr(eq + 3));
+        size_t pos = 0;
+        for (int i = 0; i < 6; ++i) {
+            pos = vals.find(',', pos);
+            if (pos == std::string::npos) return 0;
+            ++pos;
+        }
+        size_t end = vals.find(',', pos);
+        return std::stoi(trimString(vals.substr(pos, end - pos)));
+    };
+
     auto partsFolder = ksp_path / "GameData" / "Squad" / "Parts";
 
     enum Resource { LF, OX, MP, UNKNOWN } rtype;
@@ -26,9 +40,8 @@ void loadPartCatalogueFromKSP(const std::filesystem::path& ksp_path, std::vector
             double maxLF = 0.0;
             double maxOX = 0.0;
             double maxMP = 0.0;
-            double LF = 0.0;
-            double OX = 0.0;
-            double MP = 0.0;
+            int attTop = 0;
+            int attBottom = 0;
         };
         Tank tank;
         if (entry.is_regular_file() && entry.path().extension() == ".cfg") {
@@ -49,6 +62,12 @@ void loadPartCatalogueFromKSP(const std::filesystem::path& ksp_path, std::vector
                 else if (line.find("mass = ") != std::string::npos) {
                     std::string massStr = line.substr(line.find("mass = ") + 7);
                     tank.mass = std::stod(massStr);
+                }
+                else if (line.find("node_stack_top") != std::string::npos) {
+                    tank.attTop = parseNodeSize(line);
+                }
+                else if (line.find("node_stack_bottom") != std::string::npos) {
+                    tank.attBottom = parseNodeSize(line);
                 }
                 else if (line.find("RESOURCE") != std::string::npos) {
                     while (std::getline(file, line) && line.find("}") == std::string::npos) {
@@ -73,15 +92,6 @@ void loadPartCatalogueFromKSP(const std::filesystem::path& ksp_path, std::vector
                                 tankType = PartType::XenonTank;
                             }
                         }
-                        else if (line.find("amount = ") != std::string::npos) {
-                            std::string amountStr = line.substr(line.find("amount = ") + 9);
-                            switch (rtype) {
-                                case LF: tank.LF = std::stod(amountStr); break;
-                                case OX: tank.OX = std::stod(amountStr); break;
-                                case MP: tank.MP = std::stod(amountStr); break;
-                                default: break;
-                            }
-                        }
                         else if (line.find("maxAmount = ") != std::string::npos) {
                             std::string amountStr = line.substr(line.find("maxAmount = ") + 12);
                             switch (rtype) {
@@ -97,8 +107,8 @@ void loadPartCatalogueFromKSP(const std::filesystem::path& ksp_path, std::vector
             partCatalogue.emplace_back(tankType,
                                        tank.name, 
                                        tank.mass, 
-                                       0,
-                                       0, 
+                                       tank.attTop,
+                                       tank.attBottom,
                                        0, // crew
                                        tank.maxLF, 
                                        tank.maxOX, 
@@ -113,6 +123,8 @@ void loadPartCatalogueFromKSP(const std::filesystem::path& ksp_path, std::vector
             std::string name;
             double mass = 0.0;
             double Thrust = 0.0;
+            int attTop = 0;
+            int attBottom = 0;
             };
         Engine engine;
         if (entry.is_regular_file() && entry.path().extension() == ".cfg") {
@@ -132,6 +144,12 @@ void loadPartCatalogueFromKSP(const std::filesystem::path& ksp_path, std::vector
                 else if (line.find("mass = ") != std::string::npos) {
                     std::string massStr = line.substr(line.find("mass = ") + 7);
                     engine.mass = std::stod(massStr);
+                }
+                else if (line.find("node_stack_top") != std::string::npos) {
+                    engine.attTop = parseNodeSize(line);
+                }
+                else if (line.find("node_stack_bottom") != std::string::npos) {
+                    engine.attBottom = parseNodeSize(line);
                 }
                 else if (line.find("maxThrust = ") != std::string::npos) {
                     std::string thrustStr = line.substr(line.find("maxThrust = ") + 12);
@@ -160,8 +178,8 @@ void loadPartCatalogueFromKSP(const std::filesystem::path& ksp_path, std::vector
             partCatalogue.emplace_back(engineType,
                                        engine.name, 
                                        engine.mass, 
-                                       0,
-                                       0, 
+                                       engine.attTop,
+                                       engine.attBottom,
                                        0, // crew
                                        0.0, 
                                        0.0, 
@@ -177,6 +195,8 @@ void loadPartCatalogueFromKSP(const std::filesystem::path& ksp_path, std::vector
             double mass = 0.0;
             int crewCapacity = 0;
             double monoPropellantMass = 0.0;
+            int attTop = 0;
+            int attBottom = 0;
         };
         CmdPod pod;
         if (entry.is_regular_file() && entry.path().extension() == ".cfg") {
@@ -195,6 +215,12 @@ void loadPartCatalogueFromKSP(const std::filesystem::path& ksp_path, std::vector
                 else if (line.find("mass = ") != std::string::npos) {
                     std::string massStr = line.substr(line.find("mass = ") + 7);
                     pod.mass = std::stod(massStr);
+                }
+                else if (line.find("node_stack_top") != std::string::npos) {
+                    pod.attTop = parseNodeSize(line);
+                }
+                else if (line.find("node_stack_bottom") != std::string::npos) {
+                    pod.attBottom = parseNodeSize(line);
                 }
                 else if (line.find("CrewCapacity = ") != std::string::npos) {
                     std::string crewStr = line.substr(line.find("CrewCapacity = ") + 15);
@@ -222,8 +248,8 @@ void loadPartCatalogueFromKSP(const std::filesystem::path& ksp_path, std::vector
             partCatalogue.emplace_back(pod.crewCapacity > 0 ? PartType::CrewedCommandPod : PartType::DronePod,
                                        pod.name, 
                                        pod.mass, 
-                                       0,
-                                       0, 
+                                       pod.attTop,
+                                       pod.attBottom,
                                        pod.crewCapacity,
                                        0.0, 
                                        0.0, 

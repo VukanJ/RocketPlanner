@@ -28,15 +28,15 @@ public:
     Part(PartType type, const std::string& name, double mass, int attsize0, int attsize1,
          int maxCrew, double maxLiquidFuel, double maxOxidizer, double maxMonoPropellant,
          double thrustkN, double fuelConsumption) :
-        type(type), name(name), mass(mass), attsize0(attsize0), attsize1(attsize1),
+        type(type), name(name), mass(mass), attTop(attsize0), attBottom(attsize1),
         MaxCrew(maxCrew), MaxLiquidFuel(maxLiquidFuel), MaxOxidizer(maxOxidizer),
         MaxMonoPropellant(maxMonoPropellant), ThrustkN(thrustkN), FuelConsumption(fuelConsumption) { }
 
     const PartType type;
     const std::string name;
     const double mass = 0.0;
-    const int attsize0 = 0;
-    const int attsize1 = 0;
+    const int attTop = 0;
+    const int attBottom = 0;
     
     // Resource capacities
     const int MaxCrew = 0;

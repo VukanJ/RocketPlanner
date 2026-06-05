@@ -23,4 +23,6 @@ int main() {
     const auto kspPath = findKSP();
     Rocket rocket("Test Rocket");
     rocket.loadPartCatalogue(kspPath);
+
+    rocket.setRootPart("mk2LanderCabin");
 }
