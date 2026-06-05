@@ -21,6 +21,7 @@ void Rocket::loadPartCatalogue(const std::filesystem::path& path) {
     // Catalogue is constant from here on
 
     for (const auto& part : partCatalogue) {
+        part.print();
         switch (part.type) {
             case PartType::MPTank:           tanks_MP.push_back(&part); break;
             case PartType::LFTank:           tanks_LF.push_back(&part); break;
@@ -32,9 +33,5 @@ void Rocket::loadPartCatalogue(const std::filesystem::path& path) {
             case PartType::DronePod:         command_modules.push_back(&part); break;
             default: break;
         }
-    }
-
-    for (auto* tank : tanks_LOX) {
-        tank->print();
     }
 }

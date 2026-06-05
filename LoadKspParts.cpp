@@ -28,12 +28,18 @@ std::tuple<int, float> parseNodeSize(const std::string& line) {
     float yPos = std::stof(trimString(vals.substr(pos, end - pos)));
     pos = end + 1;
 
-    // values 2-5: z, dir_x, dir_y, dir_z — skip
-    for (int i = 0; i < 4; ++i) {
+    // values 2-4: z, dir_x, dir_y — skip
+    for (int i = 0; i < 3; ++i) {
         end = vals.find(',', pos);
         if (end == std::string::npos) return {0, 0.0f};
         pos = end + 1;
     }
+    // value 5: dir_z — skip (may be last if size omitted)
+    end = vals.find(',', pos);
+    if (end == std::string::npos) {
+        return {-1, yPos};
+    }
+    pos = end + 1;
 
     // value 6: size
     end = vals.find(',', pos);
@@ -41,6 +47,20 @@ std::tuple<int, float> parseNodeSize(const std::string& line) {
 
     return {size, yPos};
 };
+
+int bulkheadProfileToDefaultSize(const std::string& profiles) {
+    // Use the first non-"srf" bulkhead profile to infer node size
+    std::istringstream ss(profiles);
+    std::string profile;
+    while (std::getline(ss, profile, ',')) {
+        profile = trimString(profile);
+        if (profile == "size0") return 0;
+        if (profile == "size1") return 1;
+        if (profile == "size2" || profile == "mk2") return 2;
+        if (profile == "size3" || profile == "mk3") return 3;
+    }
+    return 0;
+}
 
 std::tuple<float, float> parseISP(const std::string& line) {
     auto pos = line.find("key = ");
@@ -105,6 +125,7 @@ std::optional<KSPPart> loadFuelTankPart(const std::filesystem::path& filePath) {
 
     KSPPart tank;
     ResourceType rtype = ResourceType::UNKNOWN;
+    std::string bulkheadProfiles;
 
     std::string line;
     while (std::getline(file, line)) {
@@ -126,6 +147,9 @@ std::optional<KSPPart> loadFuelTankPart(const std::filesystem::path& filePath) {
             auto [attSize, yPos] = parseNodeSize(line);
             tank.attBottom = attSize;
             tank.attBottomY = yPos;
+        }
+        else if (line.find("bulkheadProfiles") != std::string::npos) {
+            bulkheadProfiles = getStringValue(line);
         }
         else if (line.find("RESOURCE") != std::string::npos) {
             while (std::getline(file, line) && line.find("}") == std::string::npos) {
@@ -164,6 +188,14 @@ std::optional<KSPPart> loadFuelTankPart(const std::filesystem::path& filePath) {
             }
         }
     }
+
+    if (tank.attTop == -1) {
+        tank.attTop = bulkheadProfileToDefaultSize(bulkheadProfiles);
+    }
+    if (tank.attBottom == -1) {
+        tank.attBottom = bulkheadProfileToDefaultSize(bulkheadProfiles);
+    }
+
     return tank;
 }
 
@@ -176,6 +208,7 @@ std::optional<Engine> loadEnginePart(const std::filesystem::path& filePath) {
 
     Engine engine;
     ResourceType rtype = ResourceType::UNKNOWN;
+    std::string bulkheadProfiles;
     std::string line;
     while (std::getline(file, line)) {
         if (line.find("title = ") != std::string::npos) {
@@ -195,6 +228,9 @@ std::optional<Engine> loadEnginePart(const std::filesystem::path& filePath) {
             auto [attSize, yPos] = parseNodeSize(line);
             engine.attBottom = attSize;
             engine.attBottomY = yPos;
+        }
+        else if (line.find("bulkheadProfiles") != std::string::npos) {
+            bulkheadProfiles = getStringValue(line);
         }
         else if (line.find("maxThrust = ") != std::string::npos) {
             engine.VacThrust = getNumberInLine(line);
@@ -241,6 +277,14 @@ std::optional<Engine> loadEnginePart(const std::filesystem::path& filePath) {
             }
         }
     }
+
+    if (engine.attTop == -1) {
+        engine.attTop = bulkheadProfileToDefaultSize(bulkheadProfiles);
+    }
+    if (engine.attBottom == -1) {
+        engine.attBottom = bulkheadProfileToDefaultSize(bulkheadProfiles);
+    }
+
     return engine;
 }
 
@@ -252,6 +296,7 @@ std::optional<CmdPod> loadCommandPodPart(const std::filesystem::path& filePath) 
     }
     CmdPod pod;
     ResourceType rtype = ResourceType::UNKNOWN;
+    std::string bulkheadProfiles;
 
     std::string line;
     while (std::getline(file, line)) {
@@ -272,6 +317,9 @@ std::optional<CmdPod> loadCommandPodPart(const std::filesystem::path& filePath) 
             auto [attSize, yPos] = parseNodeSize(line);
             pod.attBottom = attSize;
             pod.attBottomY = yPos;
+        }
+        else if (line.find("bulkheadProfiles") != std::string::npos) {
+            bulkheadProfiles = getStringValue(line);
         }
         else if (line.find("CrewCapacity = ") != std::string::npos) {
             pod.crewCapacity = getNumberInLine(line);
@@ -302,6 +350,14 @@ std::optional<CmdPod> loadCommandPodPart(const std::filesystem::path& filePath) 
             }
         }
     }
+
+    if (pod.attTop == -1) {
+        pod.attTop = bulkheadProfileToDefaultSize(bulkheadProfiles);
+    }
+    if (pod.attBottom == -1) {
+        pod.attBottom = bulkheadProfileToDefaultSize(bulkheadProfiles);
+    }
+
     return pod;
 }
 
