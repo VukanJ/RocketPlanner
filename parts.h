@@ -22,10 +22,6 @@ enum class PartType {
     UNKNOWN
 };
 
-static bool isEngine(PartType type) {
-    return type == PartType::LFEngine || type == PartType::LOXEngine || type == PartType::MPEngine || type == PartType::XenonEngine || type == PartType::SolidBooster;
-}
-
 struct ResourceContainer {
     double liquidFuel = 0.0;
     double oxidizer = 0.0;
@@ -42,10 +38,10 @@ struct EngineISPInfo {
     double fuelConsumptionRate = 0.0f;
 };
 
-class Part {
+class PartProperty {
 public:
-    Part() = delete;
-    Part(PartType part_type, 
+    PartProperty() = delete;
+    PartProperty(PartType part_type, 
          const std::string& parttitle, 
          double emptymass, 
          int att_top, 
@@ -74,6 +70,17 @@ public:
     double getMass(double fillPercent=1.0) const;
 
     void print() const;
+};
+
+class Part {
+public:
+    Part(const PartProperty* part_property) : part(part_property) { }
+    void attachBelow(Part* part);
+    void attachAbove(Part* part);
+
+    const PartProperty* part;
+    Part* below = nullptr; // The part directly attached below this part. Null if this is the bottommost part of a stage
+    Part* above = nullptr;    // The part directly attached above this part. Null if this is the topmost part of a stage
 };
 
 

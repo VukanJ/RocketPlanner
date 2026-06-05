@@ -12,5 +12,4 @@ namespace Constants {
     constexpr inline double XenonGasDensity       = 0.0001;
 };
 
-
 #endif // KSPCONSTANTS_H

@@ -4,9 +4,11 @@
 #include <string_view>
 #include <vector>
 #include <string>
+#include <list>
 #include <filesystem>
 
 #include "parts.h"
+#include "stage.h"
 
 class Rocket {
 public:
@@ -14,25 +16,29 @@ public:
 
     void loadPartCatalogue(const std::filesystem::path& path);
 
-    std::vector<Part> partCatalogue;
+    std::vector<PartProperty> partCatalogue;
 
-    std::vector<const Part*> tanks_MP;
-    std::vector<const Part*> tanks_LOX;
-    std::vector<const Part*> tanks_LF;
-    std::vector<const Part*> engines_LF;
-    std::vector<const Part*> engines_LOX;
-    std::vector<const Part*> engines_Booster;
-    std::vector<const Part*> command_modules;
+    std::vector<const PartProperty*> tanks_MP;
+    std::vector<const PartProperty*> tanks_LOX;
+    std::vector<const PartProperty*> tanks_LF;
+    std::vector<const PartProperty*> engines_LF;
+    std::vector<const PartProperty*> engines_LOX;
+    std::vector<const PartProperty*> engines_Booster;
+    std::vector<const PartProperty*> command_modules;
 
     const std::string name;
 
     double deltaV() const;
     double mass() const;
+    void print() const;
 
     void setRootPart(std::string_view partName);
+    void construct(double targetDeltaV, double payloadMass, double minTWR=0);
 
 private:
-    Part* root = nullptr;
+    PartProperty* root = nullptr;
+
+    std::vector<Stage> stages;
 };
 
 #endif // ROCKET_H

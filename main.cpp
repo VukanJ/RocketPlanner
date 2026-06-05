@@ -25,4 +25,6 @@ int main() {
     rocket.loadPartCatalogue(kspPath);
 
     rocket.setRootPart("Mk2 Lander Can");
+    rocket.construct(1000, 2, 1.2);
+    rocket.print();
 }

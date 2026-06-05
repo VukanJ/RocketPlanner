@@ -2,8 +2,9 @@
 
 #include <iostream>
 #include "kspConstants.h"
+#include "helper.h"
 
-Part::Part(PartType part_type, 
+PartProperty::PartProperty(PartType part_type, 
      const std::string& parttitle, 
      double emptymass, 
      int att_top, 
@@ -77,7 +78,7 @@ std::string partTypeToString(PartType type) {
     }
 }
 
-void Part::print() const {
+void PartProperty::print() const {
     std::cout << "Part: " << title << "\n";
     std::cout << "\tType: " << partTypeToString(type) << "\n";
     std::cout << "\tMass: " << mass << " tons\n";
@@ -120,7 +121,7 @@ void Part::print() const {
     }
 }
 
-double Part::getMass(double fillPercent) const {
+double PartProperty::getMass(double fillPercent) const {
     if (fillPercent < 0.0 || fillPercent > 1.0) {
         throw std::invalid_argument("Fill percent must be between 0 and 1");
     }
@@ -138,4 +139,16 @@ double Part::getMass(double fillPercent) const {
     else {
         return mass;
     }
+}
+
+void Part::attachBelow(Part* att) {
+    // Check if attachment is valid
+    below = att;
+    att->above = this;
+}
+
+void Part::attachAbove(Part* att) {
+    // Check if attachment is valid
+    above = att;
+    att->below = this;
 }

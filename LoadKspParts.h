@@ -31,7 +31,7 @@ std::string trimString(const std::string& str);
 
 std::tuple<int, float> parseNodeSize(const std::string& line);
 
-void loadPartCatalogueFromKSP(const std::filesystem::path& ksp_path, std::vector<Part>& partCatalogue);
+void loadPartCatalogueFromKSP(const std::filesystem::path& ksp_path, std::vector<PartProperty>& partCatalogue);
 
 ResourceType parseResourceType(const std::string& resourceName);
 

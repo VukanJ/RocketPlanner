@@ -21,7 +21,7 @@ void Rocket::loadPartCatalogue(const std::filesystem::path& path) {
     // Catalogue is constant from here on
 
     for (const auto& part : partCatalogue) {
-        part.print();
+        //part.print();
         switch (part.type) {
             case PartType::MPTank:           tanks_MP.push_back(&part); break;
             case PartType::LFTank:           tanks_LF.push_back(&part); break;
@@ -34,4 +34,33 @@ void Rocket::loadPartCatalogue(const std::filesystem::path& path) {
             default: break;
         }
     }
+}
+
+void Rocket::print() const {
+    std::cout << "Rocket: " << name << "\n";
+    std::cout << "Stages: " << stages.size() << "\n";
+    for (size_t i = 0; i < stages.size(); ++i) {
+        std::cout << "Stage " << i+1 << ":\n";
+        for (const auto& part : stages[i].all_parts) {
+            std::cout << "\t" << part.part->title << "\n";
+        }
+    }
+}
+
+void Rocket::construct(double targetDeltaV, double payloadMass, double minTWR) {
+    if (root == nullptr) {
+        throw std::runtime_error("Root part not set. Call setRootPart() before constructing the rocket.");
+    }
+
+    // Initialize default stage
+    stages.emplace_back();
+    stages.back().setTop(root);
+
+    // Start optimization
+    Stage& currentStage = stages.back();
+    Part* p = nullptr;
+    p = currentStage.attachBelow(currentStage.Top, tanks_LOX.back());
+    p = currentStage.attachBelow(p, engines_LOX.back());
+
+    std::cout << stages.back().DeltaV() << " m/s\n";
 }

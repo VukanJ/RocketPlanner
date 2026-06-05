@@ -361,7 +361,7 @@ std::optional<CmdPod> loadCommandPodPart(const std::filesystem::path& filePath) 
     return pod;
 }
 
-void loadPartCatalogueFromKSP(const std::filesystem::path& ksp_path, std::vector<Part>& partCatalogue) {
+void loadPartCatalogueFromKSP(const std::filesystem::path& ksp_path, std::vector<PartProperty>& partCatalogue) {
     auto partsFolder = ksp_path / "GameData" / "Squad" / "Parts";
 
     for (const auto& entry : std::filesystem::recursive_directory_iterator(partsFolder / "FuelTank")) {
