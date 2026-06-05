@@ -4,8 +4,12 @@
 #include <vector>
 #include <string>
 
+#include "kspConstants.h"
+
 // Weight in tons
 constexpr double AstronautMass = 0.1;
+
+class Part;
 
 enum class PartType {
     CrewedCommandPod,
@@ -23,6 +27,7 @@ enum class PartType {
 };
 
 struct ResourceContainer {
+    // Fuel amounts in units
     double liquidFuel = 0.0;
     double oxidizer = 0.0;
     double monoPropellant = 0.0;
@@ -31,11 +36,14 @@ struct ResourceContainer {
     bool hasResources() const {
         return liquidFuel > 0 || oxidizer > 0 || monoPropellant > 0 || solidFuel > 0 || xenonGas > 0;
     }
+
+    double getUsableFuelUnits(const Part* engine) const;
 };
 
 struct EngineISPInfo {
     std::vector<std::pair<double, double>> isp; // pairs of (atm pressure, ISP)
-    double fuelConsumptionRate = 0.0f;
+    double vacuumISP = 0.0f;
+    double fuelConsumptionRate_UPS = 0.0f; // Units per second
 };
 
 class PartProperty {
@@ -63,11 +71,12 @@ public:
     const int MaxCrew = 0;
     ResourceContainer resources;
     const double MaxThrustkN  = 0.0;
-    EngineISPInfo ispCurve;
+    EngineISPInfo enginePerf;
 
     int crewAmount = 0;
 
     double getMass(double fillPercent=1.0) const;
+    double usedFuelDensity() const;
 
     void print() const;
 };

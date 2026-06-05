@@ -129,8 +129,11 @@ std::optional<KSPPart> loadFuelTankPart(const std::filesystem::path& filePath) {
 
     std::string line;
     while (std::getline(file, line)) {
-        // Simple
-        if (line.find("title = ") != std::string::npos) {
+        if (line.find("TechHidden = True") != std::string::npos) {
+            // Skip hidden parts as they are unavailable in-game
+            return std::nullopt;
+        }
+        else if (line.find("title = ") != std::string::npos) {
             if (tank.title.empty()) {
                 tank.title = getTitleValue(line);
             }
@@ -211,7 +214,11 @@ std::optional<Engine> loadEnginePart(const std::filesystem::path& filePath) {
     std::string bulkheadProfiles;
     std::string line;
     while (std::getline(file, line)) {
-        if (line.find("title = ") != std::string::npos) {
+        if (line.find("TechHidden = True") != std::string::npos) {
+            // Skip hidden parts as they are unavailable in-game
+            return std::nullopt;
+        }
+        else if (line.find("title = ") != std::string::npos) {
             if (engine.title.empty()) {
                 engine.title = getTitleValue(line);
             }
@@ -300,7 +307,11 @@ std::optional<CmdPod> loadCommandPodPart(const std::filesystem::path& filePath) 
 
     std::string line;
     while (std::getline(file, line)) {
-        if (line.find("title = ") != std::string::npos) {
+        if (line.find("TechHidden = True") != std::string::npos) {
+            // Skip hidden parts as they are unavailable in-game
+            return std::nullopt;
+        }
+        else if (line.find("title = ") != std::string::npos) {
             if (pod.title.empty()) {
                 pod.title = getTitleValue(line);
             }

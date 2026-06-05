@@ -1,6 +1,8 @@
 #include "stage.h"
 #include "helper.h"
 
+#include <iostream>
+#include <cmath>
 #include <algorithm>
 
 bool Stage::hasPropulsion() const {
@@ -28,16 +30,16 @@ double Stage::DeltaV() const {
         Part* engine;
         std::vector<Part*> fuelTanks;
 
-        float totalFuel = 0; // Total usable fuel for this engine
-        float burnTimeSecond = 0;
+        float usableFuelUnits = 0; // Total usable fuel for this engine
+        float burnTimeSeconds = 0;
     };
 
     std::vector<BurnStack> burnStacks;
     for (const auto& engine : engines) {
         // Identify fuel tanks for this engine
         BurnStack burnstack;
-        Part* current = engine;
         burnstack.engine = engine;
+        Part* current = engine;
         while (current != nullptr) {
             if (current->part->resources.hasResources()) {
                 burnstack.fuelTanks.push_back(current);
@@ -47,24 +49,54 @@ double Stage::DeltaV() const {
                 break; // Don't go beyond the top of the stage
             }
         }
+        burnStacks.push_back(burnstack);
     }
-    // Do all burn stacks burn the for the same duration?
+
+    // Do all burn stacks burn for the same duration?
     // If not, then the stage will carry dead weight after shorter burn stacks runs out of fuel
     // If it does, then, DeltaV can be computed in a single step
 
+    bool sameBurnTime = true;
     // Compute total usable fuel
-    for (auto& burnstack : burnStacks) {
-        for (const auto& tank : burnstack.fuelTanks) {
-            // For now, assume all fuel in the tank is usable. In reality, some fuel may be trapped and unusable depending on the configuration of the stage and the position of the tanks
-            burnstack.totalFuel += tank->part->resources.liquidFuel;
-            burnstack.totalFuel += tank->part->resources.oxidizer;
-            burnstack.totalFuel += tank->part->resources.monoPropellant;
-            burnstack.totalFuel += tank->part->resources.solidFuel;
-            burnstack.totalFuel += tank->part->resources.xenonGas;
+    for (auto& bst : burnStacks) {
+        for (const auto& tank : bst.fuelTanks) {
+            bst.usableFuelUnits += tank->part->resources.getUsableFuelUnits(bst.engine);
         }
     }
-    for (auto& burnstack : burnStacks) {
-        burnstack.burnTimeSecond = burnstack.totalFuel / burnstack.engine->part->ispCurve.fuelConsumptionRate;
+    // Compute burn time for each burn stack
+    for (auto& bst : burnStacks) {
+        bst.burnTimeSeconds = bst.usableFuelUnits / bst.engine->part->enginePerf.fuelConsumptionRate_UPS;
+    }
+
+    float burnTime = burnStacks[0].burnTimeSeconds;
+    for (const auto& bst : burnStacks) {
+        if (std::abs(bst.burnTimeSeconds - burnTime) > 0.5) { // 0.5 seconds is fine...
+            sameBurnTime = false;
+            break;
+        }
+    }
+
+    if (sameBurnTime) {
+        // Compute total mass and effective ISP for the stage
+        double totalStageMass = TotalMass();
+        double emptyStageMass = totalStageMass;
+        double effectiveISP = 0.0;
+        double denom = 0.0;
+        for (const auto& bst : burnStacks) {
+            effectiveISP += bst.engine->part->MaxThrustkN;
+            denom += bst.engine->part->MaxThrustkN / bst.engine->part->enginePerf.vacuumISP;
+
+            for (const auto& tank : bst.fuelTanks) {
+                emptyStageMass -= tank->part->resources.getUsableFuelUnits(bst.engine) * bst.engine->part->usedFuelDensity();
+            }
+        }
+        effectiveISP = effectiveISP / denom; // Weighted harmonic mean of ISPs
+        double deltaV = effectiveISP * Constants::g0_kerbin * std::log(totalStageMass / emptyStageMass);
+
+        return deltaV;
+    }
+    else {
+        throw std::runtime_error("DeltaV calculation for asynchronously depleting fuel tanks is not implemented yet");
     }
 
     return 42;

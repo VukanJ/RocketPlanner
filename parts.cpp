@@ -23,37 +23,36 @@ PartProperty::PartProperty(PartType part_type,
     MaxCrew(maxCrew), 
     resources(res), 
     MaxThrustkN(thrustkN), 
-    ispCurve(isp_curve) 
+    enginePerf(isp_curve) 
 { 
     // If engine, compute consumption rate based on max thrust and ISP at vacuum and fuel density
     if (isEngine(part_type)) {
-        double ispVac = 0.0;
-        for (const auto& [pressure, isp] : ispCurve.isp) {
+        for (const auto& [pressure, isp] : enginePerf.isp) {
             if (pressure == 0.0) { // Vacuum ISP
-                ispVac = isp;
+                enginePerf.vacuumISP = isp;
                 break;
             }
         }
-        if (ispVac > 0.0) {
+        if (enginePerf.vacuumISP > 0.0) {
             switch (part_type) {
                 case PartType::LFEngine:
-                    ispCurve.fuelConsumptionRate = MaxThrustkN / (ispVac * Constants::g0_kerbin * Constants::LiquidFuelDensity);
+                    enginePerf.fuelConsumptionRate_UPS = MaxThrustkN / (enginePerf.vacuumISP * Constants::g0_kerbin * Constants::LiquidFuelDensity);
                     break;
                 case PartType::LOXEngine:
                     {
                         // Its always the same ratio
                         float meanDensity = (Constants::LiquidFuelDensity * 0.9 + Constants::OxidizerDensity * 1.1) / 2.0;
-                        ispCurve.fuelConsumptionRate = MaxThrustkN / (ispVac * Constants::g0_kerbin * meanDensity);
+                        enginePerf.fuelConsumptionRate_UPS = MaxThrustkN / (enginePerf.vacuumISP * Constants::g0_kerbin * meanDensity);
                     }
                     break;
                 case PartType::MPEngine:
-                    ispCurve.fuelConsumptionRate = MaxThrustkN / (ispVac * Constants::g0_kerbin * Constants::MonoPropellantDensity);
+                    enginePerf.fuelConsumptionRate_UPS = MaxThrustkN / (enginePerf.vacuumISP * Constants::g0_kerbin * Constants::MonoPropellantDensity);
                     break;
                 case PartType::XenonEngine:
-                    ispCurve.fuelConsumptionRate = MaxThrustkN / (ispVac * Constants::g0_kerbin * Constants::XenonGasDensity);
+                    enginePerf.fuelConsumptionRate_UPS = MaxThrustkN / (enginePerf.vacuumISP * Constants::g0_kerbin * Constants::XenonGasDensity);
                     break;
                 case PartType::SolidBooster:
-                    ispCurve.fuelConsumptionRate = MaxThrustkN / (ispVac * Constants::g0_kerbin * Constants::SolidFuelDensity);
+                    enginePerf.fuelConsumptionRate_UPS = MaxThrustkN / (enginePerf.vacuumISP * Constants::g0_kerbin * Constants::SolidFuelDensity);
                     break;
                 default: break;
             }
@@ -112,10 +111,10 @@ void PartProperty::print() const {
         }
     }
 
-    if (!ispCurve.isp.empty()) {
-        std::cout << "\tFuel Consumption Rate: " << ispCurve.fuelConsumptionRate << " L/s\n";
+    if (!enginePerf.isp.empty()) {
+        std::cout << "\tFuel Consumption Rate: " << enginePerf.fuelConsumptionRate_UPS << " L/s\n";
         std::cout << "\tISP Curve:\n";
-        for (const auto& [pressure, isp] : ispCurve.isp) {
+        for (const auto& [pressure, isp] : enginePerf.isp) {
             std::cout << "\t  " << pressure << " atm -> " << isp << " s\n";
         }
     }
@@ -151,4 +150,38 @@ void Part::attachAbove(Part* att) {
     // Check if attachment is valid
     above = att;
     att->below = this;
+}
+
+double ResourceContainer::getUsableFuelUnits(const Part* engine) const {
+    switch (engine->part->type) {
+        case PartType::LFEngine:
+            return liquidFuel;
+        case PartType::LOXEngine:
+            return liquidFuel + oxidizer;
+        case PartType::MPEngine:
+            return monoPropellant;
+        case PartType::XenonEngine:
+            return xenonGas;
+        case PartType::SolidBooster:
+            return solidFuel;
+        default:
+            return 0.0;
+    }
+}
+
+double PartProperty::usedFuelDensity() const {
+    switch (type) {
+        case PartType::LFEngine:
+            return Constants::LiquidFuelDensity;
+        case PartType::LOXEngine:
+            return 0.5 * (Constants::OxidizerDensity * 1.1 + Constants::LiquidFuelDensity * 0.9);
+        case PartType::MPEngine:
+            return Constants::MonoPropellantDensity;
+        case PartType::XenonEngine:
+            return Constants::XenonGasDensity;
+        case PartType::SolidBooster:
+            return Constants::SolidFuelDensity;
+        default:
+            return 0.0;
+    }
 }
