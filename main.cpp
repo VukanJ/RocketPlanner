@@ -24,5 +24,5 @@ int main() {
     Rocket rocket("Test Rocket");
     rocket.loadPartCatalogue(kspPath);
 
-    rocket.setRootPart("mk2LanderCabin");
+    rocket.setRootPart("Mk2 Lander Can");
 }

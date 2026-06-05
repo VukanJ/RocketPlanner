@@ -4,7 +4,7 @@
 #include "kspConstants.h"
 
 Part::Part(PartType part_type, 
-     const std::string& partname, 
+     const std::string& parttitle, 
      double emptymass, 
      int att_top, 
      int att_bot, 
@@ -14,7 +14,7 @@ Part::Part(PartType part_type,
      double thrustkN, 
      EngineISPInfo isp_curve) :
     type(part_type), 
-    name(partname), 
+    title(parttitle), 
     mass(emptymass), 
     attTop(att_top), 
     attBottom(att_bot), 
@@ -40,6 +40,7 @@ Part::Part(PartType part_type,
                     break;
                 case PartType::LOXEngine:
                     {
+                        // Its always the same ratio
                         float meanDensity = (Constants::LiquidFuelDensity * 0.9 + Constants::OxidizerDensity * 1.1) / 2.0;
                         ispCurve.fuelConsumptionRate = MaxThrustkN / (ispVac * Constants::g0_kerbin * meanDensity);
                     }
@@ -77,7 +78,7 @@ std::string partTypeToString(PartType type) {
 }
 
 void Part::print() const {
-    std::cout << "Part: " << name << "\n";
+    std::cout << "Part: " << title << "\n";
     std::cout << "\tType: " << partTypeToString(type) << "\n";
     std::cout << "\tMass: " << mass << " tons\n";
     if (resources.hasResources()) {

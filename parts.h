@@ -46,7 +46,7 @@ class Part {
 public:
     Part() = delete;
     Part(PartType part_type, 
-         const std::string& partname, 
+         const std::string& parttitle, 
          double emptymass, 
          int att_top, 
          int att_bot, 
@@ -57,7 +57,7 @@ public:
          EngineISPInfo isp);
 
     const PartType type;
-    const std::string name;
+    const std::string title;
     const double mass = 0.0;
     const int attTop = 0;
     const int attBottom = 0;

@@ -9,7 +9,7 @@
 
 struct KSPPart {
     PartType type = PartType::UNKNOWN;
-    std::string name;
+    std::string title;
     double mass = 0.0;
     int attTop = 0; // Attachment size class for top node
     int attBottom = 0;

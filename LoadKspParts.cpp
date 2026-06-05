@@ -80,6 +80,22 @@ std::string getStringValue(const std::string& line) {
     return trimString(line.substr(pos));
 }
 
+std::string getTitleValue(const std::string& line) {
+    std::string raw = getStringValue(line);
+    if (raw.empty()) return raw;
+
+    auto commentPos = raw.find("//");
+    if (commentPos != std::string::npos) {
+        std::string comment = raw.substr(commentPos + 2);
+        auto eqPos = comment.rfind("= ");
+        if (eqPos != std::string::npos) {
+            return trimString(comment.substr(eqPos + 2));
+        }
+    }
+
+    return raw;
+}
+
 std::optional<KSPPart> loadFuelTankPart(const std::filesystem::path& filePath) {
     std::ifstream file(filePath);
     if (!file.is_open()) {
@@ -93,9 +109,9 @@ std::optional<KSPPart> loadFuelTankPart(const std::filesystem::path& filePath) {
     std::string line;
     while (std::getline(file, line)) {
         // Simple
-        if (line.find("name = ") != std::string::npos) {
-            if (tank.name.empty()) {
-                tank.name = getStringValue(line); // Part Name is usually the first field
+        if (line.find("title = ") != std::string::npos) {
+            if (tank.title.empty()) {
+                tank.title = getTitleValue(line);
             }
         }
         else if (line.find("mass = ") != std::string::npos) {
@@ -162,9 +178,9 @@ std::optional<Engine> loadEnginePart(const std::filesystem::path& filePath) {
     ResourceType rtype = ResourceType::UNKNOWN;
     std::string line;
     while (std::getline(file, line)) {
-        if (line.find("name = ") != std::string::npos) {
-            if (engine.name.empty()) {
-                engine.name = getStringValue(line);
+        if (line.find("title = ") != std::string::npos) {
+            if (engine.title.empty()) {
+                engine.title = getTitleValue(line);
             }
         }
         else if (line.find("mass = ") != std::string::npos) {
@@ -239,9 +255,9 @@ std::optional<CmdPod> loadCommandPodPart(const std::filesystem::path& filePath) 
 
     std::string line;
     while (std::getline(file, line)) {
-        if (line.find("name = ") != std::string::npos) {
-            if (pod.name.empty()) {
-                pod.name = getStringValue(line);
+        if (line.find("title = ") != std::string::npos) {
+            if (pod.title.empty()) {
+                pod.title = getTitleValue(line);
             }
         }
         else if (line.find("mass = ") != std::string::npos) {
@@ -298,7 +314,7 @@ void loadPartCatalogueFromKSP(const std::filesystem::path& ksp_path, std::vector
         if (tankOpt.has_value()) {
             auto tank = tankOpt.value();
             partCatalogue.emplace_back(tank.type,
-                                       tank.name, 
+                                       tank.title, 
                                        tank.mass, 
                                        tank.attTop,
                                        tank.attBottom,
@@ -316,7 +332,7 @@ void loadPartCatalogueFromKSP(const std::filesystem::path& ksp_path, std::vector
         if (engineOpt.has_value()) {
             auto engine = engineOpt.value();
             partCatalogue.emplace_back(engine.type,
-                                       engine.name,
+                                       engine.title,
                                        engine.mass,
                                        engine.attTop,
                                        engine.attBottom,
@@ -335,7 +351,7 @@ void loadPartCatalogueFromKSP(const std::filesystem::path& ksp_path, std::vector
             auto pod = podOpt.value();
 
             partCatalogue.emplace_back(pod.type,
-                                       pod.name,
+                                       pod.title,
                                        pod.mass, 
                                        pod.attTop,
                                        pod.attBottom,

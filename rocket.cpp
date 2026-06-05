@@ -6,7 +6,7 @@
 
 void Rocket::setRootPart(std::string_view partName) {
     for (auto& part : partCatalogue) {
-        if (part.name == partName) {
+        if (part.title == partName) {
             root = &part;
             return;
         }
@@ -18,8 +18,22 @@ Rocket::Rocket(const std::string& rocket_name) : name(rocket_name) { }
 
 void Rocket::loadPartCatalogue(const std::filesystem::path& path) {
     loadPartCatalogueFromKSP(path, partCatalogue);
+    // Catalogue is constant from here on
 
     for (const auto& part : partCatalogue) {
-        part.print();
+        switch (part.type) {
+            case PartType::LFTank:           tanks_LF.push_back(&part); break;
+            case PartType::LFOXTank:         tanks_LOX.push_back(&part); break;
+            case PartType::LFEngine:         engines_LF.push_back(&part); break;
+            case PartType::LOXEngine:        engines_LOX.push_back(&part); break;
+            case PartType::SolidBooster:     engines_Booster.push_back(&part); break;
+            case PartType::CrewedCommandPod: command_modules.push_back(&part); break;
+            case PartType::DronePod:         command_modules.push_back(&part); break;
+            default: break;
+        }
+    }
+
+    for (auto* tank : tanks_LOX) {
+        tank->print();
     }
 }
