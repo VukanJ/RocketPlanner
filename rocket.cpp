@@ -22,6 +22,7 @@ void Rocket::loadPartCatalogue(const std::filesystem::path& path) {
 
     for (const auto& part : partCatalogue) {
         switch (part.type) {
+            case PartType::MPTank:           tanks_MP.push_back(&part); break;
             case PartType::LFTank:           tanks_LF.push_back(&part); break;
             case PartType::LFOXTank:         tanks_LOX.push_back(&part); break;
             case PartType::LFEngine:         engines_LF.push_back(&part); break;

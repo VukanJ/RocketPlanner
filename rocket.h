@@ -16,6 +16,7 @@ public:
 
     std::vector<Part> partCatalogue;
 
+    std::vector<const Part*> tanks_MP;
     std::vector<const Part*> tanks_LOX;
     std::vector<const Part*> tanks_LF;
     std::vector<const Part*> engines_LF;
