@@ -28,7 +28,8 @@ double Stage::DeltaV() const {
         Part* engine;
         std::vector<Part*> fuelTanks;
 
-        float burnTime = 0;
+        float totalFuel = 0; // Total usable fuel for this engine
+        float burnTimeSecond = 0;
     };
 
     std::vector<BurnStack> burnStacks;
@@ -47,8 +48,24 @@ double Stage::DeltaV() const {
             }
         }
     }
+    // Do all burn stacks burn the for the same duration?
+    // If not, then the stage will carry dead weight after shorter burn stacks runs out of fuel
+    // If it does, then, DeltaV can be computed in a single step
 
-
+    // Compute total usable fuel
+    for (auto& burnstack : burnStacks) {
+        for (const auto& tank : burnstack.fuelTanks) {
+            // For now, assume all fuel in the tank is usable. In reality, some fuel may be trapped and unusable depending on the configuration of the stage and the position of the tanks
+            burnstack.totalFuel += tank->part->resources.liquidFuel;
+            burnstack.totalFuel += tank->part->resources.oxidizer;
+            burnstack.totalFuel += tank->part->resources.monoPropellant;
+            burnstack.totalFuel += tank->part->resources.solidFuel;
+            burnstack.totalFuel += tank->part->resources.xenonGas;
+        }
+    }
+    for (auto& burnstack : burnStacks) {
+        burnstack.burnTimeSecond = burnstack.totalFuel / burnstack.engine->part->ispCurve.fuelConsumptionRate;
+    }
 
     return 42;
 }
