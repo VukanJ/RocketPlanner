@@ -10,7 +10,7 @@
 
 class Rocket {
 public:
-    Rocket(const std::string& name);
+    Rocket(const std::string& rocket_name);
 
     void loadPartCatalogue(const std::filesystem::path& path);
 

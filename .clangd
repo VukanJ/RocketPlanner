@@ -2,3 +2,7 @@ CompileFlags:
   Add:
     - -std=c++17
     - -Iext
+    - -Wall
+    - -Wunused-value
+    - -Wshadow
+    - -pedantic

@@ -22,41 +22,47 @@ enum class PartType {
     UNKNOWN
 };
 
+struct ResourceContainer {
+    double liquidFuel = 0.0;
+    double oxidizer = 0.0;
+    double monoPropellant = 0.0;
+    double solidFuel = 0.0;
+    double xenonGas = 0.0;
+};
+
 class Part {
 public:
     Part() = delete;
-    Part(PartType type, const std::string& name, double mass, int attsize0, int attsize1,
-         int maxCrew, double maxLiquidFuel, double maxOxidizer, double maxMonoPropellant,
-         double thrustkN, double fuelConsumption) :
-        type(type), name(name), mass(mass), attTop(attsize0), attBottom(attsize1),
-        MaxCrew(maxCrew), MaxLiquidFuel(maxLiquidFuel), MaxOxidizer(maxOxidizer),
-        MaxMonoPropellant(maxMonoPropellant), ThrustkN(thrustkN), FuelConsumption(fuelConsumption) { }
+    Part(PartType part_type, 
+         const std::string& partname, 
+         double emptymass, 
+         int att_top, 
+         int att_bot, 
+         float part_length,
+         int maxCrew, 
+         ResourceContainer res,
+         double thrustkN, 
+         double fuelConsumption) :
+        type(part_type), name(partname), mass(emptymass), attTop(att_top), attBottom(att_bot), length(part_length),
+        MaxCrew(maxCrew), resources(res), ThrustkN(thrustkN), FuelConsumption(fuelConsumption) { }
 
     const PartType type;
     const std::string name;
     const double mass = 0.0;
     const int attTop = 0;
     const int attBottom = 0;
+    float length = 0.0f; // Distance between attachment nodes 
     
     // Resource capacities
     const int MaxCrew = 0;
-    const double MaxLiquidFuel = 0.0;
-    const double MaxOxidizer = 0.0;
-    const double MaxMonoPropellant = 0.0;
+    ResourceContainer resources;
 
-    double liquidFuelLevel = 1.0;
-    double oxidizerLevel = 1.0;
-    double monoPropellantLevel = 1.0;
     int crewAmount = 0;
 
     const double ThrustkN  = 0.0;
     const double FuelConsumption = 0.0; // kg per second
 
-    double getMass() const {
-        return mass;
-    }
-
-    std::vector<Part*> attachedParts;
+    double getMass() const;
 };
 
 
