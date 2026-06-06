@@ -1,6 +1,7 @@
 #include <iostream>
 #include <filesystem>
 
+#include "kspConstants.h"
 #include "rocket.h"
 
 std::string findKSP() {
@@ -25,6 +26,6 @@ int main() {
     rocket.loadPartCatalogue(kspPath);
 
     rocket.setRootPart("Mk2 Lander Can");
-    rocket.construct(1000, 2, 1.2);
-    rocket.print();
+    rocket.construct(5000, 10, 2, Constants::g0_tylo);
+    rocket.printConfig();
 }

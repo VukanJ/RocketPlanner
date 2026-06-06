@@ -19,6 +19,8 @@ public:
 
     void setTop(const PartProperty* top);
 
+    double mass_stage_above = 0.0;
+
     Part* Top = nullptr; // The topmost part of the stage. Connects to the next stage
 
 };

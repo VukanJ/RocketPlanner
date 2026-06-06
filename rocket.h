@@ -30,10 +30,10 @@ public:
 
     double deltaV() const;
     double mass() const;
-    void print() const;
+    void printConfig() const;
 
     void setRootPart(std::string_view partName);
-    void construct(double targetDeltaV, double payloadMass, double minTWR=0);
+    void construct(double targetDeltaV, double payloadMass, double minTWR=0, double g0=Constants::g0_tylo);
 
 private:
     PartProperty* root = nullptr;
