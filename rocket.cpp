@@ -68,29 +68,31 @@ void Rocket::construct(double targetDeltaV, double payloadMass, double minTWR, d
     // Compute required mass ratio using Tsiolkovsky's equation, then add fuel tanks and engines until we meet the requirements
     // Tsiolkovsky: Δv = Isp * g0 * ln((m0 + payload)/(mf + payload))
     // Rearranging: m0 = mf * exp(Δv / (Isp * g0))
+
+    std::vector<std::pair<int, const PartProperty*>> viableEngineOptions; // (number of engines, engine pointer)
     for (const auto& engine : engines_LOX) {
-        for (int i = 1; i < 8; ++i) { // Try 1 to 4 engines
+        for (int i = 1; i <= 64; ++i) { // Try multiple engines
             double thrust = engine->MaxThrustkN * i;
             double engine_mass = engine->getMass(1.0) * i;
-
             double R = std::exp(targetDeltaV / (engine->enginePerf.vacuumISP * Constants::g0_kerbin));
             if ((R - 1.0) / 8.0 >= 1.0) {
-                println<RED>("Stage cannot achieve ", targetDeltaV, "m/s with engine:", engine->title, "(mass ratio exceeds tank dry mass limit)");
+                // Mass ratio exceeds what the tanks can support (dry mass becomes greater than or equal to fuel mass), so skip this engine configuration
                 continue;
             }
             // LF/OX tank dry mass = fuel_mass / 8  (full/dry = 9:1 ratio from stock KSP parts)
             double dry_base = payloadMass + engine_mass;
-            double mfinal = dry_base / (1.0 - (R - 1.0) / 8.0);  // Closed form solution for final mass. The more fuel, the more dry mass, so it would be a loop.
+            double mfinal = dry_base / (1.0 - (R - 1.0) / 8.0);  // Closed form solution for final mass. The more fuel, the more dry mass. This breaks the loop.
             double mfull = mfinal * R;
             double TWR_start = thrust / (mfull * g0);
-            double TWR_end = thrust / (mfinal * g0);
+            //double TWR_end = thrust / (mfinal * g0);
             if (TWR_start >= minTWR) {
-                println<BLUE>(i, "x Engine:", engine->title, ". Required Fuel Mass: ", mfull - mfinal,  " tons, TWR: ",  TWR_start,  "(",  TWR_end,  ")");
+                viableEngineOptions.emplace_back(i, engine);
                 break;
             }
-            else {
-                println<RED>("XXX Engine:", engine->title, "does not meet TWR requirement. TWR: ", TWR_start, "(", TWR_end, ")");
-            }
         }
+    }
+
+    for (const auto& [numEngines, engine] : viableEngineOptions) {
+        println<BLUE>("Viable engine option:", numEngines, "x", engine->title);
     }
 }

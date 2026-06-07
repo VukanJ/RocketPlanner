@@ -16,6 +16,7 @@ public:
 
     Part* attachAbove(Part* part, const PartProperty* attach);
     Part* attachBelow(Part* part, const PartProperty* attach);
+    Part* attachRadially(Part* part, const PartProperty* attach, int radialSymmetry, int radialIndex, bool decoupler);
 
     void setTop(const PartProperty* top);
 
