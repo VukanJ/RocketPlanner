@@ -2,6 +2,7 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <algorithm>
 
 #include "kspConstants.h"
 
@@ -202,26 +203,25 @@ std::optional<KSPPart> loadFuelTankPart(const std::filesystem::path& filePath) {
     return tank;
 }
 
-std::optional<Engine> loadEnginePart(const std::filesystem::path& filePath) {
+std::vector<Engine> loadEnginePart(const std::filesystem::path& filePath) {
     std::ifstream file(filePath);
     if (!file.is_open()) {
         std::cerr << "Failed to open file: " << filePath << std::endl;
-        return std::nullopt;
+        return {};
     }
 
     Engine engine;
-    ResourceType rtype = ResourceType::UNKNOWN;
+    bool hasIntakeAir = false;
+    bool hasOxidizer = false;
     std::string bulkheadProfiles;
+
     std::string line;
     while (std::getline(file, line)) {
         if (line.find("TechHidden = True") != std::string::npos) {
-            // Skip hidden parts as they are unavailable in-game
-            return std::nullopt;
+            return {};
         }
-        else if (line.find("title = ") != std::string::npos) {
-            if (engine.title.empty()) {
-                engine.title = getTitleValue(line);
-            }
+        else if (line.find("title = ") != std::string::npos && engine.title.empty()) {
+            engine.title = getTitleValue(line);
         }
         else if (line.find("mass = ") != std::string::npos) {
             engine.mass = getNumberInLine(line);
@@ -245,31 +245,17 @@ std::optional<Engine> loadEnginePart(const std::filesystem::path& filePath) {
         else if (line.find("PROPELLANT") != std::string::npos) {
             while (std::getline(file, line) && line.find("}") == std::string::npos) {
                 if (line.find("name = ") != std::string::npos) {
-                    ResourceType res = parseResourceType(getStringValue(line));
+                    std::string propName = getStringValue(line);
+                    if (propName == "IntakeAir") {
+                        hasIntakeAir = true;
+                    }
+                    ResourceType res = parseResourceType(propName);
                     switch (res) {
-                        case LF:    engine.type = PartType::LFEngine; break;
-                        case OX:    engine.type = PartType::LOXEngine; break;
+                        case LF:    if (!hasIntakeAir) engine.type = PartType::LFEngine; break;
+                        case OX:    hasOxidizer = true; engine.type = PartType::LOXEngine; break;
                         case MP:    engine.type = PartType::MPEngine; break;
                         case SOLID: engine.type = PartType::SolidBooster; break;
                         case XE:    engine.type = PartType::XenonEngine; break;
-                        default: break;
-                    }
-                }
-            }
-        }
-        else if (line.find("RESOURCE") != std::string::npos) {
-            while (std::getline(file, line) && line.find("}") == std::string::npos) {
-                if (line.find("name = ") != std::string::npos) {
-                    rtype = parseResourceType(getStringValue(line));
-                }
-                else if (line.find("amount = ") != std::string::npos) {
-                    double amount = getNumberInLine(line);
-                    switch (rtype) {
-                        case LF:    engine.resources.liquidFuel     = amount; break;
-                        case OX:    engine.resources.oxidizer       = amount; break;
-                        case MP:    engine.resources.monoPropellant = amount; break;
-                        case SOLID: engine.resources.solidFuel      = amount; break;
-                        case XE:    engine.resources.xenonGas       = amount; break;
                         default: break;
                     }
                 }
@@ -292,7 +278,38 @@ std::optional<Engine> loadEnginePart(const std::filesystem::path& filePath) {
         engine.attBottom = bulkheadProfileToDefaultSize(bulkheadProfiles);
     }
 
-    return engine;
+    std::vector<Engine> result;
+
+    if (hasIntakeAir && hasOxidizer) {
+        // Hybrid engine (only the Rapier in stock KSP). Split into two.
+        Engine jet = engine;
+        jet.title += " (Jet)";
+        jet.type = PartType::JetEngine;
+        jet.ispCurve.isp.erase(
+            std::remove_if(jet.ispCurve.isp.begin(), jet.ispCurve.isp.end(),
+                [](const auto& kv) { return kv.second <= 2000; }),
+            jet.ispCurve.isp.end());
+
+        Engine rocket = engine;
+        rocket.title += " (Rocket)";
+        rocket.type = PartType::LOXEngine;
+        rocket.ispCurve.isp.erase(
+            std::remove_if(rocket.ispCurve.isp.begin(), rocket.ispCurve.isp.end(),
+                [](const auto& kv) { return kv.second > 2000; }),
+            rocket.ispCurve.isp.end());
+
+        result.push_back(jet);
+        result.push_back(rocket);
+    }
+    else if (hasIntakeAir) {
+        engine.type = PartType::JetEngine;
+        result.push_back(engine);
+    }
+    else {
+        result.push_back(engine);
+    }
+
+    return result;
 }
 
 std::optional<CmdPod> loadCommandPodPart(const std::filesystem::path& filePath) {
@@ -395,9 +412,8 @@ void loadPartCatalogueFromKSP(const std::filesystem::path& ksp_path, std::vector
 
     for (const auto& entry : std::filesystem::recursive_directory_iterator(partsFolder / "Engine")) {
         if (!entry.is_regular_file() || entry.path().extension() != ".cfg") { continue; }
-        auto engineOpt = loadEnginePart(entry.path());
-        if (engineOpt.has_value()) {
-            auto engine = engineOpt.value();
+        auto engineVec = loadEnginePart(entry.path());
+        for (const auto& engine : engineVec) {
             partCatalogue.emplace_back(engine.type,
                                        engine.title,
                                        engine.mass,

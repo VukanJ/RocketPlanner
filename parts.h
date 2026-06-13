@@ -100,7 +100,9 @@ public:
 
     std::vector<PartProperty> allParts;
 
-    std::vector<const PartProperty*> all_engines;
+    std::vector<const PartProperty*> all_engines;  // Rocket engines only (no jets)
+
+    std::vector<const PartProperty*> engines_Jet;
 
     std::vector<const PartProperty*> tanks_MP;
     std::vector<const PartProperty*> tanks_LOX;

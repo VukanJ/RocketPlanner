@@ -36,7 +36,7 @@ void loadPartCatalogueFromKSP(const std::filesystem::path& ksp_path, std::vector
 ResourceType parseResourceType(const std::string& resourceName);
 
 std::optional<KSPPart> loadFuelTankPart(const std::filesystem::path&);
-std::optional<Engine> loadEnginePart(const std::filesystem::path&);
+std::vector<Engine> loadEnginePart(const std::filesystem::path&);
 std::optional<CmdPod> loadCommandPodPart(const std::filesystem::path&);
 
 #endif // LOADKSPPARTS_H

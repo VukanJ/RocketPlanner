@@ -23,7 +23,7 @@ void println(Args... args) {
 }
 
 static bool isEngine(PartType type) {
-    return type == PartType::LFEngine || type == PartType::LOXEngine || type == PartType::MPEngine || type == PartType::XenonEngine || type == PartType::SolidBooster;
+    return type == PartType::LFEngine || type == PartType::LOXEngine || type == PartType::MPEngine || type == PartType::XenonEngine || type == PartType::SolidBooster || type == PartType::JetEngine;
 }
 
 #endif // HELPER_H

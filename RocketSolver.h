@@ -16,19 +16,6 @@ public:
         Aspargus2,    // 4 -> 2 -> 1 Every substage has two tanks less
         Apargus4,     // 8 -> 4 -> 1 Every substage has four tanks less
     };
-    //struct StageOption {
-    //    const PartProperty* main_engine = nullptr;
-    //    int engineMultiplicity = 0;
-    //    RadialTankConfig radialTankConfig = RadialTankConfig::None;
-    //    std::vector<std::pair<const PartProperty*, float>> radialTank_fuelFraction;
-    //
-    //    float TWR = 0;
-    //    float burnTime = 0;
-    //    float deltaV = 0;
-    //};
-    //struct StageVariants {
-    //    std::vector<StageOption> options;
-    //};
 
     struct StageInfo {
         double fullMass = INFINITY;
@@ -40,7 +27,6 @@ public:
     struct RocketConfig {
         std::vector<StageInfo> stages;
         double totalMass = INFINITY;
-        double totalDeltaV = 0;
     };
 
     PartInfoList allEngines;
@@ -48,8 +34,8 @@ public:
     void solve(double targetDeltaV, double payloadMass, double minTWR=0, double g0=Constants::g0_kerbin);
 
 private:
-    RocketSolver::RocketConfig liftoffWeight(const std::vector<double>& deltaVPerStage, double payloadMass);
-    StageInfo solveSingleStage(double targetDeltaV, double payloadMass, double g0=Constants::g0_kerbin);
+    RocketSolver::RocketConfig buildRocket(const std::vector<double>& deltaVPerStage, double payloadMass, double minTWR, double g0);
+    StageInfo solveSingleStage(double targetDeltaV, double payloadMass, double minTWR, double g0=Constants::g0_kerbin);
 };
 
 

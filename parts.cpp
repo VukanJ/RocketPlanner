@@ -55,6 +55,9 @@ PartProperty::PartProperty(PartType part_type,
                 case PartType::SolidBooster:
                     enginePerf.fuelConsumptionRate_UPS = MaxThrustkN / (enginePerf.vacuumISP * Constants::g0_kerbin * Constants::SolidFuelDensity);
                     break;
+                case PartType::JetEngine:
+                    enginePerf.fuelConsumptionRate_UPS = MaxThrustkN / (enginePerf.vacuumISP * Constants::g0_kerbin * Constants::LiquidFuelDensity);
+                    break;
                 default: break;
             }
         }
@@ -74,6 +77,7 @@ std::string partTypeToString(PartType type) {
         case PartType::MPEngine:         return "MonoProp-Engine";
         case PartType::XenonEngine:      return "Xenon-Engine";
         case PartType::SolidBooster:     return "Solid Fuel Booster";
+        case PartType::JetEngine:        return "Jet Engine";
         default: return "Unknown Part Type";
     }
 }
@@ -165,6 +169,8 @@ double ResourceContainer::getUsableFuelUnits(const Part* engine) const {
             return xenonGas;
         case PartType::SolidBooster:
             return solidFuel;
+        case PartType::JetEngine:
+            return liquidFuel;
         default:
             return 0.0;
     }
@@ -182,6 +188,8 @@ double PartProperty::usedFuelDensity() const {
             return Constants::XenonGasDensity;
         case PartType::SolidBooster:
             return Constants::SolidFuelDensity;
+        case PartType::JetEngine:
+            return Constants::LiquidFuelDensity;
         default:
             return 0.0;
     }
@@ -198,6 +206,7 @@ void PartCatalogue::loadPartCatalogue(const std::filesystem::path& path) {
             case PartType::LFEngine:         engines_LF.push_back(&part); break;
             case PartType::LOXEngine:        engines_LOX.push_back(&part); break;
             case PartType::SolidBooster:     engines_Booster.push_back(&part); break;
+            case PartType::JetEngine:        engines_Jet.push_back(&part); break;
             case PartType::CrewedCommandPod: command_modules.push_back(&part); break;
             case PartType::DronePod:         command_modules.push_back(&part); break;
             default: break;
