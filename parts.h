@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <string>
+#include <filesystem>
 
 #include "kspConstants.h"
 
@@ -18,6 +19,7 @@ enum class PartType {
     LFOXTank,
     MPTank,
     XenonTank,
+    JetEngine,
     LFEngine,
     LOXEngine,
     MPEngine,
@@ -92,5 +94,21 @@ public:
     Part* above = nullptr;    // The part directly attached above this part. Null if this is the topmost part of a stage
 };
 
+class PartCatalogue {
+public:
+    void loadPartCatalogue(const std::filesystem::path& path);
+
+    std::vector<PartProperty> allParts;
+
+    std::vector<const PartProperty*> all_engines;
+
+    std::vector<const PartProperty*> tanks_MP;
+    std::vector<const PartProperty*> tanks_LOX;
+    std::vector<const PartProperty*> tanks_LF;
+    std::vector<const PartProperty*> engines_LF;
+    std::vector<const PartProperty*> engines_LOX;
+    std::vector<const PartProperty*> engines_Booster;
+    std::vector<const PartProperty*> command_modules;
+};
 
 #endif // PARTS_H

@@ -4,7 +4,6 @@
 #include <string_view>
 #include <vector>
 #include <string>
-#include <list>
 #include <filesystem>
 
 #include "parts.h"
@@ -12,19 +11,7 @@
 
 class Rocket {
 public:
-    Rocket(const std::string& rocket_name);
-
-    void loadPartCatalogue(const std::filesystem::path& path);
-
-    std::vector<PartProperty> partCatalogue;
-
-    std::vector<const PartProperty*> tanks_MP;
-    std::vector<const PartProperty*> tanks_LOX;
-    std::vector<const PartProperty*> tanks_LF;
-    std::vector<const PartProperty*> engines_LF;
-    std::vector<const PartProperty*> engines_LOX;
-    std::vector<const PartProperty*> engines_Booster;
-    std::vector<const PartProperty*> command_modules;
+    Rocket(const std::filesystem::path& kspPath, const std::string& rocket_name);
 
     const std::string name;
 
@@ -37,6 +24,7 @@ public:
 
 private:
     PartProperty* root = nullptr;
+    PartCatalogue partCatalogue;
 
     std::vector<Stage> stages;
 };

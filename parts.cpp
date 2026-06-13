@@ -1,6 +1,7 @@
 #include "parts.h"
 
 #include <iostream>
+#include "LoadKspParts.h"
 #include "kspConstants.h"
 #include "helper.h"
 
@@ -184,4 +185,26 @@ double PartProperty::usedFuelDensity() const {
         default:
             return 0.0;
     }
+}
+
+void PartCatalogue::loadPartCatalogue(const std::filesystem::path& path) {
+    loadPartCatalogueFromKSP(path, allParts);
+    for (const auto& part : allParts) {
+        //part.print();
+        switch (part.type) {
+            case PartType::MPTank:           tanks_MP.push_back(&part); break;
+            case PartType::LFTank:           tanks_LF.push_back(&part); break;
+            case PartType::LFOXTank:         tanks_LOX.push_back(&part); break;
+            case PartType::LFEngine:         engines_LF.push_back(&part); break;
+            case PartType::LOXEngine:        engines_LOX.push_back(&part); break;
+            case PartType::SolidBooster:     engines_Booster.push_back(&part); break;
+            case PartType::CrewedCommandPod: command_modules.push_back(&part); break;
+            case PartType::DronePod:         command_modules.push_back(&part); break;
+            default: break;
+        }
+    }
+
+    all_engines.insert(all_engines.end(), engines_LF.begin(), engines_LF.end());
+    all_engines.insert(all_engines.end(), engines_LOX.begin(), engines_LOX.end());
+    all_engines.insert(all_engines.end(), engines_Booster.begin(), engines_Booster.end());
 }

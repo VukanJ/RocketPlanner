@@ -22,10 +22,9 @@ std::string findKSP() {
 int main() {
 
     const auto kspPath = findKSP();
-    Rocket rocket("Test Rocket");
-    rocket.loadPartCatalogue(kspPath);
+    Rocket rocket(kspPath, "Test Rocket");
 
     rocket.setRootPart("Mk2 Lander Can");
-    rocket.construct(12000, 2, 2.0, Constants::g0_eve);
+    rocket.construct(12000, 2, 2.0, Constants::g0_kerbin);
     rocket.printConfig();
 }
