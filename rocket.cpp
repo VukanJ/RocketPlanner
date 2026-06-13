@@ -69,7 +69,7 @@ void Rocket::construct(double targetDeltaV, double payloadMass, double minTWR, d
     // Tsiolkovsky: Δv = Isp * g0 * ln((m0 + payload)/(mf + payload))
     // Rearranging: m0 = mf * exp(Δv / (Isp * g0))
 
-    std::vector<std::pair<int, const PartProperty*>> viableEngineOptions; // (number of engines, engine pointer)
+    std::vector<std::tuple<int, const PartProperty*, float, float>> viableEngineOptions; // (number of engines, engine pointer)
     for (const auto& engine : engines_LOX) {
         for (int i = 1; i <= 64; ++i) { // Try multiple engines
             double thrust = engine->MaxThrustkN * i;
@@ -86,13 +86,13 @@ void Rocket::construct(double targetDeltaV, double payloadMass, double minTWR, d
             double TWR_start = thrust / (mfull * g0);
             //double TWR_end = thrust / (mfinal * g0);
             if (TWR_start >= minTWR) {
-                viableEngineOptions.emplace_back(i, engine);
+                viableEngineOptions.emplace_back(i, engine, mfinal-dry_base, TWR_start);
                 break;
             }
         }
     }
 
-    for (const auto& [numEngines, engine] : viableEngineOptions) {
-        println<BLUE>("Viable engine option:", numEngines, "x", engine->title);
+    for (const auto& [numEngines, engine, fuel, TWR] : viableEngineOptions) {
+        println<BLUE>("Viable engine option:", numEngines, "x", engine->title, ", Fuel mass", fuel, "minTWR:", TWR);
     }
 }

@@ -26,6 +26,6 @@ int main() {
     rocket.loadPartCatalogue(kspPath);
 
     rocket.setRootPart("Mk2 Lander Can");
-    rocket.construct(5000, 1.3, 2, Constants::g0_tylo);
+    rocket.construct(12000, 2, 2.0, Constants::g0_eve);
     rocket.printConfig();
 }
