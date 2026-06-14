@@ -25,6 +25,6 @@ int main() {
     Rocket rocket(kspPath, "Test Rocket");
 
     rocket.setRootPart("Mk2 Lander Can");
-    rocket.construct(1200, 2, 2.0, Constants::g0_kerbin);
+    rocket.construct(5000, 2, 2.0, Constants::g0_eve);
     //rocket.printConfig();
 }

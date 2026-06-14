@@ -1,30 +1,77 @@
 #include "RocketSolver.h"
 #include "helper.h"
+#include "NelderMead.h"
 
 #include <cmath>
+
+static std::vector<double> deltaVFromParams(const std::vector<double>& params, double target) {
+    // Maps n-1 unconstrained variables (params ∈ ℝ^(n-1)) to n Δv values summing to target.
+    // The optimizer needs unconstrained variables (any ℝ), but Δv values must be positive
+    // and sum to target. Softmax with a fixed zero anchor handles both:
+    //   - exp(x) > 0 guarantees positive Δv
+    //   - softmax fractions sum to 1, then scaled by target
+    // params=[0,0,...] gives equal split (all stages get target/n).
+    int n = params.size() + 1;
+    std::vector<double> exps(n);
+    double sumExp = 0.0;
+    for (int i = 0; i < n - 1; ++i) {
+        exps[i] = std::exp(params[i]);
+        sumExp += exps[i];
+    }
+    exps[n - 1] = 1.0;
+    sumExp += 1.0;
+
+    std::vector<double> deltaV(n);
+    for (int i = 0; i < n; ++i) {
+        deltaV[i] = (exps[i] / sumExp) * target;
+    }
+    return deltaV;
+}
 
 RocketSolver::RocketSolver(const PartInfoList engines) : allEngines(engines) { }
 
 void RocketSolver::solve(double targetDeltaV, double payloadMass, double minTWR, double g0) {
-    for (int nstage = 1; nstage < 5; ++nstage) {
-        std::vector<double> deltaVPerStage(nstage, targetDeltaV / nstage); // Initial guess: equal deltaV per stage
-        auto rocket = buildRocket(deltaVPerStage, payloadMass, minTWR, g0);
-        println("=========== ROCKET WITH STAGES:", nstage, "===========");
+    RocketConfig bestConfig;
+    bestConfig.totalMass = INFINITY;
+
+    for (int nstage = 1; nstage < 8; ++nstage) {
+        std::vector<double> deltaV;
+
+        if (nstage == 1) {
+            deltaV = {targetDeltaV};
+        } else {
+            auto objective = [&](const std::vector<double>& p) -> double {
+                auto dv = deltaVFromParams(p, targetDeltaV);
+                return buildRocket(dv, payloadMass, minTWR, g0).totalMass;
+            };
+
+            std::vector<double> x0(nstage - 1, 0.0);
+            auto best = minimize(objective, x0);
+            auto optDV = deltaVFromParams(best, targetDeltaV);
+            auto optRocket = buildRocket(optDV, payloadMass, minTWR, g0);
+            auto eqRocket = buildRocket(deltaVFromParams(x0, targetDeltaV), payloadMass, minTWR, g0);
+            deltaV = (optRocket.totalMass <= eqRocket.totalMass) ? optDV : deltaVFromParams(x0, targetDeltaV);
+        }
+
+        auto rocket = buildRocket(deltaV, payloadMass, minTWR, g0);
+        if (rocket.totalMass < bestConfig.totalMass) {
+            bestConfig = rocket;
+        }
+
         if (rocket.totalMass < INFINITY) {
-            println("Total Mass:", rocket.totalMass);
+            println("=========== ROCKET WITH STAGES:", nstage, ", Mass:", rocket.totalMass, "===========");
             for (int stage = 0; stage < nstage; ++stage) {
                 const auto& info = rocket.stages[stage];
-                println(" Stage", stage + 1, ":");
-                println("  Engine:", info.engine->title, "x", info.engineMultiplicity);
-                println("  Full Mass:", info.fullMass);
-                println("  Empty Mass:", info.emptyMass);
-                println("  TWR:", info.TWR);
+                println("  Stage", stage + 1, ": ", info.engine->title, " x", info.engineMultiplicity,
+                        ", full=", info.fullMass, ", TWR=", info.TWR);
             }
-        }
-        else {
-            println("No valid configuration found.");
+        } else {
+            println("=========== ROCKET WITH STAGES:", nstage, " ===========");
+            println("  No valid configuration found.");
         }
     }
+
+    println("Best: ", bestConfig.stages.size(), " stages, total mass: ", bestConfig.totalMass, "t");
 }
 
 RocketSolver::StageInfo RocketSolver::solveSingleStage(double targetDeltaV, double payloadMass, double minTWR, double g0) {
