@@ -88,8 +88,15 @@ RocketSolver::StageInfo inline calcStageMass(const PartProperty* engine,
     RocketSolver::StageInfo info;
 
     if (asparagusBaseSymmetry > 0) {
-        std::vector<double> fuelFractions(asparagusNumStages + 1, 0.5 / (asparagusNumStages + 1)); // Equal fuel distribution among base and asparagus stages
-        fuelFractions[0] = 0.5; // Base stage gets half the fuel as a default
+        std::vector<double> fuelFractions(asparagusNumStages + 1);
+        if (asparagusNumStages == 0) {
+            fuelFractions[0] = 1.0;
+        } else {
+            fuelFractions[0] = 0.5;
+            for (int i = 1; i <= asparagusNumStages; ++i) {
+                fuelFractions[i] = 0.5 / asparagusNumStages;
+            }
+        }
         std::array<double, MAX_ASPARAGUS_SUBSTAGES + 1> stageMassesFull;
         std::array<double, MAX_ASPARAGUS_SUBSTAGES + 1> stageMassesEmpty;
 
@@ -105,6 +112,10 @@ RocketSolver::StageInfo inline calcStageMass(const PartProperty* engine,
         const double mEmpty = (payloadMass +  enginesMass) / (1 - (R - 1.0) / 8.0);
         const double mFMax = mEmpty * (R - 1.0);
 
+        if ((R - 1.0) / 8.0 >= 1.0) {
+            info.fullMass = INFINITY;
+            return info;
+        }
 
         // Run bisection for 20 iterations
         // Assume all same engines, so isp is the same for all stages.
@@ -120,7 +131,7 @@ RocketSolver::StageInfo inline calcStageMass(const PartProperty* engine,
             for (int s = 1; s <= asparagusNumStages; ++s) {
                 // Subtract burnt fuel and tank and potentiall engine weight of previous stage
                 double burnedFuel           = fuelFractions[s - 1] * mF;
-                double detachedEngineWeight = (asparagusEngineConfig >> (s - 1) & 0x1) * (asparagusBaseSymmetry * engine->getMass() * engineMultiplicity);
+                double detachedEngineWeight = (asparagusEngineConfig >> (s - 1) & 0x1) * (asparagusBaseSymmetry * engine->getMass());
                 double tankWeight           = burnedFuel / 9.0;  // 1:9 tank mass ratio assumption
 
                 stageMassesFull[s]  = stageMassesFull[s-1] - burnedFuel - detachedEngineWeight - tankWeight;
