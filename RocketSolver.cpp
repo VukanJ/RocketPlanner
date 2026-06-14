@@ -74,29 +74,81 @@ void RocketSolver::solve(double targetDeltaV, double payloadMass, double minTWR,
     println("Best: ", bestConfig.stages.size(), " stages, total mass: ", bestConfig.totalMass, "t");
 }
 
+RocketSolver::StageInfo inline calcStageMass(const PartProperty* engine, 
+                                             int engineMultiplicity, 
+                                             double targetDeltaV, 
+                                             double payloadMass, 
+                                             double minTWR, 
+                                             int asparagusBaseSymmetry,
+                                             int asparagusNumStages,
+                                             std::uint16_t asparagusEngineConfig,
+                                             double g0) 
+{
+    RocketSolver::StageInfo info;
+
+    if (asparagusBaseSymmetry > 0) {
+        std::vector<double> fuelFractions(asparagusNumStages + 1, 0.5 / (asparagusNumStages + 1)); // Equal fuel distribution among base and asparagus stages
+        fuelFractions[0] = 0.5; // Base stage gets half the fuel as a default
+        double maxThrust = engine->MaxThrustkN * engineMultiplicity;
+        for (int i = 0; i <= asparagusNumStages; ++i) {
+        }
+    }
+    else {
+        double enginesMass = engine->getMass() * engineMultiplicity;
+        double R = std::exp(targetDeltaV / (engine->enginePerf.vacuumISP * Constants::g0_kerbin));
+        if ((R - 1.0) / 8.0 >= 1.0) {
+            // Does not converge. Dry mass too high, cannot be offset by more fuel.
+            info.fullMass = INFINITY;
+            return info;
+        }
+        
+        double mEmpty = (payloadMass + enginesMass) / (1 - (R - 1.0) / 8.0);
+        double mFull = mEmpty * R;
+        double TWR = (engine->MaxThrustkN * engineMultiplicity) / (mFull * g0);
+        if (TWR < minTWR) {
+            info.fullMass = INFINITY;
+            return info;
+        }
+        info.fullMass           = mFull;
+        info.emptyMass          = mEmpty;
+        info.engine             = engine;
+        info.engineMultiplicity = engineMultiplicity;
+        info.TWR                = TWR;
+        info.asparagus_config.baseSymmetry       = asparagusBaseSymmetry;
+        info.asparagus_config.numAsparagusStages = asparagusNumStages;
+        info.asparagus_config.hasEngine          = asparagusEngineConfig;
+    }
+    return info;
+}
+
+
 RocketSolver::StageInfo RocketSolver::solveSingleStage(double targetDeltaV, double payloadMass, double minTWR, double g0) {
     // Find best stage configuration for single stage rocket
+    // Best = lowest wet mass rocket fulfilling the Δv and TWR requirements
     StageInfo bestStage;
+    // Iterate over available engines
     for (const auto& engine : allEngines) {
+        // Iterate over allowed engine multiplicities (number of engines in the stage)
         for (int mult = 1; mult <= 8; ++mult) {
-            double engineMass = engine->getMass(1.0) * mult;
-            double R = std::exp(targetDeltaV / (engine->enginePerf.vacuumISP * Constants::g0_kerbin));
-            if ((R - 1.0) / 8.0 >= 1.0) {
-                continue; // Does not converge
-            }
-    
-            double mEmpty = (payloadMass + engineMass) / (1 - (R - 1.0) / 8.0);
-            double mFull = mEmpty * R;
-            double TWR = (engine->MaxThrustkN * mult) / (mFull * g0);
-            if (TWR < minTWR) {
-                continue; // Not enough thrust
-            }
-            if (mFull < bestStage.fullMass) {
-                bestStage.fullMass           = mFull;
-                bestStage.emptyMass          = mEmpty;
-                bestStage.engine             = engine;
-                bestStage.engineMultiplicity = mult;
-                bestStage.TWR                = TWR;
+            // Iterate over allowed asparagus configurations.
+            // Base symmetry: 0 (no asparagus). 
+            for (int baseSymmetry = 0; baseSymmetry <= MAX_ASPARAGUS_SYMMETRY; ++baseSymmetry) {
+                if (baseSymmetry == 1) { continue; } // Asymmetric mass distribution
+                // Iterate over number of asparagus substages. 0 Means only base symmetry pumping to middle.
+                for (int asparagusStages = 0; asparagusStages <= MAX_ASPARAGUS_SUBSTAGES; ++asparagusStages) {
+                    // Now iterate over all possible configurations of which asparagus boosters have engines.
+                    // If there are three substages, then there are 000 to 111 (0 to 7) configurations
+                    // 0 means, the stage is a simple drop tank. 000 means, all engines are on the main stage
+                    const std::uint16_t maxConfig = (1 << asparagusStages) - 1;
+                    for (std::uint16_t econfig = 0x0; econfig <= maxConfig; ++econfig) {
+
+                        const auto stage = calcStageMass(engine, mult, targetDeltaV, payloadMass, minTWR, baseSymmetry, asparagusStages, econfig, g0);
+                        if (stage.fullMass < bestStage.fullMass) {
+                            bestStage = stage;
+                        }
+
+                    }
+                }
             }
         }
     }

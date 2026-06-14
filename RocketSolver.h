@@ -8,6 +8,9 @@
 #include "parts.h"
 using PartInfoList = std::vector<const PartProperty*>;
 
+constexpr short MAX_ASPARAGUS_SYMMETRY = 4;
+constexpr short MAX_ASPARAGUS_SUBSTAGES = 3;
+
 class RocketSolver {
 public:
     RocketSolver(const PartInfoList engines);
