@@ -38,26 +38,26 @@ PartProperty::PartProperty(PartType part_type,
         if (enginePerf.vacuumISP > 0.0) {
             switch (part_type) {
                 case PartType::LFEngine:
-                    enginePerf.fuelConsumptionRate_UPS = MaxThrustkN / (enginePerf.vacuumISP * Constants::g0_kerbin * Constants::LiquidFuelDensity);
+                    enginePerf.fuelConsumptionRate_UPS = MaxThrustkN / (enginePerf.vacuumISP * KspSystem::Kerbin.surfaceGravity * Constants::LiquidFuelDensity);
                     break;
                 case PartType::LOXEngine:
                     {
                         // Its always the same ratio
                         float meanDensity = (Constants::LiquidFuelDensity * 0.9 + Constants::OxidizerDensity * 1.1) / 2.0;
-                        enginePerf.fuelConsumptionRate_UPS = MaxThrustkN / (enginePerf.vacuumISP * Constants::g0_kerbin * meanDensity);
+                        enginePerf.fuelConsumptionRate_UPS = MaxThrustkN / (enginePerf.vacuumISP * KspSystem::Kerbin.surfaceGravity * meanDensity);
                     }
                     break;
                 case PartType::MPEngine:
-                    enginePerf.fuelConsumptionRate_UPS = MaxThrustkN / (enginePerf.vacuumISP * Constants::g0_kerbin * Constants::MonoPropellantDensity);
+                    enginePerf.fuelConsumptionRate_UPS = MaxThrustkN / (enginePerf.vacuumISP * KspSystem::Kerbin.surfaceGravity * Constants::MonoPropellantDensity);
                     break;
                 case PartType::XenonEngine:
-                    enginePerf.fuelConsumptionRate_UPS = MaxThrustkN / (enginePerf.vacuumISP * Constants::g0_kerbin * Constants::XenonGasDensity);
+                    enginePerf.fuelConsumptionRate_UPS = MaxThrustkN / (enginePerf.vacuumISP * KspSystem::Kerbin.surfaceGravity * Constants::XenonGasDensity);
                     break;
                 case PartType::SolidBooster:
-                    enginePerf.fuelConsumptionRate_UPS = MaxThrustkN / (enginePerf.vacuumISP * Constants::g0_kerbin * Constants::SolidFuelDensity);
+                    enginePerf.fuelConsumptionRate_UPS = MaxThrustkN / (enginePerf.vacuumISP * KspSystem::Kerbin.surfaceGravity * Constants::SolidFuelDensity);
                     break;
                 case PartType::JetEngine:
-                    enginePerf.fuelConsumptionRate_UPS = MaxThrustkN / (enginePerf.vacuumISP * Constants::g0_kerbin * Constants::LiquidFuelDensity);
+                    enginePerf.fuelConsumptionRate_UPS = MaxThrustkN / (enginePerf.vacuumISP * KspSystem::Kerbin.surfaceGravity * Constants::LiquidFuelDensity);
                     break;
                 default: break;
             }

@@ -91,7 +91,7 @@ double Stage::DeltaV() const {
             }
         }
         effectiveISP = effectiveISP / denom; // Weighted harmonic mean of ISPs
-        double deltaV = effectiveISP * Constants::g0_kerbin * std::log(totalStageMass / emptyStageMass);
+        double deltaV = effectiveISP * KspSystem::Kerbin.surfaceGravity * std::log(totalStageMass / emptyStageMass);
 
         return deltaV;
     }

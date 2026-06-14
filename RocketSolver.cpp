@@ -65,7 +65,7 @@ static double computeAsparagusFullMass(
     double B = mEmpty * R * 5.0;
     double mF;
 
-    for (int nIter = 0; nIter < 22; ++nIter) {
+    for (int nIter = 0; nIter < 10; ++nIter) {
         mF = (A + B) / 2.0;
         double mCurrent = mEmpty + mF + mF / 9.0;
         double productFullMasses = mCurrent;
@@ -264,7 +264,7 @@ RocketSolver::StageInfo inline calcStageMass(const PartProperty* engine,
     }
     else {
         double enginesMass = engine->getMass() * engineMultiplicity;
-        double R = std::exp(targetDeltaV / (engine->enginePerf.vacuumISP * Constants::g0_kerbin));
+        double R = std::exp(targetDeltaV / (engine->enginePerf.vacuumISP * KspSystem::Kerbin.surfaceGravity));
         if ((R - 1.0) / 8.0 >= 1.0) {
             // Does not converge. Dry mass too high, cannot be offset by more fuel.
             info.fullMass = INFINITY;

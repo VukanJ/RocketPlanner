@@ -40,11 +40,11 @@ public:
 
     PartInfoList allEngines;
 
-    void solve(double targetDeltaV, double payloadMass, double minTWR=0, double g0=Constants::g0_kerbin);
+    void solve(double targetDeltaV, double payloadMass, double minTWR=0, double g0=KspSystem::Kerbin.surfaceGravity);
 
 private:
     RocketSolver::RocketConfig buildRocket(const std::vector<double>& deltaVPerStage, double payloadMass, double minTWR, double g0);
-    StageInfo solveSingleStage(double targetDeltaV, double payloadMass, double minTWR, double g0=Constants::g0_kerbin);
+    StageInfo solveSingleStage(double targetDeltaV, double payloadMass, double minTWR, double g0=KspSystem::Kerbin.surfaceGravity);
 };
 
 
