@@ -41,7 +41,7 @@ double Stage::DeltaV() const {
         burnstack.engine = engine;
         Part* current = engine;
         while (current != nullptr) {
-            if (current->part->resources.hasResources()) {
+            if (current->part->hasResources) {
                 burnstack.fuelTanks.push_back(current);
             }
             current = current->above;

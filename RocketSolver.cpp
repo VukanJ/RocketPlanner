@@ -84,7 +84,7 @@ RocketSolver::StageInfo RocketSolver::solveSingleStage(double targetDeltaV, doub
             if ((R - 1.0) / 8.0 >= 1.0) {
                 continue; // Does not converge
             }
-
+    
             double mEmpty = (payloadMass + engineMass) / (1 - (R - 1.0) / 8.0);
             double mFull = mEmpty * R;
             double TWR = (engine->MaxThrustkN * mult) / (mFull * g0);

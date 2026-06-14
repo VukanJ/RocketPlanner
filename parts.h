@@ -35,10 +35,6 @@ struct ResourceContainer {
     double monoPropellant = 0.0;
     double solidFuel = 0.0;
     double xenonGas = 0.0;
-    bool hasResources() const {
-        return liquidFuel > 0 || oxidizer > 0 || monoPropellant > 0 || solidFuel > 0 || xenonGas > 0;
-    }
-
     double getUsableFuelUnits(const Part* engine) const;
 };
 
@@ -72,6 +68,7 @@ public:
     // Resource capacities
     const int MaxCrew = 0;
     ResourceContainer resources;
+    bool hasResources;
     const double MaxThrustkN  = 0.0;
     EngineISPInfo enginePerf;
 

@@ -23,6 +23,7 @@ PartProperty::PartProperty(PartType part_type,
     length(part_length),
     MaxCrew(maxCrew), 
     resources(res), 
+    hasResources(res.liquidFuel > 0 || res.oxidizer > 0 || res.monoPropellant > 0 || res.solidFuel > 0 || res.xenonGas > 0),
     MaxThrustkN(thrustkN), 
     enginePerf(isp_curve) 
 { 
@@ -86,7 +87,7 @@ void PartProperty::print() const {
     std::cout << "Part: " << title << "\n";
     std::cout << "\tType: " << partTypeToString(type) << "\n";
     std::cout << "\tMass: " << mass << " tons\n";
-    if (resources.hasResources()) {
+    if (hasResources) {
         std::cout << "\tMass (Full): " << getMass(1.0) << " tons\n";
     }
     std::cout << "\tAttachment: " << attBottom << " -> " << attTop << "\n";
@@ -97,7 +98,7 @@ void PartProperty::print() const {
     if (MaxThrustkN > 0.0) {
         std::cout << "\tThrust(Vac): " << MaxThrustkN << " kN\n";
     }
-    if (resources.hasResources()) {
+    if (hasResources) {
         std::cout << "\tResources:\n";
         if (resources.liquidFuel > 0) {
             std::cout << "\t\tLiquid Fuel: " << resources.liquidFuel << "L\n";
@@ -130,7 +131,7 @@ double PartProperty::getMass(double fillPercent) const {
         throw std::invalid_argument("Fill percent must be between 0 and 1");
     }
 
-    if (resources.hasResources()) {
+    if (hasResources) {
         double totalMass = mass;
         totalMass += resources.liquidFuel * Constants::LiquidFuelDensity;
         totalMass += resources.oxidizer * Constants::OxidizerDensity;

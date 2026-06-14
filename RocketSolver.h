@@ -2,6 +2,7 @@
 #define ROCKET_SOLVER_H
 
 #include <cmath>
+#include <cstdint>
 #include <vector>
 
 #include "parts.h"
@@ -10,11 +11,15 @@ using PartInfoList = std::vector<const PartProperty*>;
 class RocketSolver {
 public:
     RocketSolver(const PartInfoList engines);
-    enum class RadialTankConfig {
-        None,         // No radial tanks, only central tank
-        PumpToMiddle, // Outer tanks pump to central tank simultaneously
-        Aspargus2,    // 4 -> 2 -> 1 Every substage has two tanks less
-        Apargus4,     // 8 -> 4 -> 1 Every substage has four tanks less
+    struct AsparagusConfig {
+        int baseSymmetry = 0; // 0 = No asparagus
+        int numAsparagusStages = 0; // Number of asparagus stages connected to base stages
+
+        // Bitmask indicating which asparagus stages have engines (1=engine, 0=no engine)
+        // LSB = innermost asparagus stage
+        std::uint16_t hasEngine = 0x0;  // Drop tanks is default
+        std::vector<double> fuelFractions;
+        std::vector<double> deltaVFractions;
     };
 
     struct StageInfo {
@@ -23,6 +28,7 @@ public:
         const PartProperty* engine = nullptr;
         int engineMultiplicity = 0;
         double TWR = 0;
+        AsparagusConfig asparagus_config;
     };
     struct RocketConfig {
         std::vector<StageInfo> stages;
