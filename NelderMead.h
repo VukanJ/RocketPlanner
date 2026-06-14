@@ -11,6 +11,7 @@ struct NelderMeadParams {
     double sigma = 0.5;   // shrink coefficient
     int maxIter = 200;
     double tol = 1e-6;    // relative tolerance on function values
+    double bestValueTol = 0.0; // early exit when relative change in best value < this (0 = disabled)
     double initialStep = 0.1; // step size for initial simplex construction
 };
 

@@ -87,6 +87,7 @@ std::vector<double> minimize(
     std::vector<double> expanded(n);
     std::vector<double> contracted(n);
 
+    double prevBest = fx[0];
     for (int iter = 0; iter < params.maxIter; ++iter) {
         // Order by function value (lowest = best)
         for (int i = 0; i < n; ++i) {
@@ -104,6 +105,13 @@ std::vector<double> minimize(
         if (fRange < params.tol * fScale) {
             break;
         }
+
+        // Early termination: relative change in best value below threshold
+        if (params.bestValueTol > 0.0 && iter > 0) {
+            double reldiff = std::abs(fx[0] - prevBest) / std::max(1.0, std::abs(fx[0]));
+            if (reldiff < params.bestValueTol) break;
+        }
+        prevBest = fx[0];
 
         // Centroid of all but worst
         computeCentroid(simplex, centroid, n);
