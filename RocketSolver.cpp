@@ -3,6 +3,7 @@
 #include "NelderMead.h"
 
 #include <cmath>
+#include <algorithm>
 
 static std::vector<double> deltaVFromParams(const std::vector<double>& params, double target) {
     // Maps n-1 unconstrained variables (params ∈ ℝ^(n-1)) to n Δv values summing to target.
@@ -89,9 +90,62 @@ RocketSolver::StageInfo inline calcStageMass(const PartProperty* engine,
     if (asparagusBaseSymmetry > 0) {
         std::vector<double> fuelFractions(asparagusNumStages + 1, 0.5 / (asparagusNumStages + 1)); // Equal fuel distribution among base and asparagus stages
         fuelFractions[0] = 0.5; // Base stage gets half the fuel as a default
-        double maxThrust = engine->MaxThrustkN * engineMultiplicity;
-        for (int i = 0; i <= asparagusNumStages; ++i) {
+        std::array<double, MAX_ASPARAGUS_SUBSTAGES + 1> stageMassesFull;
+        std::array<double, MAX_ASPARAGUS_SUBSTAGES + 1> stageMassesEmpty;
+
+        // Find total needed fuel to satisfy Δv requirement with the given
+        // asparagus configuration by bisection. The total fuel mass should
+        // surely be in the interval [mFmax/4,mFmax], where mFmax is the fuel
+        // mass needed without asparagus. Asparagus is more efficient in
+        // general, but probably not more than 4x efficient.
+
+        // Calculate mFmax upper bound
+        double enginesMass = engine->getMass() * engineMultiplicity;
+        const double R = std::exp(targetDeltaV / (engine->enginePerf.vacuumISP * g0));
+        const double mEmpty = (payloadMass +  enginesMass) / (1 - (R - 1.0) / 8.0);
+        const double mFMax = mEmpty * (R - 1.0);
+
+
+        // Run bisection for 20 iterations
+        // Assume all same engines, so isp is the same for all stages.
+        double A = mFMax / 4.0;
+        double B = mFMax;
+        double mF = (A + B) / 2.0;
+        for (int nIter = 0; nIter < 20; ++nIter) {
+            // Calculate stage masses just before each stage begins its burn and just right after it has burned the outermost fuel
+            stageMassesFull[0] = mEmpty + mF; // Start with all stages full
+            stageMassesEmpty[0] = stageMassesFull[0] - fuelFractions[0] * mF; // Subtract fuel burned in first asparagus stage
+            double productFullMasses = stageMassesFull[0];
+            double productFinalMasses = stageMassesEmpty[0];
+            for (int s = 1; s <= asparagusNumStages; ++s) {
+                // Subtract burnt fuel and tank and potentiall engine weight of previous stage
+                double burnedFuel           = fuelFractions[s - 1] * mF;
+                double detachedEngineWeight = (asparagusEngineConfig >> (s - 1) & 0x1) * (asparagusBaseSymmetry * engine->getMass() * engineMultiplicity);
+                double tankWeight           = burnedFuel / 9.0;  // 1:9 tank mass ratio assumption
+
+                stageMassesFull[s]  = stageMassesFull[s-1] - burnedFuel - detachedEngineWeight - tankWeight;
+                stageMassesEmpty[s] = stageMassesFull[s] - fuelFractions[s] * mF; // Subtract fuel burned in this stage
+                productFullMasses  *= stageMassesFull[s];
+                productFinalMasses *= stageMassesEmpty[s];
+            }
+
+            double achievedDeltaV = engine->enginePerf.vacuumISP * g0 * std::log(productFullMasses / productFinalMasses);
+            if (achievedDeltaV < targetDeltaV) {
+                A = mF; // Need more fuel
+            } else {
+                B = mF; // Can do with less fuel
+            }
+            mF = (A + B) / 2.0;
         }
+        double mFull = mEmpty + mF;
+        double TWR = (engine->MaxThrustkN * engineMultiplicity) / (mFull * g0);
+        if (TWR < minTWR) { 
+            info.fullMass = INFINITY;
+            return info;
+        }
+        info.fullMass  = mFull;
+        info.emptyMass = mEmpty;
+        info.TWR       = TWR;
     }
     else {
         double enginesMass = engine->getMass() * engineMultiplicity;
@@ -109,15 +163,16 @@ RocketSolver::StageInfo inline calcStageMass(const PartProperty* engine,
             info.fullMass = INFINITY;
             return info;
         }
-        info.fullMass           = mFull;
-        info.emptyMass          = mEmpty;
-        info.engine             = engine;
-        info.engineMultiplicity = engineMultiplicity;
-        info.TWR                = TWR;
-        info.asparagus_config.baseSymmetry       = asparagusBaseSymmetry;
-        info.asparagus_config.numAsparagusStages = asparagusNumStages;
-        info.asparagus_config.hasEngine          = asparagusEngineConfig;
+        info.fullMass  = mFull;
+        info.emptyMass = mEmpty;
+        info.TWR       = TWR;
     }
+
+    info.engine             = engine;
+    info.engineMultiplicity = engineMultiplicity;
+    info.asparagus_config.baseSymmetry       = asparagusBaseSymmetry;
+    info.asparagus_config.numAsparagusStages = asparagusNumStages;
+    info.asparagus_config.hasEngine          = asparagusEngineConfig;
     return info;
 }
 
