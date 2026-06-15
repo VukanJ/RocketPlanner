@@ -372,12 +372,13 @@ void integrate_ascent(float liftoffTWR, Body body) {
     };
 
     auto rocketMass = [&body](double alt_km) {
-        // Assume that rocket starts with some projected airstream area at liftoff which exponentiall decays 
-        // with each stage. Assume that area decays with the same rate as pressure
-        double Minitial = 50000;
-        double Mfinal = 5000;
-        double alpha = body.atmHeight_km / log(Minitial / Mfinal);
-        return Minitial * std::exp(-alt_km / alpha);
+      // Assume that rocket starts with some mass  at liftoff which exponentiall
+      // decays with each stage. The reason is that fuel consumption becomes
+      // slower as more engines are dropped.
+      double Minitial = 50000;
+      double Mfinal = 5000;
+      double alpha = body.atmHeight_km / log(Minitial / Mfinal);
+      return std::min(Mfinal, Minitial * std::exp(-alt_km / alpha));
     };
 
     constexpr double Cd = 0.2;  // Most parts have a minimum drag coefficient of around 0.2, sometimes less.
