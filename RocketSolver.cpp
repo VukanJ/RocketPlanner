@@ -1,10 +1,10 @@
 #include "RocketSolver.h"
 #include "helper.h"
 #include "NelderMead.h"
+#include "kspConstants.h"
 
 #include <bit>
 #include <cmath>
-#include <algorithm>
 #include <bitset>
 
 static void softmaxFractions(const std::vector<double>& params, std::vector<double>& result) {
@@ -352,11 +352,37 @@ RocketSolver::StageInfo RocketSolver::solveSingleStage(double targetDeltaV, doub
     return bestStage;
 }
 
+void integrate_ascent(float liftoffTWR, Body body) {
+    auto AltPressure = [&body](double alt_km) -> double {
+        return alt_km > 90 ? 0 : body.seaLevel_atm * std::exp(-alt_km / 7.0);
+    };
+    auto getGravity = [&body](double alt_km) -> double {
+        return body.surfaceGravity * std::pow(body.radius_km / (body.radius_km + alt_km), 2);
+    };
+
+    double dt = 1;
+    double alt = 0.0;
+    double v = 0.0;
+
+    for (int i = 0; i < 300; ++i) {
+        double drag_accel = 0.0001 * AltPressure(alt*0.001) * v * v; 
+
+        v += (liftoffTWR - 1) * (getGravity(alt*0.001) - drag_accel) * dt;
+        alt += v * dt;
+        println("Time:", i, "s, Altitude:", alt*0.001, "km, Velocity:", v, "m/s, Gravity:", getGravity(alt*0.001), "m/s^2, Atm Pressure:", AltPressure(alt*0.001), "atm");
+    }
+
+    exit(0);
+
+}
+
 RocketSolver::RocketConfig RocketSolver::buildRocket(const std::vector<double>& deltaVPerStage, double payloadMass, double minTWR, double g0, double seaLevelAtm) {
     // deltaVPerStage = [deltaV_stage1, deltaV_stage2, ..., deltaV_stage_last]
     const int nStages = deltaVPerStage.size();
     RocketConfig config;
     config.stages.resize(nStages);
+
+    integrate_ascent(1.7, KspSystem::Eve);
 
     double stagePayload = payloadMass;
     for (int stage = nStages - 1; stage >= 0; --stage) {
