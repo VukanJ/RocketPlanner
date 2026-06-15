@@ -42,6 +42,7 @@ struct EngineISPInfo {
     std::vector<std::pair<double, double>> isp; // pairs of (atm pressure, ISP)
     double vacuumISP = 0.0f;
     double fuelConsumptionRate_UPS = 0.0f; // Units per second
+    double getISP(double pressure) const;
 };
 
 class PartProperty {

@@ -1,9 +1,27 @@
 #include "parts.h"
 
 #include <iostream>
+#include <algorithm>
 #include "LoadKspParts.h"
 #include "kspConstants.h"
 #include "helper.h"
+
+double EngineISPInfo::getISP(double pressure) const {
+    if (isp.empty()) return 0.0;
+    auto elem = std::find_if(isp.begin(), isp.end(), [&pressure](const auto& pair) {
+        return pair.first >= pressure;
+    });
+    if (elem == isp.end()) {
+        return isp.back().second;
+    } else if (elem == isp.begin()) {
+        return isp.front().second;
+    } else {
+        auto [p1, isp1] = *(elem - 1);
+        auto [p2, isp2] = *elem;
+        double t = (pressure - p1) / (p2 - p1);
+        return std::lerp(isp1, isp2, t);
+    }
+}
 
 PartProperty::PartProperty(PartType part_type, 
      const std::string& parttitle, 
@@ -27,6 +45,11 @@ PartProperty::PartProperty(PartType part_type,
     MaxThrustkN(thrustkN), 
     enginePerf(isp_curve) 
 { 
+    // Sort isp
+    std::sort(enginePerf.isp.begin(), enginePerf.isp.end(), [](const auto& a, const auto& b) {
+        return a.first < b.first;
+    });
+
     // If engine, compute consumption rate based on max thrust and ISP at vacuum and fuel density
     if (isEngine(part_type)) {
         for (const auto& [pressure, isp] : enginePerf.isp) {
