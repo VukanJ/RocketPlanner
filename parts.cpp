@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <algorithm>
+#include <cmath>
 #include "LoadKspParts.h"
 #include "kspConstants.h"
 #include "helper.h"

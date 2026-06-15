@@ -34,13 +34,13 @@ void Rocket::printConfig() const {
     }
 }
 
-void Rocket::construct(double targetDeltaV, double payloadMass, double minTWR, double g0) {
+void Rocket::construct(double targetDeltaV, double payloadMass, double minTWR, double g0, double seaLevelAtm) {
     if (root == nullptr) {
         throw std::runtime_error("Root part not set. Call setRootPart() before constructing the rocket.");
     }
 
     RocketSolver solver(partCatalogue.all_engines);
-    solver.solve(targetDeltaV, payloadMass, minTWR, g0);
+    solver.solve(targetDeltaV, payloadMass, minTWR, g0, seaLevelAtm);
 
     //// Initialize default stage
     //stages.emplace_back();

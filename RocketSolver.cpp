@@ -47,12 +47,15 @@ static double computeAsparagusFullMass(
     int baseSymmetry,
     int numStages,
     std::uint16_t engineConfig,
-    double g0)
+    double g0,
+    double atmPressure)
 {
     // Compute the total mass of an asparagus stage needed to reach a targeted deltaV.
     // This is needed so that the coarse staging optimization remains valid even if a stage is 
     // subdivided into multiple asparagus substages. 
     // Returns the asparagus staged config
+
+    double isp = (atmPressure == 0.0) ? engine->enginePerf.vacuumISP : engine->enginePerf.getISP(atmPressure);
 
     // Dry mass = payload + ALL engines (core + boosters), no tanks.
     double engineMass = engine->getMass();
@@ -61,7 +64,7 @@ static double computeAsparagusFullMass(
                               * baseSymmetry * engine->getMass();
     double mEmpty = payloadMass + coreEnginesMass + boosterEnginesMass;
 
-    double R = std::exp(targetDeltaV / (engine->enginePerf.vacuumISP * g0));
+    double R = std::exp(targetDeltaV / (isp * g0));
     double A = 0.0;
     double B = mEmpty * R * 5.0;
     double mF;
@@ -82,6 +85,14 @@ static double computeAsparagusFullMass(
             double dropMass = tankWeight + detachedEngineWeight;
             if (dropMass >= mCurrent) { feasible = false; break; }
             mCurrent -= dropMass;
+
+            // Check if remaining engines have enough thrust to maintain TWR
+            int remainingEngines = engineMultiplicity
+                                 + std::popcount((unsigned)(engineConfig >> s)) * baseSymmetry;
+            if (engine->MaxThrustkN * remainingEngines / (mCurrent * g0) < minTWR) {
+                feasible = false; break;
+            }
+
             productFullMasses *= mCurrent;
 
             double nextFuel = fuelFractions[s] * mF;
@@ -95,7 +106,7 @@ static double computeAsparagusFullMass(
             continue;
         }
 
-        double achievedDeltaV = engine->enginePerf.vacuumISP * g0
+        double achievedDeltaV = isp * g0
                               * std::log(productFullMasses / productFinalMasses);
         if (achievedDeltaV < targetDeltaV) {
             A = mF;
@@ -118,6 +129,11 @@ static double computeAsparagusFullMass(
         double dropMass = burnedFuel / 9.0 + detachedEngineWeight;
         if (dropMass >= mCurrent) return INFINITY;
         mCurrent -= dropMass;
+
+        int remainingEngines = engineMultiplicity
+                             + std::popcount((unsigned)(engineConfig >> s)) * baseSymmetry;
+        if (engine->MaxThrustkN * remainingEngines / (mCurrent * g0) < minTWR) return INFINITY;
+
         productFullMasses *= mCurrent;
         double nextFuel = fuelFractions[s] * mF;
         if (nextFuel >= mCurrent) return INFINITY;
@@ -125,7 +141,7 @@ static double computeAsparagusFullMass(
         productFinalMasses *= mCurrent;
     }
     if (productFullMasses <= 0.0 || productFinalMasses <= 0.0) return INFINITY;
-    double achievedDeltaV = engine->enginePerf.vacuumISP * g0
+    double achievedDeltaV = isp * g0
                           * std::log(productFullMasses / productFinalMasses);
     if (achievedDeltaV < targetDeltaV) return INFINITY;
 
@@ -138,7 +154,7 @@ static double computeAsparagusFullMass(
 
 RocketSolver::RocketSolver(const PartInfoList engines) : allEngines(engines) { }
 
-void RocketSolver::solve(double targetDeltaV, double payloadMass, double minTWR, double g0) {
+void RocketSolver::solve(double targetDeltaV, double payloadMass, double minTWR, double g0, double seaLevelAtm) {
     RocketConfig bestConfig;
     bestConfig.totalMass = INFINITY;
 
@@ -151,19 +167,19 @@ void RocketSolver::solve(double targetDeltaV, double payloadMass, double minTWR,
             std::vector<double> dvBuf, optDV, eqDV;
             auto objective = [&](const std::vector<double>& p) -> double {
                 deltaVFromParams(p, targetDeltaV, dvBuf);
-                return buildRocket(dvBuf, payloadMass, minTWR, g0).totalMass;
+                return buildRocket(dvBuf, payloadMass, minTWR, g0, seaLevelAtm).totalMass;
             };
 
             std::vector<double> x0(nstage - 1, 0.0);
             auto best = minimize(objective, x0, NelderMeadParams{.bestValueTol = 1e-3});
             deltaVFromParams(best, targetDeltaV, optDV);
-            auto optRocket = buildRocket(optDV, payloadMass, minTWR, g0);
+            auto optRocket = buildRocket(optDV, payloadMass, minTWR, g0, seaLevelAtm);
             deltaVFromParams(x0, targetDeltaV, eqDV);
-            auto eqRocket = buildRocket(eqDV, payloadMass, minTWR, g0);
+            auto eqRocket = buildRocket(eqDV, payloadMass, minTWR, g0, seaLevelAtm);
             deltaV = (optRocket.totalMass <= eqRocket.totalMass) ? optDV : eqDV;
         }
 
-        auto rocket = buildRocket(deltaV, payloadMass, minTWR, g0);
+        auto rocket = buildRocket(deltaV, payloadMass, minTWR, g0, seaLevelAtm);
         if (rocket.totalMass < bestConfig.totalMass) {
             bestConfig = rocket;
         }
@@ -206,7 +222,8 @@ RocketSolver::StageInfo inline calcStageMass(const PartProperty* engine,
                                              int asparagusBaseSymmetry,
                                              int asparagusNumStages,
                                              std::uint16_t asparagusEngineConfig,
-                                             double g0) 
+                                             double g0,
+                                             double atmPressure) 
 {
     static int callCount = 0;
     callCount++;
@@ -227,7 +244,7 @@ RocketSolver::StageInfo inline calcStageMass(const PartProperty* engine,
                 return computeAsparagusFullMass(fracBuf, engine, engineMultiplicity,
                                                 targetDeltaV, payloadMass, minTWR,
                                                 asparagusBaseSymmetry, asparagusNumStages,
-                                                asparagusEngineConfig, g0);
+                                                asparagusEngineConfig, g0, atmPressure);
             };
             std::vector<double> x0(asparagusNumStages, 0.0);
 
@@ -240,18 +257,18 @@ RocketSolver::StageInfo inline calcStageMass(const PartProperty* engine,
             double mOpt = computeAsparagusFullMass(optFractions, engine, engineMultiplicity,
                                                    targetDeltaV, payloadMass, minTWR,
                                                    asparagusBaseSymmetry, asparagusNumStages,
-                                                   asparagusEngineConfig, g0);
+                                                   asparagusEngineConfig, g0, atmPressure);
             double mEq = computeAsparagusFullMass(eqFractions, engine, engineMultiplicity,
                                                   targetDeltaV, payloadMass, minTWR,
                                                   asparagusBaseSymmetry, asparagusNumStages,
-                                                  asparagusEngineConfig, g0);
+                                                  asparagusEngineConfig, g0, atmPressure);
             fuelFractions = (mOpt <= mEq) ? optFractions : eqFractions;
         }
 
         double mFull = computeAsparagusFullMass(fuelFractions, engine, engineMultiplicity,
                                                 targetDeltaV, payloadMass, minTWR,
                                                 asparagusBaseSymmetry, asparagusNumStages,
-                                                asparagusEngineConfig, g0);
+                                                asparagusEngineConfig, g0, atmPressure);
         if (mFull == INFINITY) {
             info.fullMass = INFINITY;
             return info;
@@ -270,8 +287,9 @@ RocketSolver::StageInfo inline calcStageMass(const PartProperty* engine,
         info.TWR       = TWR;
     }
     else {
+        double isp = (atmPressure == 0.0) ? engine->enginePerf.vacuumISP : engine->enginePerf.getISP(atmPressure);
         double enginesMass = engine->getMass() * engineMultiplicity;
-        double R = std::exp(targetDeltaV / (engine->enginePerf.vacuumISP * KspSystem::Kerbin.surfaceGravity));
+        double R = std::exp(targetDeltaV / (isp * KspSystem::Kerbin.surfaceGravity));
         if ((R - 1.0) / 8.0 >= 1.0) {
             // Does not converge. Dry mass too high, cannot be offset by more fuel.
             info.fullMass = INFINITY;
@@ -299,12 +317,13 @@ RocketSolver::StageInfo inline calcStageMass(const PartProperty* engine,
 }
 
 
-RocketSolver::StageInfo RocketSolver::solveSingleStage(double targetDeltaV, double payloadMass, double minTWR, double g0) {
+RocketSolver::StageInfo RocketSolver::solveSingleStage(double targetDeltaV, double payloadMass, double minTWR, double g0, double atmPressure) {
     // Find best stage configuration for single stage rocket
     // Best = lowest wet mass rocket fulfilling the Δv and TWR requirements
     StageInfo bestStage;
     // Iterate over available engines
     for (const auto& engine : allEngines) {
+        if (atmPressure > 0.0 && engine->enginePerf.getISP(atmPressure) <= 0.0) continue;
         // Iterate over allowed engine multiplicities (number of engines in the stage)
         for (int mult = 1; mult <= 4; ++mult) {
 
@@ -320,7 +339,7 @@ RocketSolver::StageInfo RocketSolver::solveSingleStage(double targetDeltaV, doub
                     const std::uint16_t maxConfig = (1 << asparagusStages) - 1;
                     for (std::uint16_t econfig = 0x0; econfig <= maxConfig; ++econfig) {
 
-                        const auto stage = calcStageMass(engine, mult, targetDeltaV, payloadMass, minTWR, baseSymmetry, asparagusStages, econfig, g0);
+                        const auto stage = calcStageMass(engine, mult, targetDeltaV, payloadMass, minTWR, baseSymmetry, asparagusStages, econfig, g0, atmPressure);
                         if (stage.fullMass < bestStage.fullMass) {
                             bestStage = stage;
                         }
@@ -333,7 +352,7 @@ RocketSolver::StageInfo RocketSolver::solveSingleStage(double targetDeltaV, doub
     return bestStage;
 }
 
-RocketSolver::RocketConfig RocketSolver::buildRocket(const std::vector<double>& deltaVPerStage, double payloadMass, double minTWR, double g0) {
+RocketSolver::RocketConfig RocketSolver::buildRocket(const std::vector<double>& deltaVPerStage, double payloadMass, double minTWR, double g0, double seaLevelAtm) {
     // deltaVPerStage = [deltaV_stage1, deltaV_stage2, ..., deltaV_stage_last]
     const int nStages = deltaVPerStage.size();
     RocketConfig config;
@@ -341,7 +360,8 @@ RocketSolver::RocketConfig RocketSolver::buildRocket(const std::vector<double>& 
 
     double stagePayload = payloadMass;
     for (int stage = nStages - 1; stage >= 0; --stage) {
-        config.stages[stage] = solveSingleStage(deltaVPerStage[stage], stagePayload, minTWR, g0);
+        double atmPressure = (stage == 0) ? seaLevelAtm : 0.0;
+        config.stages[stage] = solveSingleStage(deltaVPerStage[stage], stagePayload, minTWR, g0, atmPressure);
         stagePayload += config.stages[stage].fullMass; // The payload for the next stage includes the mass of the current stage
     }
     config.totalMass = stagePayload;
