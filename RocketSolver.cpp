@@ -353,11 +353,39 @@ RocketSolver::StageInfo RocketSolver::solveSingleStage(double targetDeltaV, doub
 }
 
 void integrate_ascent(float liftoffTWR, Body body) {
-    auto AltPressure = [&body](double alt_km) -> double {
-        return alt_km > 90 ? 0 : body.seaLevel_atm * std::exp(-alt_km / 7.0);
+    // Calculate the (rough) ascent profile of a rocket of a certain TWR. 
+    // This is quite crude, but better than nothing.
+    auto AltPressure_atm = [&body](double alt_km) -> double {
+        return alt_km > body.atmHeight_km ? 0 : body.seaLevel_atm * std::exp(-alt_km / body.atm_reference_height_km);
     };
     auto getGravity = [&body](double alt_km) -> double {
         return body.surfaceGravity * std::pow(body.radius_km / (body.radius_km + alt_km), 2);
+    };
+
+    auto A = [&body](double alt_km) {
+        // Assume that rocket starts with some projected airstream area at liftoff which exponentiall decays 
+        // with each stage. Assume that area decays with the same rate as pressure
+        double Ainitial = Constants::mk1_area_m2 * 8 + Constants::mk2_area_m2;
+        double Afinal = Constants::mk2_area_m2;
+        double alpha = body.atmHeight_km / log(Ainitial / Afinal);
+        return Ainitial * std::exp(-alt_km / alpha);
+    };
+
+    auto rocketMass = [&body](double alt_km) {
+        // Assume that rocket starts with some projected airstream area at liftoff which exponentiall decays 
+        // with each stage. Assume that area decays with the same rate as pressure
+        double Minitial = 50000;
+        double Mfinal = 5000;
+        double alpha = body.atmHeight_km / log(Minitial / Mfinal);
+        return Minitial * std::exp(-alt_km / alpha);
+    };
+
+    constexpr double Cd = 0.2;  // Most parts have a minimum drag coefficient of around 0.2, sometimes less.
+
+    auto DragAccel = [&](double alt_km, double v) {
+        // Newtonian drag: Fd = 0.5 * rho * v^2 * A * Cd
+        double rho = AltPressure_atm(alt_km) * body.sea_level_density_kgpm3 / body.seaLevel_atm;
+        return 0.5 * rho * v * v * A(alt_km) * Cd;
     };
 
     double dt = 1;
@@ -365,11 +393,11 @@ void integrate_ascent(float liftoffTWR, Body body) {
     double v = 0.0;
 
     for (int i = 0; i < 300; ++i) {
-        double drag_accel = 0.0001 * AltPressure(alt*0.001) * v * v; 
+        double drag_accel = DragAccel(alt*0.001, v) / rocketMass(alt*0.001);
 
-        v += (liftoffTWR - 1) * (getGravity(alt*0.001) - drag_accel) * dt;
+        v += (liftoffTWR*body.surfaceGravity - getGravity(alt*0.001) - drag_accel) * dt;
         alt += v * dt;
-        println("Time:", i, "s, Altitude:", alt*0.001, "km, Velocity:", v, "m/s, Gravity:", getGravity(alt*0.001), "m/s^2, Atm Pressure:", AltPressure(alt*0.001), "atm");
+        println("Time:", i, "s, Altitude:", alt*0.001, "km, Velocity:", v, "m/s, Gravity:", getGravity(alt*0.001), "m/s^2, Atm Pressure:", AltPressure_atm(alt*0.001), "atm");
     }
 
     exit(0);
