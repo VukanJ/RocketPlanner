@@ -25,6 +25,6 @@ int main() {
     Rocket rocket(kspPath, "Test Rocket");
 
     rocket.setRootPart("Mk2 Lander Can");
-    rocket.construct(12000, 2, 1.8, KspSystem::Eve.surfaceGravity);
+    rocket.construct(12000, 2, 2.0, KspSystem::Eve.surfaceGravity);
     //rocket.printConfig();
 }

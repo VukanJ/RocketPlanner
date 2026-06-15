@@ -66,7 +66,7 @@ static double computeAsparagusFullMass(
     double B = mEmpty * R * 5.0;
     double mF;
 
-    for (int nIter = 0; nIter < 6; ++nIter) {
+    for (int nIter = 0; nIter < 7; ++nIter) {
         mF = (A + B) / 2.0;
         double mCurrent = mEmpty + mF + mF / 9.0;
         double productFullMasses = mCurrent;
