@@ -82,6 +82,14 @@ std::vector<double> minimize(
         fx[i] = f(simplex[i]);
     }
 
+    // If every vertex is non-finite (e.g. all INFINITY), the optimizer
+    // cannot make progress — NaN arithmetic would silently run all iterations.
+    bool allNonFinite = true;
+    for (int i = 0; i <= n; ++i) {
+        if (std::isfinite(fx[i])) { allNonFinite = false; break; }
+    }
+    if (allNonFinite) return simplex[0];
+
     std::vector<double> centroid(n);
     std::vector<double> reflected(n);
     std::vector<double> expanded(n);
@@ -102,14 +110,14 @@ std::vector<double> minimize(
         // Check convergence: range of function values
         double fRange = std::abs(fx[n] - fx[0]);
         double fScale = std::max(1.0, std::abs(fx[0]));
-        if (fRange < params.tol * fScale) {
+        if (!std::isfinite(fRange) || fRange < params.tol * fScale) {
             break;
         }
 
         // Early termination: relative change in best value below threshold
         if (params.bestValueTol > 0.0 && iter > 0) {
             double reldiff = std::abs(fx[0] - prevBest) / std::max(1.0, std::abs(fx[0]));
-            if (reldiff < params.bestValueTol) break;
+            if (!std::isfinite(reldiff) || reldiff < params.bestValueTol) break;
         }
         prevBest = fx[0];
 

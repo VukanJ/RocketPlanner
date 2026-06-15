@@ -55,7 +55,8 @@ static double computeAsparagusFullMass(
     // Returns the asparagus staged config
 
     // Dry mass = payload + ALL engines (core + boosters), no tanks.
-    double coreEnginesMass = engine->getMass() * engineMultiplicity;
+    double engineMass = engine->getMass();
+    double coreEnginesMass = engineMass * engineMultiplicity;
     double boosterEnginesMass = (double)std::popcount((unsigned)engineConfig)
                               * baseSymmetry * engine->getMass();
     double mEmpty = payloadMass + coreEnginesMass + boosterEnginesMass;
@@ -65,7 +66,7 @@ static double computeAsparagusFullMass(
     double B = mEmpty * R * 5.0;
     double mF;
 
-    for (int nIter = 0; nIter < 10; ++nIter) {
+    for (int nIter = 0; nIter < 6; ++nIter) {
         mF = (A + B) / 2.0;
         double mCurrent = mEmpty + mF + mF / 9.0;
         double productFullMasses = mCurrent;
@@ -75,7 +76,7 @@ static double computeAsparagusFullMass(
         bool feasible = true;
         for (int s = 1; s <= numStages; ++s) {
             double burnedFuel           = fuelFractions[s - 1] * mF;
-            double detachedEngineWeight = (engineConfig >> (s - 1) & 0x1) * (baseSymmetry * engine->getMass());
+            double detachedEngineWeight = (engineConfig >> (s - 1) & 0x1) * (baseSymmetry * engineMass);
             double tankWeight           = burnedFuel / 9.0;
 
             double dropMass = tankWeight + detachedEngineWeight;
@@ -113,7 +114,7 @@ static double computeAsparagusFullMass(
     double productFinalMasses = mCurrent;
     for (int s = 1; s <= numStages; ++s) {
         double burnedFuel           = fuelFractions[s - 1] * mF;
-        double detachedEngineWeight = (engineConfig >> (s - 1) & 0x1) * (baseSymmetry * engine->getMass());
+        double detachedEngineWeight = (engineConfig >> (s - 1) & 0x1) * (baseSymmetry * engineMass);
         double dropMass = burnedFuel / 9.0 + detachedEngineWeight;
         if (dropMass >= mCurrent) return INFINITY;
         mCurrent -= dropMass;
@@ -128,7 +129,8 @@ static double computeAsparagusFullMass(
                           * std::log(productFullMasses / productFinalMasses);
     if (achievedDeltaV < targetDeltaV) return INFINITY;
 
-    double TWR = (engine->MaxThrustkN * engineMultiplicity) / (mFull * g0);
+    int totalEngines = engineMultiplicity + std::popcount((unsigned int)engineConfig) * baseSymmetry;
+    double TWR = (engine->MaxThrustkN * totalEngines) / (mFull * g0);
     if (TWR < minTWR) return INFINITY;
     return mFull;
 }
@@ -153,7 +155,7 @@ void RocketSolver::solve(double targetDeltaV, double payloadMass, double minTWR,
             };
 
             std::vector<double> x0(nstage - 1, 0.0);
-            auto best = minimize(objective, x0);
+            auto best = minimize(objective, x0, NelderMeadParams{.bestValueTol = 1e-3});
             deltaVFromParams(best, targetDeltaV, optDV);
             auto optRocket = buildRocket(optDV, payloadMass, minTWR, g0);
             deltaVFromParams(x0, targetDeltaV, eqDV);
@@ -206,6 +208,11 @@ RocketSolver::StageInfo inline calcStageMass(const PartProperty* engine,
                                              std::uint16_t asparagusEngineConfig,
                                              double g0) 
 {
+    static int callCount = 0;
+    callCount++;
+    //if (callCount % 10000 == 0) {
+    //    println("calcStageMass calls: ", callCount);
+    //}
     RocketSolver::StageInfo info;
 
     if (asparagusBaseSymmetry > 0) {
@@ -223,10 +230,10 @@ RocketSolver::StageInfo inline calcStageMass(const PartProperty* engine,
                                                 asparagusEngineConfig, g0);
             };
             std::vector<double> x0(asparagusNumStages, 0.0);
-            for (int i = 0; i < asparagusNumStages; ++i)
-                x0[i] = (asparagusEngineConfig & (1 << i)) ? 0.5 : -0.5;
+
             NelderMeadParams nmParams;
-            nmParams.bestValueTol = 1e-4;
+            nmParams.bestValueTol = 1e-2;
+            nmParams.initialStep = 1.5;
             auto best = minimize(objective, x0, nmParams);
             softmaxFractions(best, optFractions);
             softmaxFractions(x0, eqFractions);
@@ -299,7 +306,7 @@ RocketSolver::StageInfo RocketSolver::solveSingleStage(double targetDeltaV, doub
     // Iterate over available engines
     for (const auto& engine : allEngines) {
         // Iterate over allowed engine multiplicities (number of engines in the stage)
-        for (int mult = 1; mult <= 8; ++mult) {
+        for (int mult = 1; mult <= 4; ++mult) {
 
             // Iterate over allowed asparagus configurations.
             // Base symmetry: 0 (no asparagus). 
