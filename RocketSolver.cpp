@@ -378,7 +378,7 @@ void integrate_ascent(float liftoffTWR, Body body) {
       double Minitial = 50000;
       double Mfinal = 5000;
       double alpha = body.atmHeight_km / log(Minitial / Mfinal);
-      return std::min(Mfinal, Minitial * std::exp(-alt_km / alpha));
+      return std::max(Mfinal, Minitial * std::exp(-alt_km / alpha));
     };
 
     constexpr double Cd = 0.2;  // Most parts have a minimum drag coefficient of around 0.2, sometimes less.
