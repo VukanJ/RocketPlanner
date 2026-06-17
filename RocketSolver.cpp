@@ -52,8 +52,7 @@ static double computeAsparagusFullMass(
 {
     // Compute the total mass of an asparagus stage needed to reach a targeted deltaV.
     // This is needed so that the coarse staging optimization remains valid even if a stage is 
-    // subdivided into multiple asparagus substages. 
-    // Returns the asparagus staged config
+    // subdivided into multiple asparagus substages. Returns the asparagus staged config
 
     double isp = (atmPressure == 0.0) ? engine->enginePerf.vacuumISP : engine->enginePerf.getISP(atmPressure);
 
@@ -323,10 +322,7 @@ RocketSolver::StageInfo RocketSolver::solveSingleStage(double targetDeltaV, doub
     StageInfo bestStage;
     // Iterate over available engines
     for (const auto& engine : allEngines) {
-        if (atmPressure > 0.0 && engine->enginePerf.getISP(atmPressure) <= 0.0) continue;
-        // Iterate over allowed engine multiplicities (number of engines in the stage)
         for (int mult = 1; mult <= 4; ++mult) {
-
             // Iterate over allowed asparagus configurations.
             // Base symmetry: 0 (no asparagus). 
             for (int baseSymmetry = 0; baseSymmetry <= MAX_ASPARAGUS_SYMMETRY; ++baseSymmetry) {
@@ -401,7 +397,7 @@ void integrate_ascent(float liftoffTWR, Body body) {
         println("Time:", i, "s, Altitude:", alt*0.001, "km, Velocity:", v, "m/s, Gravity:", getGravity(alt*0.001), "m/s^2, Atm Pressure:", AltPressure_atm(alt*0.001), "atm");
     }
 
-    exit(0);
+    //exit(0);
 
 }
 
@@ -411,7 +407,7 @@ RocketSolver::RocketConfig RocketSolver::buildRocket(const std::vector<double>& 
     RocketConfig config;
     config.stages.resize(nStages);
 
-    integrate_ascent(1.7, KspSystem::Eve);
+    //integrate_ascent(1.7, KspSystem::Eve);
 
     double stagePayload = payloadMass;
     for (int stage = nStages - 1; stage >= 0; --stage) {
