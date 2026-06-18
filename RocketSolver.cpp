@@ -276,7 +276,9 @@ RocketSolver::StageInfo inline calcStageMass(const PartProperty* engine,
         double coreEnginesMass = engine->getMass() * engineMultiplicity;
         double boosterEnginesMass = (double)std::popcount((unsigned int)asparagusEngineConfig)
                                   * asparagusBaseSymmetry * engine->getMass();
-        double mEmpty = payloadMass + coreEnginesMass + boosterEnginesMass;
+        double massNoFuelNoTanks = payloadMass + coreEnginesMass + boosterEnginesMass;
+        double totalTankMass = (mFull - massNoFuelNoTanks) / 10.0;
+        double mEmpty = massNoFuelNoTanks + totalTankMass;
         int totalEngines = engineMultiplicity + std::popcount((unsigned int)asparagusEngineConfig) * asparagusBaseSymmetry;
         double TWR = (engine->MaxThrustkN * totalEngines) / (mFull * g0);
 
@@ -286,6 +288,7 @@ RocketSolver::StageInfo inline calcStageMass(const PartProperty* engine,
         info.TWR       = TWR;
     }
     else {
+        info.asparagus_config.fuelFractions = {1.0};
         double isp = (atmPressure == 0.0) ? engine->enginePerf.vacuumISP : engine->enginePerf.getISP(atmPressure);
         double enginesMass = engine->getMass() * engineMultiplicity;
         double R = std::exp(targetDeltaV / (isp * KspSystem::Kerbin.surfaceGravity));
@@ -352,7 +355,7 @@ void integrate_ascent(float liftoffTWR, Body body) {
     // Calculate the (rough) ascent profile of a rocket of a certain TWR. 
     // This is quite crude, but better than nothing.
     auto AltPressure_atm = [&body](double alt_km) -> double {
-        return alt_km > body.atmHeight_km ? 0 : body.seaLevel_atm * std::exp(-alt_km / body.atm_reference_height_km);
+        return alt_km > body.atmHeight_km ? 0 : body.seaLevel_atm * std::exp(-alt_km / body.atm_falloff_km);
     };
     auto getGravity = [&body](double alt_km) -> double {
         return body.surfaceGravity * std::pow(body.radius_km / (body.radius_km + alt_km), 2);
@@ -401,6 +404,56 @@ void integrate_ascent(float liftoffTWR, Body body) {
 
 }
 
+int RocketSolver::RocketConfig::totalStages() const {
+    int tot = 0;
+    for (const auto& stage : stages) {
+        tot += 1 + stage.asparagus_config.numAsparagusStages;
+    }
+    return tot;
+}
+
+void RocketSolver::RocketConfig::calcStageKinematics(std::vector<StageKinematics>& kinematics) const {
+    const int totStages = totalStages();
+    kinematics.resize(totStages);
+
+    int sptr = 0;
+    for (int stage = 0; stage < stages.size(); ++stage) {
+        const auto& stageInfo = stages[stage];
+        const double totalFuel_tons = stageInfo.fullMass - stageInfo.emptyMass;
+        double currMass_tons = stageInfo.fullMass;
+        int nEngines = stageInfo.engineMultiplicity + std::popcount(stageInfo.asparagus_config.hasEngine) * stageInfo.asparagus_config.baseSymmetry;
+        for (int sub = 0; sub < stageInfo.asparagus_config.numAsparagusStages + 1; ++sub) {
+            kinematics[sptr].engine = stageInfo.engine;
+            kinematics[sptr].nEngines = nEngines;
+            double burnedFuel = stageInfo.asparagus_config.fuelFractions[sub] * totalFuel_tons;
+            int detachedEngines = sub == stageInfo.asparagus_config.numAsparagusStages ? 
+                                                                stageInfo.engineMultiplicity
+                                                             : ((stageInfo.asparagus_config.hasEngine >> sub) & 0x1) * (stageInfo.asparagus_config.baseSymmetry);
+            double tankWeight = burnedFuel / 9.0;
+            kinematics[sptr].m0 = currMass_tons;
+            kinematics[sptr].mf = currMass_tons - burnedFuel;
+            kinematics[sptr].burnTime = (burnedFuel / stageInfo.engine->usedFuelDensity()) / (stageInfo.engine->enginePerf.fuelConsumptionRate_UPS * nEngines);
+            currMass_tons -= burnedFuel + detachedEngines*stageInfo.engine->getMass() + tankWeight;
+            nEngines -= detachedEngines;
+            sptr++;
+        }
+    }
+}
+
+void simulate_flight(Body body, const RocketSolver::RocketConfig& rocket) {
+    struct vec { float x = 0; float y = 0; };
+    vec pos {0, body.radius_km};
+    vec vel {0, 0};
+    vec dir {0, 1};
+
+    std::vector<StageKinematics> kinematics;
+    rocket.calcStageKinematics(kinematics);
+
+    float dt = 1;
+    for (const auto& stage : rocket.stages) {
+    }
+}
+
 RocketSolver::RocketConfig RocketSolver::buildRocket(const std::vector<double>& deltaVPerStage, double payloadMass, double minTWR, double g0, double seaLevelAtm) {
     // deltaVPerStage = [deltaV_stage1, deltaV_stage2, ..., deltaV_stage_last]
     const int nStages = deltaVPerStage.size();
@@ -413,8 +466,15 @@ RocketSolver::RocketConfig RocketSolver::buildRocket(const std::vector<double>& 
     for (int stage = nStages - 1; stage >= 0; --stage) {
         double atmPressure = (stage == 0) ? seaLevelAtm : 0.0;
         config.stages[stage] = solveSingleStage(deltaVPerStage[stage], stagePayload, minTWR, g0, atmPressure);
-        stagePayload += config.stages[stage].fullMass; // The payload for the next stage includes the mass of the current stage
+        stagePayload = config.stages[stage].fullMass; // The next stage carries this stage as payload
     }
     config.totalMass = stagePayload;
+
+    // Debug
+    if (config.totalMass < INFINITY) {
+        simulate_flight(KspSystem::Eve, config);
+    }
+    //
+
     return config;
 }

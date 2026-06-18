@@ -11,6 +11,16 @@ using PartInfoList = std::vector<const PartProperty*>;
 constexpr short MAX_ASPARAGUS_SYMMETRY = 4;
 constexpr short MAX_ASPARAGUS_SUBSTAGES = 3;
 
+struct StageKinematics {
+    // Store basic kinematic info about a rocket stage, 
+    // which can be used for numerical integration of the rocket's trajectory.
+    float m0;
+    float mf;
+    float burnTime;
+    const PartProperty* engine;
+    int nEngines;
+};
+
 class RocketSolver {
 public:
     RocketSolver(const PartInfoList engines);
@@ -35,6 +45,8 @@ public:
     };
     struct RocketConfig {
         std::vector<StageInfo> stages;
+        void calcStageKinematics(std::vector<StageKinematics>& kinematics) const;
+        int totalStages() const;
         double totalMass = INFINITY;
     };
 
