@@ -17,6 +17,7 @@ struct StageKinematics {
     float m0;
     float mf;
     float burnTime;
+    float area_m2;
     const PartProperty* engine;
     int nEngines;
 };

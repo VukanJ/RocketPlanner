@@ -427,13 +427,16 @@ void RocketSolver::RocketConfig::calcStageKinematics(std::vector<StageKinematics
         const double totalFuel_tons = stageInfo.fullMass - stageInfo.emptyMass;
         double currMass_tons = stageInfo.fullMass;
         int nEngines = stageInfo.engineMultiplicity + std::popcount(stageInfo.asparagus_config.hasEngine) * stageInfo.asparagus_config.baseSymmetry;
-        for (int sub = 0; sub < stageInfo.asparagus_config.numAsparagusStages + 1; ++sub) {
+        int asparagus = stageInfo.asparagus_config.numAsparagusStages;
+        int boosters = stageInfo.asparagus_config.baseSymmetry;
+        for (int sub = 0; sub < asparagus + 1; ++sub) {
             kinematics[sptr].engine = stageInfo.engine;
             kinematics[sptr].nEngines = nEngines;
+            int boosters_attached = (asparagus == 0) ? boosters : (sub < asparagus ? boosters - sub : 0);
+            kinematics[sptr].area_m2 = Constants::mk2_area_m2 + boosters_attached * Constants::mk1_area_m2;
             double burnedFuel = stageInfo.asparagus_config.fuelFractions[sub] * totalFuel_tons;
-            int detachedEngines = sub == stageInfo.asparagus_config.numAsparagusStages ? 
-                                                                stageInfo.engineMultiplicity
-                                                             : ((stageInfo.asparagus_config.hasEngine >> sub) & 0x1) * (stageInfo.asparagus_config.baseSymmetry);
+            int detachedEngines = sub == asparagus ? stageInfo.engineMultiplicity
+                                                    : ((stageInfo.asparagus_config.hasEngine >> sub) & 0x1) * boosters;
             double tankWeight = burnedFuel / 9.0;
             kinematics[sptr].m0 = currMass_tons;
             kinematics[sptr].mf = currMass_tons - burnedFuel;
@@ -526,11 +529,8 @@ void simulate_flight(Body body, const RocketSolver::RocketConfig& rocket) {
         float ispVac = currentStage.engine->enginePerf.vacuumISP;
         float thrust = (isp / ispVac) * currentStage.engine->MaxThrustkN * currentStage.nEngines;
 
-        // Drag: area decays with altitude (same heuristic as integrate_ascent)
-        const double Ainit = Constants::mk1_area_m2 * 8 + Constants::mk2_area_m2;
-        const double Afinal = Constants::mk2_area_m2;
-        double alpha = body.atmHeight_km / std::log(Ainit / Afinal);
-        double A = Ainit * std::exp(-altitude / alpha);
+        // Drag: cross-sectional area from current stage's exposed hardware
+        double A = currentStage.area_m2;
         constexpr double Cd = 0.2;
         double rho = (double)pressure * body.sea_level_density_kgpm3 / body.seaLevel_atm;
         double speed_d = std::sqrt((double)vel.x * vel.x + (double)vel.y * vel.y);
