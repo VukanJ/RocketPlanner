@@ -448,7 +448,7 @@ void RocketSolver::RocketConfig::calcStageKinematics(std::vector<StageKinematics
 void simulate_flight(Body body, const RocketSolver::RocketConfig& rocket) {
     struct vec { float x = 0; float y = 0; };
     vec pos {0, body.radius_km};
-    vec vel {0, 0};
+    vec vel {2.0f * M_PI * body.radius_km * 1000.0f / body.rotPeriod_s, 0};
     vec dir {0, 1};
 
     std::vector<StageKinematics> kinematics;
@@ -471,7 +471,7 @@ void simulate_flight(Body body, const RocketSolver::RocketConfig& rocket) {
 
 #ifdef CSV_DUMP
     std::ofstream csv("flight_log.csv");
-    csv << "t,alt_km,vel_m_s,vx_m_s,vy_m_s,posx_km,posy_km,thrust_kN,mass_t,pressure_atm,dir_angle_deg,apoapsis_km,stage\n";
+    csv << "t,alt_km,vel_m_s,vx_m_s,vy_m_s,posx_km,posy_km,thrust_kN,mass_t,pressure_atm,dir_angle_deg,apoapsis_km,stage,A_m2,drag_N\n";
 #endif
 
     const int nStage = kinematics.size();
@@ -496,14 +496,55 @@ void simulate_flight(Body body, const RocketSolver::RocketConfig& rocket) {
         }
 
         float altitude = std::sqrt(pos.x*pos.x + pos.y*pos.y) - body.radius_km;
-        float gravity = body.surfaceGravity * std::pow(body.radius_km / (body.radius_km + altitude), 2);
         float pressure = body.getPressureAtAltitude_km(altitude);
+
+        // Gravity vector: always points toward planet center
+        float r = altitude + body.radius_km;
+        float g_mag = body.surfaceGravity * std::pow(body.radius_km / r, 2);
+        vec grav = {-g_mag * pos.x / r, -g_mag * pos.y / r};
+
+        // Gravity turn: steer from vertical toward horizontal as pressure drops
+        {
+            float r = std::sqrt(pos.x*pos.x + pos.y*pos.y);
+            vec up  {pos.x / r, pos.y / r};
+            vec east{up.y, -up.x};
+            float angle_rad;
+            constexpr float startATM = 1.0f;
+            if (pressure > startATM) {
+                angle_rad = 0.0f;
+            } else if (pressure <= 0.0f) {
+                angle_rad = 85.0f * M_PI / 180.0f;
+            } else {
+                float t = pressure / startATM;
+                angle_rad = (1.0f - t) * 85.0f * M_PI / 180.0f;
+            }
+            dir.x = cos(angle_rad) * up.x + sin(angle_rad) * east.x;
+            dir.y = cos(angle_rad) * up.y + sin(angle_rad) * east.y;
+        }
+
         float isp = currentStage.engine->enginePerf.getISP(pressure);
         float ispVac = currentStage.engine->enginePerf.vacuumISP;
         float thrust = (isp / ispVac) * currentStage.engine->MaxThrustkN * currentStage.nEngines;
 
-        float accel_x = thrust * dir.x / mass;
-        float accel_y = thrust * dir.y / mass - gravity;
+        // Drag: area decays with altitude (same heuristic as integrate_ascent)
+        const double Ainit = Constants::mk1_area_m2 * 8 + Constants::mk2_area_m2;
+        const double Afinal = Constants::mk2_area_m2;
+        double alpha = body.atmHeight_km / std::log(Ainit / Afinal);
+        double A = Ainit * std::exp(-altitude / alpha);
+        constexpr double Cd = 0.2;
+        double rho = (double)pressure * body.sea_level_density_kgpm3 / body.seaLevel_atm;
+        double speed_d = std::sqrt((double)vel.x * vel.x + (double)vel.y * vel.y);
+        double drag_mag = 0.5 * rho * speed_d * speed_d * A * Cd;
+        float drag_N = (float)drag_mag;
+        vec drag_accel{0, 0};
+        if (speed_d > 1e-6) {
+            float ax = (float)(-drag_mag / (mass * 1000.0) * vel.x / speed_d);
+            float ay = (float)(-drag_mag / (mass * 1000.0) * vel.y / speed_d);
+            drag_accel = {ax, ay};
+        }
+
+        float accel_x = thrust * dir.x / mass + drag_accel.x + grav.x;
+        float accel_y = thrust * dir.y / mass + drag_accel.y + grav.y;
         vel.x += accel_x * dt;
         vel.y += accel_y * dt;
         pos.x += vel.x * dt / 1000.0;
@@ -529,7 +570,9 @@ void simulate_flight(Body body, const RocketSolver::RocketConfig& rocket) {
             << pressure << ","
             << dir_angle_deg << ","
             << apo << ","
-            << stage << "\n";
+            << stage << ","
+            << A << ","
+            << drag_N << "\n";
 #endif
         
         stageTime += dt;
