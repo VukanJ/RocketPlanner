@@ -63,6 +63,7 @@ static void run_interactive() {
 
         ws.render();
         ws.renderKinematics();
+        ws.renderBodySelector();
         ws.renderPictogram();
 
 

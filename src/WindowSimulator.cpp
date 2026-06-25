@@ -1,8 +1,26 @@
 #include "WindowSimulator.h"
 #include "imgui.h"
 
+static const struct { const char* name; const Body* body; } bodyTable[] = {
+    { "Kerbin", &KspSystem::Kerbin },
+    { "Eve",    &KspSystem::Eve },
+    { "Duna",   &KspSystem::Duna },
+    { "Laythe", &KspSystem::Laythe },
+    { "Mun",    &KspSystem::Mun },
+    { "Minmus", &KspSystem::Minmus },
+    { "Moho",   &KspSystem::Moho },
+    { "Gilly",  &KspSystem::Gilly },
+    { "Dres",   &KspSystem::Dres },
+    { "Ike",    &KspSystem::Ike },
+    { "Vall",   &KspSystem::Vall },
+    { "Tylo",   &KspSystem::Tylo },
+    { "Bop",    &KspSystem::Bop },
+    { "Pol",    &KspSystem::Pol },
+    { "Eeloo",  &KspSystem::Eeloo },
+};
+
 WindowSimulator::WindowSimulator(const PartInfoList& engines)
-    : allEngines(engines)
+    : allEngines(engines), selectedBody(&KspSystem::Kerbin)
 {
     engineNames.reserve(allEngines.size());
     for (const auto* e : allEngines) {
@@ -12,6 +30,7 @@ WindowSimulator::WindowSimulator(const PartInfoList& engines)
         }
     }
 
+    selectedBody = &KspSystem::Kerbin;
     insertDefaultStage();
 }
 
@@ -134,9 +153,13 @@ void WindowSimulator::render() {
                                 if (asp.fuelFractions[j] < 0.0) asp.fuelFractions[j] = 0.0;
                             }
                         }
-                        configDirty = true;
                         sum = 0.0;
                         for (int j = 0; j < nFrac; ++j) sum += asp.fuelFractions[j];
+                        if (sum > 0.0) {
+                            for (int j = 0; j < nFrac; ++j) asp.fuelFractions[j] /= sum;
+                            sum = 1.0;
+                        }
+                        configDirty = true;
                     }
                 }
 
@@ -286,24 +309,55 @@ void WindowSimulator::renderPictogram() {
     ImGui::End();
 }
 
+void WindowSimulator::renderBodySelector() {
+    ImGui::Begin("Body Selector");
+    const char* currentName = "None";
+    for (auto& entry : bodyTable) {
+        if (selectedBody == entry.body) { currentName = entry.name; break; }
+    }
+    if (ImGui::BeginCombo("Body", currentName)) {
+        for (auto& entry : bodyTable) {
+            bool isSelected = selectedBody == entry.body;
+            if (ImGui::Selectable(entry.name, isSelected))
+                selectedBody = entry.body;
+            if (isSelected)
+                ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
+    if (selectedBody) {
+        ImGui::Text("Surface g: %.2f m/s²", selectedBody->surfaceGravity);
+        ImGui::Text("Radius: %.0f km", selectedBody->radius_km);
+        ImGui::Text("Atmosphere: %.4f atm", selectedBody->seaLevel_atm);
+        if (selectedBody->seaLevel_atm > 0.0f) {
+            ImGui::Text("Atm height: %.0f km", selectedBody->atmHeight_km);
+            ImGui::Text("Rot. period: %.0f s", selectedBody->rotPeriod_s);
+        }
+    }
+    ImGui::End();
+}
+
 void WindowSimulator::renderKinematics() {
     ImGui::Begin("Stage Kinematics");
-    if (ImGui::BeginTable("kinematics", 8, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
+    if (ImGui::BeginTable("kinematics", 7, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
         ImGui::TableSetupColumn("#");
         ImGui::TableSetupColumn("m0 [t]");
         ImGui::TableSetupColumn("mf [t]");
         ImGui::TableSetupColumn("burn [s]");
         ImGui::TableSetupColumn("dV [m/s]");
         ImGui::TableSetupColumn("area [m2]");
-        ImGui::TableSetupColumn("engine");
-        ImGui::TableSetupColumn("nEng");
+        ImGui::TableSetupColumn("TWR");
         ImGui::TableHeadersRow();
 
         double totalDV = 0;
+        double totalBurn = 0;
         for (int i = 0; i < (int)kinematics.size(); ++i) {
             const auto& k = kinematics[i];
             double dV = k.engine ? k.engine->enginePerf.vacuumISP * 9.81f * std::log(k.m0 / k.mf) : 0.0f;
+            double g0 = selectedBody ? selectedBody->surfaceGravity : 9.81f;
+            double twr = k.engine ? k.engine->MaxThrustkN * k.nEngines / (k.m0 * g0) : 0.0;
             totalDV += dV;
+            totalBurn += k.burnTime;
             ImGui::TableNextRow();
             ImGui::TableSetColumnIndex(0); ImGui::Text("%d", i + 1);
             ImGui::TableSetColumnIndex(1); ImGui::Text("%.1f", k.m0);
@@ -311,11 +365,11 @@ void WindowSimulator::renderKinematics() {
             ImGui::TableSetColumnIndex(3); ImGui::Text("%.1f", k.burnTime);
             ImGui::TableSetColumnIndex(4); ImGui::Text("%.0f", dV);
             ImGui::TableSetColumnIndex(5); ImGui::Text("%.3f", k.area_m2);
-            ImGui::TableSetColumnIndex(6); ImGui::Text("%s", k.engine ? k.engine->title.c_str() : "none");
-            ImGui::TableSetColumnIndex(7); ImGui::Text("%d", k.nEngines);
+            ImGui::TableSetColumnIndex(6); ImGui::Text("%.2f", twr);
         }
         ImGui::EndTable();
         ImGui::Text("Total Δv = %f m/s", totalDV);
+        ImGui::Text("Total burn = %f s", totalBurn);
     }
     ImGui::End();
 }

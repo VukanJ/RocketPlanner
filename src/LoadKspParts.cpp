@@ -130,7 +130,7 @@ std::optional<KSPPart> loadFuelTankPart(const std::filesystem::path& filePath) {
 
     std::string line;
     while (std::getline(file, line)) {
-        if (line.find("TechHidden = True") != std::string::npos) {
+        if (line.find("TechHidden = True") != std::string::npos || line.find("TechHidden = true") != std::string::npos) {
             // Skip hidden parts as they are unavailable in-game
             return std::nullopt;
         }
@@ -217,7 +217,7 @@ std::vector<Engine> loadEnginePart(const std::filesystem::path& filePath) {
 
     std::string line;
     while (std::getline(file, line)) {
-        if (line.find("TechHidden = True") != std::string::npos) {
+        if (line.find("TechHidden = True") != std::string::npos || line.find("TechHidden = true") != std::string::npos) {
             return {};
         }
         else if (line.find("title = ") != std::string::npos && engine.title.empty()) {

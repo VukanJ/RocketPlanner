@@ -2,6 +2,7 @@
 #define WINDOW_SIMULATOR
 
 #include "RocketSolver.h"
+#include "kspConstants.h"
 
 #include <vector>
 #include <string>
@@ -13,12 +14,14 @@ public:
     void render();
     void renderKinematics();
     void renderPictogram();
+    void renderBodySelector();
 
     RocketSolver::RocketConfig rocket;
     PartInfoList allEngines;
     std::vector<std::string> engineNames;
     std::vector<StageKinematics> kinematics;
     std::vector<double> stageFuelMass;
+    const Body* selectedBody;
 
 private:
     bool configDirty = false;
