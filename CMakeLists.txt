@@ -16,6 +16,21 @@ set(ROCKET_SOURCES
   src/WindowSimulator.cpp
 )
 
+# ---- Agave Font ----
+set(AGAVE_FONT_URL "https://raw.githubusercontent.com/blobject/agave/master/dist/Agave-Regular.ttf")
+set(AGAVE_FONT_PATH "${CMAKE_BINARY_DIR}/Agave-Regular.ttf")
+if(NOT EXISTS ${AGAVE_FONT_PATH})
+  message(STATUS "Downloading Agave font...")
+  file(DOWNLOAD ${AGAVE_FONT_URL} ${AGAVE_FONT_PATH} STATUS dl_status)
+  list(GET dl_status 0 dl_code)
+  list(GET dl_status 1 dl_msg)
+  if(dl_code EQUAL 0)
+    message(STATUS "Agave font downloaded")
+  else()
+    message(WARNING "Failed to download Agave font: ${dl_msg}")
+  endif()
+endif()
+
 # ---- ImGui + GLFW ----
 find_package(glfw3 REQUIRED)
 find_package(OpenGL REQUIRED)
@@ -41,12 +56,14 @@ set(IMGUI_SOURCES
 
 add_executable(debug ${ROCKET_SOURCES} ${IMGUI_SOURCES})
 target_include_directories(debug PRIVATE ext src ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends)
+target_compile_definitions(debug PRIVATE AGAVE_FONT_PATH="${AGAVE_FONT_PATH}")
 target_compile_options(debug PRIVATE -no-pie -g -O0 -fno-omit-frame-pointer -Wall -Wunused-value -Wshadow -pedantic)
 target_link_options(debug PRIVATE -no-pie)
 target_link_libraries(debug glfw OpenGL::GL)
 
 add_executable(release ${ROCKET_SOURCES} ${IMGUI_SOURCES})
 target_include_directories(release PRIVATE ext src ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends)
+target_compile_definitions(release PRIVATE AGAVE_FONT_PATH="${AGAVE_FONT_PATH}")
 target_compile_options(release PRIVATE -Wall -Wunused-value -Wshadow -pedantic -O3 -DNDEBUG)
 target_link_libraries(release glfw OpenGL::GL)
 
