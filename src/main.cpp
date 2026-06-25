@@ -41,6 +41,10 @@ static void run_interactive() {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); (void)io;
+    if (std::filesystem::exists("../AgaveNerdFontMono-Regular.ttf")) {
+        ImFont* font = io.Fonts->AddFontFromFileTTF("../AgaveNerdFontMono-Regular.ttf", 15.0f, nullptr, io.Fonts->GetGlyphRangesGreek());
+        if (font) io.FontDefault = font;
+    }
     ImGui::StyleColorsDark();
 
     ImGui_ImplGlfw_InitForOpenGL(window, true);
@@ -59,6 +63,7 @@ static void run_interactive() {
 
         ws.render();
         ws.renderKinematics();
+        ws.renderPictogram();
 
 
         ImGui::Render();

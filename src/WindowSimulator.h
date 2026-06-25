@@ -12,6 +12,7 @@ public:
 
     void render();
     void renderKinematics();
+    void renderPictogram();
 
     RocketSolver::RocketConfig rocket;
     PartInfoList allEngines;
