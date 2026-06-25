@@ -337,6 +337,7 @@ RocketSolver::StageInfo RocketSolver::solveSingleStage(double targetDeltaV, doub
                 if (baseSymmetry == 1) { continue; } // Asymmetric mass distribution
                 // Iterate over number of asparagus substages. 0 Means only base symmetry pumping to middle.
                 for (int asparagusStages = 0; asparagusStages <= MAX_ASPARAGUS_SUBSTAGES; ++asparagusStages) {
+                    if (baseSymmetry == 0 && asparagusStages > 0) continue; // No asparagus without base symmetry
                     // Now iterate over all possible configurations of which asparagus boosters have engines.
                     // If there are three substages, then there are 000 to 111 (0 to 7) configurations
                     // 0 means, the stage is a simple drop tank. 000 means, all engines are on the main stage
@@ -432,7 +433,7 @@ void RocketSolver::RocketConfig::calcStageKinematics(std::vector<StageKinematics
         for (int sub = 0; sub < asparagus + 1; ++sub) {
             kinematics[sptr].engine = stageInfo.engine;
             kinematics[sptr].nEngines = nEngines;
-            int boosters_attached = (asparagus == 0) ? boosters : (sub < asparagus ? boosters - sub : 0);
+            int boosters_attached = (asparagus == 0) ? 0 : (sub < asparagus ? boosters - sub : 0);
             kinematics[sptr].area_m2 = Constants::mk2_area_m2 + boosters_attached * Constants::mk1_area_m2;
             double burnedFuel = stageInfo.asparagus_config.fuelFractions[sub] * totalFuel_tons;
             int detachedEngines = sub == asparagus ? stageInfo.engineMultiplicity

@@ -1,7 +1,9 @@
 CompileFlags:
   Add:
-    - -std=c++20
+    - -std=c++23
     - -Iext
+    - -I/home/vukan/rocket_optimizer/build/_deps/imgui-src
+    - -I/home/vukan/rocket_optimizer/build/_deps/imgui-src/backends
     - -Wall
     - -Wunused-value
     - -Wshadow
