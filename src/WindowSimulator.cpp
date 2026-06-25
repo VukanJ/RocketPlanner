@@ -1,5 +1,6 @@
 #include "WindowSimulator.h"
 #include "imgui.h"
+#include <stdexcept>
 
 static const struct { const char* name; const Body* body; } bodyTable[] = {
     { "Kerbin", &KspSystem::Kerbin },
@@ -30,6 +31,10 @@ WindowSimulator::WindowSimulator(const PartInfoList& engines)
         }
     }
 
+    if (defaultEngine == nullptr) {
+        throw std::runtime_error("Faulty engine list");
+    }
+
     selectedBody = &KspSystem::Kerbin;
     insertDefaultStage();
 }
@@ -53,145 +58,170 @@ void WindowSimulator::render() {
         auto& stage = rocket.stages[s];
         ImGui::PushID(s);
         ImGui::Separator();
-        ImGui::Text("Stage %i. Full %.3f / Empty %.3f t", s + 1, stage.fullMass, stage.emptyMass);
 
-        int current = 0;
-        for (int i = 0; i < (int)allEngines.size(); ++i) {
-            if (allEngines[i] == stage.engine) {
-                current = i;
-                break;
-            }
-        }
+        std::string headerLabel = "Stage " + std::to_string(s + 1)
+            + "  —  Full " + (stage.fullMass == INFINITY ? "∞" : std::to_string(stage.fullMass))
+            + " / Empty " + (stage.emptyMass == INFINITY ? "∞" : std::to_string(stage.emptyMass)) + " t";
+        if (ImGui::CollapsingHeader(headerLabel.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
 
-        if (ImGui::BeginCombo(("Engine##" + std::to_string(s)).c_str(), 
-                stage.engine ? stage.engine->title.c_str() : "None")) {
+            int current = 0;
             for (int i = 0; i < (int)allEngines.size(); ++i) {
-                bool selected = (current == i);
-                if (ImGui::Selectable(allEngines[i]->title.c_str(), selected)) {
-                    stage.engine = allEngines[i];
-                    configDirty = true;
+                if (allEngines[i] == stage.engine) {
+                    current = i;
+                    break;
                 }
-                if (selected)
-                    ImGui::SetItemDefaultFocus();
             }
-            ImGui::EndCombo();
-        }
 
-        if (ImGui::InputInt(("Count##" + std::to_string(s)).c_str(), &stage.engineMultiplicity, 1, 4))
-            configDirty = true;
-        if (stage.engineMultiplicity < 0) stage.engineMultiplicity = 0;
+            if (ImGui::BeginCombo(("Engine##" + std::to_string(s)).c_str(),
+                    stage.engine ? stage.engine->title.c_str() : "None")) {
+                for (int i = 0; i < (int)allEngines.size(); ++i) {
+                    bool selected = (current == i);
+                    if (ImGui::Selectable(allEngines[i]->title.c_str(), selected)) {
+                        stage.engine = allEngines[i];
+                        configDirty = true;
+                    }
+                    if (selected) {
+                        ImGui::SetItemDefaultFocus();
+                    }
+                }
+                ImGui::EndCombo();
+            }
 
-        if (ImGui::InputDouble(("Fuel (t)##" + std::to_string(s)).c_str(), &stageFuelMass[s], 0.1, 1.0, "%.3f")) {
-            if (stageFuelMass[s] < 0.0) stageFuelMass[s] = 0.0;
-            configDirty = true;
-        }
+            if (ImGui::SliderInt(("Count##" + std::to_string(s)).c_str(), &stage.engineMultiplicity, 1, 4)) {
+                configDirty = true;
+            }
+            if (stage.engineMultiplicity < 0) {
+                stage.engineMultiplicity = 0;
+            }
 
-        auto& asp = stage.asparagus_config;
-        if (ImGui::CollapsingHeader(("Asparagus##" + std::to_string(s)).c_str())) {
-            ImGui::Indent();
-            if (ImGui::InputInt("Base symmetry", &asp.baseSymmetry, 1, 1)) {
-                if (asp.baseSymmetry < 0) asp.baseSymmetry = 0;
-                if (asp.baseSymmetry > MAX_ASPARAGUS_SYMMETRY) asp.baseSymmetry = MAX_ASPARAGUS_SYMMETRY;
-                if (asp.baseSymmetry == 0) {
-                    asp.numAsparagusStages = 0;
-                    asp.fuelFractions = {1.0};
+            if (ImGui::InputDouble(("Fuel (t)##" + std::to_string(s)).c_str(), &stageFuelMass[s], 0.1, 1.0, "%.3f")) {
+                if (stageFuelMass[s] < 0.0) {
+                    stageFuelMass[s] = 0.0;
                 }
                 configDirty = true;
             }
 
-            if (ImGui::InputInt("Asparagus stages", &asp.numAsparagusStages, 1, 1)) {
-                if (asp.numAsparagusStages < 0) asp.numAsparagusStages = 0;
-                if (asp.baseSymmetry == 0) asp.numAsparagusStages = 0;
-                if (asp.numAsparagusStages > MAX_ASPARAGUS_SUBSTAGES) asp.numAsparagusStages = MAX_ASPARAGUS_SUBSTAGES;
-                asp.fuelFractions.assign(asp.numAsparagusStages + 1, 1.0 / (asp.numAsparagusStages + 1));
-                configDirty = true;
-            }
-
-            std::uint16_t mask = (1 << asp.numAsparagusStages) - 1;
-            asp.hasEngine &= mask;
-
-            for (int a = 0; a < asp.numAsparagusStages; ++a) {
-                bool has = (asp.hasEngine >> a) & 1;
-                if (ImGui::Checkbox(("Stage " + std::to_string(a + 1) + " has engine").c_str(), &has)) {
-                    if (has)
-                        asp.hasEngine |= (1 << a);
-                    else
-                        asp.hasEngine &= ~(1 << a);
+            auto& asp = stage.asparagus_config;
+            if (ImGui::CollapsingHeader(("Asparagus##" + std::to_string(s)).c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
+                ImGui::Indent();
+                if (ImGui::SliderInt("Base symmetry", &asp.baseSymmetry, 0, MAX_ASPARAGUS_SYMMETRY)) {
+                    if (asp.baseSymmetry == 0) {
+                        asp.numAsparagusStages = 0;
+                        asp.fuelFractions = {1.0};
+                    }
                     configDirty = true;
                 }
-            }
 
-            if (asp.numAsparagusStages > 0) {
-                int nFrac = (int)asp.fuelFractions.size();
-                if (nFrac != asp.numAsparagusStages + 1) {
+                int maxStages = asp.baseSymmetry > 0 ? MAX_ASPARAGUS_SUBSTAGES : 0;
+                if (ImGui::SliderInt("Asparagus stages", &asp.numAsparagusStages, 0, maxStages)) {
+                    if (asp.baseSymmetry == 0) {
+                        asp.numAsparagusStages = 0;
+                    }
                     asp.fuelFractions.assign(asp.numAsparagusStages + 1, 1.0 / (asp.numAsparagusStages + 1));
-                    nFrac = asp.numAsparagusStages + 1;
-                }
-
-                double sum = 0.0;
-                for (int j = 0; j < nFrac; ++j) sum += asp.fuelFractions[j];
-
-                if (ImGui::Button(("Equal##" + std::to_string(s)).c_str())) {
-                    for (int j = 0; j < nFrac; ++j) asp.fuelFractions[j] = 1.0 / nFrac;
                     configDirty = true;
                 }
 
-                for (int f = 0; f < nFrac; ++f) {
-                    float val = (float)asp.fuelFractions[f];
-                    if (ImGui::SliderFloat(("Frac " + std::to_string(f + 1)).c_str(),
-                            &val, 0.0f, 1.0f, "%.3f")) {
-                        double oldVal = asp.fuelFractions[f];
-                        asp.fuelFractions[f] = val;
-                        if (asp.fuelFractions[f] < 0.0) asp.fuelFractions[f] = 0.0;
-                        double diff = asp.fuelFractions[f] - oldVal;
-                        double others = sum - oldVal;
-                        if (others > 0.0) {
-                            for (int j = 0; j < nFrac; ++j) {
-                                if (j == f) continue;
-                                double frac = asp.fuelFractions[j] / others;
-                                asp.fuelFractions[j] -= diff * frac;
-                                if (asp.fuelFractions[j] < 0.0) asp.fuelFractions[j] = 0.0;
-                            }
-                        }
-                        sum = 0.0;
-                        for (int j = 0; j < nFrac; ++j) sum += asp.fuelFractions[j];
-                        if (sum > 0.0) {
-                            for (int j = 0; j < nFrac; ++j) asp.fuelFractions[j] /= sum;
-                            sum = 1.0;
+                std::uint16_t mask = (1 << asp.numAsparagusStages) - 1;
+                asp.hasEngine &= mask;
+
+                for (int a = 0; a < asp.numAsparagusStages; ++a) {
+                    bool has = (asp.hasEngine >> a) & 1;
+                    if (ImGui::Checkbox(("Stage " + std::to_string(a + 1) + " has engine").c_str(), &has)) {
+                        if (has) {
+                            asp.hasEngine |= (1 << a);
+                        } else {
+                            asp.hasEngine &= ~(1 << a);
                         }
                         configDirty = true;
                     }
                 }
 
-                ImGui::Text("Sum: %.3f", sum);
-            }
-            ImGui::Unindent();
-        }
+                if (asp.numAsparagusStages > 0) {
+                    int nFrac = (int)asp.fuelFractions.size();
+                    if (nFrac != asp.numAsparagusStages + 1) {
+                        asp.fuelFractions.assign(asp.numAsparagusStages + 1, 1.0 / (asp.numAsparagusStages + 1));
+                        nFrac = asp.numAsparagusStages + 1;
+                    }
 
-        if (ImGui::Button("Remove stage")) {
-            rocket.stages.erase(rocket.stages.begin() + s);
-            stageFuelMass.erase(stageFuelMass.begin() + s);
-            configDirty = true;
-            ImGui::PopID();
-            --s;
-            continue;
-        }
-        ImGui::SameLine();
-        if (s > 0) {
-            if (ImGui::ArrowButton("##up", ImGuiDir_Up)) {
-                std::swap(rocket.stages[s], rocket.stages[s - 1]);
-                std::swap(stageFuelMass[s], stageFuelMass[s - 1]);
-                configDirty = true;
+                    double sum = 0.0;
+                    for (int j = 0; j < nFrac; ++j) {
+                        sum += asp.fuelFractions[j];
+                    }
+
+                    if (ImGui::Button(("Equal##" + std::to_string(s)).c_str())) {
+                        for (int j = 0; j < nFrac; ++j) {
+                            asp.fuelFractions[j] = 1.0 / nFrac;
+                        }
+                        configDirty = true;
+                    }
+
+                    for (int f = 0; f < nFrac; ++f) {
+                        float val = (float)asp.fuelFractions[f];
+                        if (ImGui::SliderFloat(("Frac " + std::to_string(f + 1)).c_str(), &val, 0.0f, 1.0f, "%.3f")) {
+                            double oldVal = asp.fuelFractions[f];
+                            asp.fuelFractions[f] = val;
+                            if (asp.fuelFractions[f] < 0.0) {
+                                asp.fuelFractions[f] = 0.0;
+                            }
+                            double diff = asp.fuelFractions[f] - oldVal;
+                            double others = sum - oldVal;
+                            if (others > 0.0) {
+                                for (int j = 0; j < nFrac; ++j) {
+                                    if (j == f) {
+                                        continue;
+                                    }
+                                    double frac = asp.fuelFractions[j] / others;
+                                    asp.fuelFractions[j] -= diff * frac;
+                                    if (asp.fuelFractions[j] < 0.0) {
+                                        asp.fuelFractions[j] = 0.0;
+                                    }
+                                }
+                            }
+                            sum = 0.0;
+                            for (int j = 0; j < nFrac; ++j) {
+                                sum += asp.fuelFractions[j];
+                            }
+                            if (sum > 0.0) {
+                                for (int j = 0; j < nFrac; ++j) {
+                                    asp.fuelFractions[j] /= sum;
+                                }
+                                sum = 1.0;
+                            }
+                            configDirty = true;
+                        }
+                    }
+
+                    ImGui::Text("Sum: %.3f", sum);
+                }
+                ImGui::Unindent();
             }
-            ImGui::SameLine();
-        }
-        if (s < (int)rocket.stages.size() - 1) {
-            if (ImGui::ArrowButton("##dn", ImGuiDir_Down)) {
-                std::swap(rocket.stages[s], rocket.stages[s + 1]);
-                std::swap(stageFuelMass[s], stageFuelMass[s + 1]);
+
+            ImGui::Spacing();
+            if (ImGui::Button("Remove stage")) {
+                rocket.stages.erase(rocket.stages.begin() + s);
+                stageFuelMass.erase(stageFuelMass.begin() + s);
                 configDirty = true;
+                ImGui::PopID();
                 --s;
                 continue;
+            }
+            if (s > 0) {
+                ImGui::SameLine();
+                if (ImGui::ArrowButton("##up", ImGuiDir_Up)) {
+                    std::swap(rocket.stages[s], rocket.stages[s - 1]);
+                    std::swap(stageFuelMass[s], stageFuelMass[s - 1]);
+                    configDirty = true;
+                }
+            }
+            if (s < (int)rocket.stages.size() - 1) {
+                ImGui::SameLine();
+                if (ImGui::ArrowButton("##dn", ImGuiDir_Down)) {
+                    std::swap(rocket.stages[s], rocket.stages[s + 1]);
+                    std::swap(stageFuelMass[s], stageFuelMass[s + 1]);
+                    configDirty = true;
+                    --s;
+                    continue;
+                }
             }
         }
         ImGui::PopID();
@@ -211,9 +241,14 @@ void WindowSimulator::renderPictogram() {
     if (rocket.stages.empty()) { ImGui::End(); return; }
 
     float maxFuel = 0.0f;
-    for (auto& f : stageFuelMass)
-        if ((float)f > maxFuel) maxFuel = (float)f;
-    if (maxFuel <= 0.0f) maxFuel = 1.0f;
+    for (auto& f : stageFuelMass) {
+        if ((float)f > maxFuel) {
+            maxFuel = (float)f;
+        }
+    }
+    if (maxFuel <= 0.0f) {
+        maxFuel = 1.0f;
+    }
 
     float coreScale = 50.0f / std::sqrt(maxFuel / 3.14159f);
 
@@ -229,32 +264,35 @@ void WindowSimulator::renderPictogram() {
         int rings = st.asparagus_config.numAsparagusStages;
 
         float coreFuel = totalFuel;
-        if (rings > 0 && (int)frac.size() == rings + 1)
+        if (rings > 0 && (int)frac.size() == rings + 1) {
             coreFuel = (float)frac[0] * totalFuel;
+        }
 
         float coreR = std::sqrt(coreFuel / 3.14159f) * coreScale;
-        if (coreR < 8.0f) coreR = 8.0f;
+        if (coreR < 8.0f) {
+            coreR = 8.0f;
+        }
 
         float maxExtent = coreR;
         float prevR = coreR;
         for (int r = 0; r < rings; ++r) {
             float boosterFuel = (int)frac.size() > r + 1 ? (float)frac[r + 1] * totalFuel / sym : 0.0f;
             float boosterR = std::sqrt(boosterFuel / 3.14159f) * coreScale;
-            if (boosterR < 4.0f) boosterR = 4.0f;
+            if (boosterR < 4.0f) { boosterR = 4.0f; }
             float minRing = prevR + boosterR + 2.0f;
             if (sym > 1) {
                 float minByAngle = boosterR / std::sin(3.14159f / sym);
-                if (minByAngle > minRing) minRing = minByAngle;
+                if (minByAngle > minRing) { minRing = minByAngle; }
             }
             float ringRad = minRing;
             prevR = ringRad + boosterR;
             float extent = ringRad + boosterR;
-            if (extent > maxExtent) maxExtent = extent;
+            if (extent > maxExtent) { maxExtent = extent; }
         }
 
         float dim = (maxExtent + 10.0f) * 2.0f;
         ImGui::PushID(i);
-        ImGui::BeginChildFrame(i, ImVec2(dim + 80.0f, dim));
+        ImGui::BeginChild(i + 1, ImVec2(dim + 80.0f, dim));
         {
             auto* draw = ImGui::GetWindowDrawList();
             ImVec2 origin = ImGui::GetCursorScreenPos();
@@ -272,12 +310,12 @@ void WindowSimulator::renderPictogram() {
 
                 float boosterFuel = (int)frac.size() > r + 1 ? (float)frac[r + 1] * totalFuel / sym : 0.0f;
                 float boosterR = std::sqrt(boosterFuel / 3.14159f) * coreScale;
-                if (boosterR < 4.0f) boosterR = 4.0f;
+                if (boosterR < 4.0f) { boosterR = 4.0f; }
 
                 float minRing = prevR + boosterR + 2.0f;
                 if (sym > 1) {
                     float minByAngle = boosterR / std::sin(3.14159f / sym);
-                    if (minByAngle > minRing) minRing = minByAngle;
+                    if (minByAngle > minRing) { minRing = minByAngle; }
                 }
                 float ringRad = minRing;
                 prevR = ringRad + boosterR;
@@ -302,7 +340,7 @@ void WindowSimulator::renderPictogram() {
                 draw->AddText(ImVec2(cx - ts.x * 0.5f, origin.y + 2.0f), orderColor, orderLabel);
             }
         }
-        ImGui::EndChildFrame();
+        ImGui::EndChild();
         ImGui::PopID();
     }
 
@@ -313,15 +351,19 @@ void WindowSimulator::renderBodySelector() {
     ImGui::Begin("Body Selector");
     const char* currentName = "None";
     for (auto& entry : bodyTable) {
-        if (selectedBody == entry.body) { currentName = entry.name; break; }
+        if (selectedBody == entry.body) {
+            currentName = entry.name; break;
+        }
     }
     if (ImGui::BeginCombo("Body", currentName)) {
         for (auto& entry : bodyTable) {
             bool isSelected = selectedBody == entry.body;
-            if (ImGui::Selectable(entry.name, isSelected))
+            if (ImGui::Selectable(entry.name, isSelected)) {
                 selectedBody = entry.body;
-            if (isSelected)
+            }
+            if (isSelected) {
                 ImGui::SetItemDefaultFocus();
+            }
         }
         ImGui::EndCombo();
     }
@@ -381,7 +423,8 @@ void WindowSimulator::recomputeMasses() {
 
 void WindowSimulator::updateKinematics() {
     kinematics.clear();
-    for (const auto& stage : rocket.stages)
-        if (!stage.engine) return;
+    for (const auto& stage : rocket.stages) {
+        if (!stage.engine) { return; }
+    }
     rocket.calcStageKinematics(kinematics);
 }

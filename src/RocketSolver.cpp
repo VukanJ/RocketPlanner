@@ -18,7 +18,7 @@ static void softmaxFractions(const std::vector<double>& params, std::vector<doub
 
     double maxVal = 0.0;
     for (int i = 0; i < n - 1; ++i) {
-        if (params[i] > maxVal) maxVal = params[i];
+        if (params[i] > maxVal) { maxVal = params[i]; }
     }
 
     double sumExp = 0.0;
@@ -131,27 +131,27 @@ static double computeAsparagusFullMass(
         double burnedFuel           = fuelFractions[s - 1] * mF;
         double detachedEngineWeight = (engineConfig >> (s - 1) & 0x1) * (baseSymmetry * engineMass);
         double dropMass = burnedFuel / 9.0 + detachedEngineWeight;
-        if (dropMass >= mCurrent) return INFINITY;
+        if (dropMass >= mCurrent) { return INFINITY; }
         mCurrent -= dropMass;
 
         int remainingEngines = engineMultiplicity
                              + std::popcount((unsigned)(engineConfig >> s)) * baseSymmetry;
-        if (engine->MaxThrustkN * remainingEngines / (mCurrent * g0) < minTWR) return INFINITY;
+        if (engine->MaxThrustkN * remainingEngines / (mCurrent * g0) < minTWR) { return INFINITY; }
 
         productFullMasses *= mCurrent;
         double nextFuel = fuelFractions[s] * mF;
-        if (nextFuel >= mCurrent) return INFINITY;
+        if (nextFuel >= mCurrent) { return INFINITY; }
         mCurrent -= nextFuel;
         productFinalMasses *= mCurrent;
     }
-    if (productFullMasses <= 0.0 || productFinalMasses <= 0.0) return INFINITY;
+    if (productFullMasses <= 0.0 || productFinalMasses <= 0.0) { return INFINITY; }
     double achievedDeltaV = isp * g0
                           * std::log(productFullMasses / productFinalMasses);
-    if (achievedDeltaV < targetDeltaV) return INFINITY;
+    if (achievedDeltaV < targetDeltaV) { return INFINITY; }
 
     int totalEngines = engineMultiplicity + std::popcount((unsigned int)engineConfig) * baseSymmetry;
     double TWR = (engine->MaxThrustkN * totalEngines) / (mFull * g0);
-    if (TWR < minTWR) return INFINITY;
+    if (TWR < minTWR) { return INFINITY; }
     return mFull;
 }
 
@@ -241,7 +241,8 @@ RocketSolver::StageInfo inline calcStageMass(const PartProperty* engine,
         std::vector<double> fuelFractions(asparagusNumStages + 1);
         if (asparagusNumStages == 0) {
             fuelFractions[0] = 1.0;
-        } else {
+        }
+        else {
             std::vector<double> fracBuf, optFractions, eqFractions;
             auto objective = [&](const std::vector<double>& p) -> double {
                 softmaxFractions(p, fracBuf);
@@ -337,7 +338,7 @@ RocketSolver::StageInfo RocketSolver::solveSingleStage(double targetDeltaV, doub
                 if (baseSymmetry == 1) { continue; } // Asymmetric mass distribution
                 // Iterate over number of asparagus substages. 0 Means only base symmetry pumping to middle.
                 for (int asparagusStages = 0; asparagusStages <= MAX_ASPARAGUS_SUBSTAGES; ++asparagusStages) {
-                    if (baseSymmetry == 0 && asparagusStages > 0) continue; // No asparagus without base symmetry
+                    if (baseSymmetry == 0 && asparagusStages > 0) { continue; } // No asparagus without base symmetry
                     // Now iterate over all possible configurations of which asparagus boosters have engines.
                     // If there are three substages, then there are 000 to 111 (0 to 7) configurations
                     // 0 means, the stage is a simple drop tank. 000 means, all engines are on the main stage
@@ -433,10 +434,12 @@ void RocketSolver::RocketConfig::recomputeMasses(const std::vector<double>& fuel
         }
         stage.emptyMass = enginesMass + fuelMass[i] / 9.0 + belowMass;
         stage.fullMass = stage.emptyMass + fuelMass[i];
-        if (stage.asparagus_config.baseSymmetry == 0)
+        if (stage.asparagus_config.baseSymmetry == 0) {
             stage.asparagus_config.fuelFractions = {1.0};
-        else if ((int)stage.asparagus_config.fuelFractions.size() != stage.asparagus_config.numAsparagusStages + 1)
+        }
+        else if ((int)stage.asparagus_config.fuelFractions.size() != stage.asparagus_config.numAsparagusStages + 1) {
             stage.asparagus_config.fuelFractions.assign(stage.asparagus_config.numAsparagusStages + 1, 1.0 / (stage.asparagus_config.numAsparagusStages + 1));
+        }
         belowMass = stage.fullMass;
     }
 }
@@ -487,7 +490,7 @@ void simulate_flight(Body body, const RocketSolver::RocketConfig& rocket) {
         double v2 = vx*vx + vy*vy;                     // km²/s²
         double r  = std::sqrt(pos.x*pos.x + pos.y*pos.y); // km
         double eps = 0.5*v2 - body.GM() / r;           // km²/s²
-        if (eps >= 0) return INFINITY;
+        if (eps >= 0) { return INFINITY; }
         double a   = -body.GM() / (2*eps);             // km
         double h   = pos.x * vy - pos.y * vx;          // km²/s
         double e   = std::sqrt(1 + 2*eps*h*h / (body.GM()*body.GM()));
@@ -539,9 +542,11 @@ void simulate_flight(Body body, const RocketSolver::RocketConfig& rocket) {
             constexpr float startATM = 1.0f;
             if (pressure > startATM) {
                 angle_rad = 0.0f;
-            } else if (pressure <= 0.0f) {
+            }
+            else if (pressure <= 0.0f) {
                 angle_rad = 85.0f * M_PI / 180.0f;
-            } else {
+            }
+            else {
                 float t = pressure / startATM;
                 angle_rad = (1.0f - t) * 85.0f * M_PI / 180.0f;
             }
