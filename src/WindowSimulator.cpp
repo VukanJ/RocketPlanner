@@ -299,46 +299,30 @@ void WindowSimulator::renderKinematics() {
         ImGui::TableSetupColumn("nEng");
         ImGui::TableHeadersRow();
 
+        double totalDV = 0;
         for (int i = 0; i < (int)kinematics.size(); ++i) {
             const auto& k = kinematics[i];
+            double dV = k.engine ? k.engine->enginePerf.vacuumISP * 9.81f * std::log(k.m0 / k.mf) : 0.0f;
+            totalDV += dV;
             ImGui::TableNextRow();
             ImGui::TableSetColumnIndex(0); ImGui::Text("%d", i + 1);
             ImGui::TableSetColumnIndex(1); ImGui::Text("%.1f", k.m0);
             ImGui::TableSetColumnIndex(2); ImGui::Text("%.1f", k.mf);
             ImGui::TableSetColumnIndex(3); ImGui::Text("%.1f", k.burnTime);
-            ImGui::TableSetColumnIndex(4); ImGui::Text("%.0f", k.engine ? k.engine->enginePerf.vacuumISP * 9.81f * std::log(k.m0 / k.mf) : 0.0f);
+            ImGui::TableSetColumnIndex(4); ImGui::Text("%.0f", dV);
             ImGui::TableSetColumnIndex(5); ImGui::Text("%.3f", k.area_m2);
             ImGui::TableSetColumnIndex(6); ImGui::Text("%s", k.engine ? k.engine->title.c_str() : "none");
             ImGui::TableSetColumnIndex(7); ImGui::Text("%d", k.nEngines);
         }
         ImGui::EndTable();
+        ImGui::Text("Total Δv = %f m/s", totalDV);
     }
     ImGui::End();
 }
 
 void WindowSimulator::recomputeMasses() {
     stageFuelMass.resize(rocket.stages.size(), 0.0);
-
-    double belowMass = 0.0;
-    for (int i = rocket.stages.size() - 1; i >= 0; --i) {
-        auto& stage = rocket.stages[i];
-        double enginesMass = 0.0;
-        if (stage.engine) {
-            enginesMass = stage.engine->getMass() * stage.engineMultiplicity;
-            auto& asp = stage.asparagus_config;
-            if (asp.baseSymmetry > 0 && asp.numAsparagusStages > 0) {
-                int boosters = std::popcount((unsigned int)asp.hasEngine) * asp.baseSymmetry;
-                enginesMass += stage.engine->getMass() * boosters;
-            }
-        }
-        stage.emptyMass = enginesMass + belowMass;
-        stage.fullMass = stage.emptyMass + stageFuelMass[i];
-        if (stage.asparagus_config.baseSymmetry == 0)
-            stage.asparagus_config.fuelFractions = {1.0};
-        else if ((int)stage.asparagus_config.fuelFractions.size() != stage.asparagus_config.numAsparagusStages + 1)
-            stage.asparagus_config.fuelFractions.assign(stage.asparagus_config.numAsparagusStages + 1, 1.0 / (stage.asparagus_config.numAsparagusStages + 1));
-        belowMass = stage.fullMass;
-    }
+    rocket.recomputeMasses(stageFuelMass);
 }
 
 void WindowSimulator::updateKinematics() {

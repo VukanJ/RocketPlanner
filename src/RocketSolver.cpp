@@ -418,6 +418,29 @@ int RocketSolver::RocketConfig::totalStages() const {
     return tot;
 }
 
+void RocketSolver::RocketConfig::recomputeMasses(const std::vector<double>& fuelMass) {
+    double belowMass = 0.0;
+    for (int i = (int)stages.size() - 1; i >= 0; --i) {
+        auto& stage = stages[i];
+        double enginesMass = 0.0;
+        if (stage.engine) {
+            enginesMass = stage.engine->getMass() * stage.engineMultiplicity;
+            auto& asp = stage.asparagus_config;
+            if (asp.baseSymmetry > 0 && asp.numAsparagusStages > 0) {
+                int boosters = std::popcount((unsigned int)asp.hasEngine) * asp.baseSymmetry;
+                enginesMass += stage.engine->getMass() * boosters;
+            }
+        }
+        stage.emptyMass = enginesMass + fuelMass[i] / 9.0 + belowMass;
+        stage.fullMass = stage.emptyMass + fuelMass[i];
+        if (stage.asparagus_config.baseSymmetry == 0)
+            stage.asparagus_config.fuelFractions = {1.0};
+        else if ((int)stage.asparagus_config.fuelFractions.size() != stage.asparagus_config.numAsparagusStages + 1)
+            stage.asparagus_config.fuelFractions.assign(stage.asparagus_config.numAsparagusStages + 1, 1.0 / (stage.asparagus_config.numAsparagusStages + 1));
+        belowMass = stage.fullMass;
+    }
+}
+
 void RocketSolver::RocketConfig::calcStageKinematics(std::vector<StageKinematics>& kinematics) const {
     const int totStages = totalStages();
     kinematics.resize(totStages);

@@ -45,6 +45,7 @@ public:
     struct RocketConfig {
         std::vector<StageInfo> stages;
         void calcStageKinematics(std::vector<StageKinematics>& kinematics) const;
+        void recomputeMasses(const std::vector<double>& fuelMass);
         int totalStages() const;
         double totalMass = INFINITY;
     };
