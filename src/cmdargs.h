@@ -19,9 +19,9 @@ public:
     bool is_flag_set(const std::string& name) const;
 
     void print_args() const;
+    void print_help() const;
 
 private:
-    void print_help() const;
 
     struct OptArg {
         enum Status : std::uint8_t {

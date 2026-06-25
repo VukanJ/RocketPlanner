@@ -1,6 +1,7 @@
 #include <iostream>
 #include <filesystem>
 
+#include "WindowSimulator.h"
 #include "kspConstants.h"
 #include "rocket.h"
 #include "cmdargs.h"
@@ -44,6 +45,10 @@ static void run_interactive() {
 
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 130");
+    
+    const auto kspPath = findKSP();
+    Rocket rocket(kspPath, "Rocket Optimizer");
+    WindowSimulator ws(rocket.allEngines());
 
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
@@ -52,9 +57,9 @@ static void run_interactive() {
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        ImGui::Begin("Hello, world!");
-        ImGui::Text("This is a simple ImGui window.");
-        ImGui::End();
+        ws.render();
+        ws.renderKinematics();
+
 
         ImGui::Render();
         int display_w, display_h;
@@ -81,7 +86,7 @@ int main(int argc, char** argv) {
 
     if (!args(argc, argv)) {
         std::cerr << "ERROR: Invalid command line option(s)\n";
-        args.print_args();
+        args.print_help();
         return EXIT_FAILURE;
     }
     if (args.is_flag_set("-h") || args.is_flag_set("--help")) {

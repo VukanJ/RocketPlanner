@@ -13,6 +13,7 @@ set(ROCKET_SOURCES
   src/RocketSolver.cpp
   src/NelderMead.cpp
   src/cmdargs.cpp
+  src/WindowSimulator.cpp
 )
 
 # ---- ImGui + GLFW ----
