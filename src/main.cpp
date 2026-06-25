@@ -25,8 +25,9 @@ std::string findKSP() {
 }
 
 static void run_interactive() {
-    if (!glfwInit())
+    if (!glfwInit()) {
         return;
+    }
 
     GLFWwindow* window = glfwCreateWindow(1280, 720, "Rocket Optimizer", nullptr, nullptr);
     if (!window) {
@@ -78,11 +79,18 @@ int main(int argc, char** argv) {
     args.add_flag("-i", "Open interactive GUI window");
     args.add_flag("--interactive", "Open interactive GUI window");
 
-    args(argc, argv);
+    if (!args(argc, argv)) {
+        std::cerr << "ERROR: Invalid command line option(s)\n";
+        args.print_args();
+        return EXIT_FAILURE;
+    }
+    if (args.is_flag_set("-h") || args.is_flag_set("--help")) {
+        return EXIT_SUCCESS;
+    }
 
     if (args.is_flag_set("-i") || args.is_flag_set("--interactive")) {
         run_interactive();
-        return 0;
+        return EXIT_SUCCESS;
     }
 
     const auto kspPath = findKSP();
@@ -90,4 +98,5 @@ int main(int argc, char** argv) {
 
     rocket.setRootPart("Mk2 Lander Can");
     rocket.construct(10000, 1.7, 1.3, KspSystem::Eve.surfaceGravity, KspSystem::Eve.seaLevel_atm);
+    return EXIT_SUCCESS;
 }

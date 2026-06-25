@@ -1,10 +1,6 @@
 #include "cmdargs.h"
 
 #include <print>
-#include <stdexcept>
-#include <cstdlib>
-#include <stdexcept>
-#include <cstdlib>
 
 CmdArgs::CmdArgs(bool help_options) {
     if (help_options) {
@@ -21,7 +17,7 @@ void CmdArgs::add_flag(const std::string& name, const std::string& description) 
     options[name] = OptArg{ OptArg::Status::FLAG, description, std::nullopt };
 }
 
-void CmdArgs::operator()(int argc, char** argv) {
+bool CmdArgs::operator()(int argc, char** argv) {
     program_name = argv[0];
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
@@ -34,28 +30,28 @@ void CmdArgs::operator()(int argc, char** argv) {
                 if (i + 1 < argc) {
                     opt.value = argv[i + 1];
                     opt.set_has_value();
-                    ++i; // Skip next argument as it's the value
+                    ++i;
                 }
                 else {
-                    throw std::runtime_error("CmdArgs: Option " + arg + " requires a value.");
+                    return false;
                 }
             }
         }
         else {
-            throw std::runtime_error("CmdArgs: Unknown option " + arg);
+            return false;
         }
     }
     
-    // Check for mandatory options
     for (const auto& [name, opt] : options) {
         if (opt.is_mandatory() && !opt.is_value_set()) {
-            throw std::runtime_error("CmdArgs: Missing mandatory option " + name);
+            return false;
         }
         if (opt.is_help() && opt.is_flag_set()) {
             print_help();
-            std::exit(0);
+            return true;
         }
     }
+    return true;
 }
 
 std::optional<std::string> CmdArgs::get(const std::string& name) const {

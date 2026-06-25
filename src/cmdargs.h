@@ -13,7 +13,7 @@ public:
     void add_option(const std::string& name, const std::string& description, bool requires_value = false);
     void add_flag(const std::string& name, const std::string& description);
 
-    void operator()(int argc, char** argv);
+    bool operator()(int argc, char** argv);
 
     std::optional<std::string> get(const std::string& name) const;
     bool is_flag_set(const std::string& name) const;
