@@ -70,6 +70,7 @@ static void run_interactive() {
         ws.renderBodySelector();
         ws.renderPictogram();
         ws.renderFlight();
+        ws.renderRawData();
 
 
         ImGui::Render();

@@ -4,6 +4,7 @@
 #include <print>
 #include <stdexcept>
 #include <iostream>
+#include <fstream>
 
 static const struct { const char* name; const Body* body; } bodyTable[] = {
     { "Kerbin", &KspSystem::Kerbin },
@@ -566,36 +567,63 @@ void WindowSimulator::renderFlight() {
 
     ImGui::EndChild();
 
-    if (ImGui::CollapsingHeader("Raw Data")) {
-        if (ImGui::BeginTable("flight_table", 10, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
-            ImGui::TableSetupColumn("t");
-            ImGui::TableSetupColumn("alt_km");
-            ImGui::TableSetupColumn("vel_m_s");
-            ImGui::TableSetupColumn("mass_t");
-            ImGui::TableSetupColumn("thrust_kN");
-            ImGui::TableSetupColumn("drag_N");
-            ImGui::TableSetupColumn("apo_km");
-            ImGui::TableSetupColumn("press_atm");
-            ImGui::TableSetupColumn("dir_deg");
-            ImGui::TableSetupColumn("stage");
-            ImGui::TableHeadersRow();
-
-            int step = std::max(1, (int)flightData.t.size() / 100);
-            for (int i = 0; i < (int)flightData.t.size(); i += step) {
-                ImGui::TableNextRow();
-                ImGui::TableSetColumnIndex(0); ImGui::Text("%.2f", flightData.t[i]);
-                ImGui::TableSetColumnIndex(1); ImGui::Text("%.3f", flightData.altitude_km[i]);
-                ImGui::TableSetColumnIndex(2); ImGui::Text("%.1f", flightData.velocity_ms[i]);
-                ImGui::TableSetColumnIndex(3); ImGui::Text("%.1f", flightData.mass_t[i]);
-                ImGui::TableSetColumnIndex(4); ImGui::Text("%.1f", flightData.thrust_kN[i]);
-                ImGui::TableSetColumnIndex(5); ImGui::Text("%.1f", flightData.drag_N[i]);
-                ImGui::TableSetColumnIndex(6); ImGui::Text("%.1f", flightData.apoapsis_km[i]);
-                ImGui::TableSetColumnIndex(7); ImGui::Text("%.4f", flightData.pressure_atm[i]);
-                ImGui::TableSetColumnIndex(8); ImGui::Text("%.1f", flightData.dir_angle_deg[i]);
-                ImGui::TableSetColumnIndex(9); ImGui::Text("%d", flightData.stage[i]);
-            }
-            ImGui::EndTable();
+    if (ImGui::Button("Save CSV")) {
+        std::ofstream csv("flight_data.csv");
+        csv << "t,alt_km,vel_m_s,mass_t,thrust_kN,drag_N,apo_km,pressure_atm,dir_deg,area_m2,stage\n";
+        for (size_t i = 0; i < flightData.t.size(); ++i) {
+            csv << flightData.t[i] << ','
+                << flightData.altitude_km[i] << ','
+                << flightData.velocity_ms[i] << ','
+                << flightData.mass_t[i] << ','
+                << flightData.thrust_kN[i] << ','
+                << flightData.drag_N[i] << ','
+                << flightData.apoapsis_km[i] << ','
+                << flightData.pressure_atm[i] << ','
+                << flightData.dir_angle_deg[i] << ','
+                << flightData.area_m2[i] << ','
+                << flightData.stage[i] << '\n';
         }
+    }
+    ImGui::SameLine();
+    ImGui::TextDisabled("(?)");
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Saves flight_data.csv to working directory");
+
+    ImGui::End();
+}
+
+void WindowSimulator::renderRawData() {
+    if (flightData.t.empty()) return;
+
+    ImGui::Begin("Raw Data");
+    if (ImGui::BeginTable("flight_table", 10, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
+        ImGui::TableSetupColumn("t");
+        ImGui::TableSetupColumn("alt_km");
+        ImGui::TableSetupColumn("vel_m_s");
+        ImGui::TableSetupColumn("mass_t");
+        ImGui::TableSetupColumn("thrust_kN");
+        ImGui::TableSetupColumn("drag_N");
+        ImGui::TableSetupColumn("apo_km");
+        ImGui::TableSetupColumn("press_atm");
+        ImGui::TableSetupColumn("dir_deg");
+        ImGui::TableSetupColumn("stage");
+        ImGui::TableHeadersRow();
+
+        int step = std::max(1, (int)flightData.t.size() / 100);
+        for (int i = 0; i < (int)flightData.t.size(); i += step) {
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0); ImGui::Text("%.2f", flightData.t[i]);
+            ImGui::TableSetColumnIndex(1); ImGui::Text("%.3f", flightData.altitude_km[i]);
+            ImGui::TableSetColumnIndex(2); ImGui::Text("%.1f", flightData.velocity_ms[i]);
+            ImGui::TableSetColumnIndex(3); ImGui::Text("%.1f", flightData.mass_t[i]);
+            ImGui::TableSetColumnIndex(4); ImGui::Text("%.1f", flightData.thrust_kN[i]);
+            ImGui::TableSetColumnIndex(5); ImGui::Text("%.1f", flightData.drag_N[i]);
+            ImGui::TableSetColumnIndex(6); ImGui::Text("%.1f", flightData.apoapsis_km[i]);
+            ImGui::TableSetColumnIndex(7); ImGui::Text("%.4f", flightData.pressure_atm[i]);
+            ImGui::TableSetColumnIndex(8); ImGui::Text("%.1f", flightData.dir_angle_deg[i]);
+            ImGui::TableSetColumnIndex(9); ImGui::Text("%d", flightData.stage[i]);
+        }
+        ImGui::EndTable();
     }
     ImGui::End();
 }

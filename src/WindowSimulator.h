@@ -16,6 +16,7 @@ public:
     void renderPictogram();
     void renderBodySelector();
     void renderFlight();
+    void renderRawData();
 
     RocketSolver::RocketConfig rocket;
     PartInfoList allEngines;

@@ -11,7 +11,8 @@ namespace Constants {
     constexpr inline double SolidFuelDensity      = 0.0075;
     constexpr inline double XenonGasDensity       = 0.0001;
 
-    constexpr inline double mk1_area_m2 = M_PI * 1.2 * 1.2;
+    constexpr inline double mk0_area_m2 = M_PI * 0.625 * 0.625;
+    constexpr inline double mk1_area_m2 = M_PI * 1.25 * 1.25;
     constexpr inline double mk2_area_m2 = M_PI * 1.9 * 1.9;
     constexpr inline double mk3_area_m2 = M_PI * 2.5 * 2.5;
 
