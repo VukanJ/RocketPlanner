@@ -7,6 +7,7 @@
 #include "cmdargs.h"
 
 #include "imgui.h"
+#include "implot.h"
 #include "backends/imgui_impl_glfw.h"
 #include "backends/imgui_impl_opengl3.h"
 #include <GLFW/glfw3.h>
@@ -40,6 +41,7 @@ static void run_interactive() {
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
+    ImPlot::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); (void)io;
 #ifdef AGAVE_FONT_PATH
     if (std::filesystem::exists(AGAVE_FONT_PATH)) {
@@ -67,6 +69,7 @@ static void run_interactive() {
         ws.renderKinematics();
         ws.renderBodySelector();
         ws.renderPictogram();
+        ws.renderFlight();
 
 
         ImGui::Render();
@@ -82,6 +85,7 @@ static void run_interactive() {
 
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
+    ImPlot::DestroyContext();
     ImGui::DestroyContext();
     glfwDestroyWindow(window);
     glfwTerminate();

@@ -15,6 +15,7 @@ public:
     void renderKinematics();
     void renderPictogram();
     void renderBodySelector();
+    void renderFlight();
 
     RocketSolver::RocketConfig rocket;
     PartInfoList allEngines;
@@ -22,11 +23,14 @@ public:
     std::vector<StageKinematics> kinematics;
     std::vector<double> stageFuelMass;
     const Body* selectedBody;
+    FlightData<float> flightData;
 
 private:
     bool configDirty = false;
+    bool showPlot[10] = {true, true, true, true, true, true, true, true, true, true};
     void recomputeMasses();
     void updateKinematics();
+    void simulateCurrentFlight();
 
     void insertDefaultStage();
 

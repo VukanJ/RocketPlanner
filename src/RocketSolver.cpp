@@ -475,34 +475,31 @@ void RocketSolver::RocketConfig::calcStageKinematics(std::vector<StageKinematics
     }
 }
 
-void simulate_flight(Body body, const RocketSolver::RocketConfig& rocket) {
+FlightData<float> simulate_flight(Body body, const RocketSolver::RocketConfig& rocket) {
     struct vec { float x = 0; float y = 0; };
-    vec pos {0, body.radius_km};
-    vec vel {2.0f * M_PI * body.radius_km * 1000.0f / body.rotPeriod_s, 0};
+    vec pos {0, (float)body.radius_km};
+    vec vel {(float)(2.0f * M_PI * body.radius_km * 1000.0f / body.rotPeriod_s), 0};
     vec dir {0, 1};
+
+    FlightData<float> data;
 
     std::vector<StageKinematics> kinematics;
     rocket.calcStageKinematics(kinematics);
 
     auto getApoapsisHeight = [&pos, &vel, &body]() -> float {
-        double vx = vel.x / 1000.0;                    // m/s → km/s
+        double vx = vel.x / 1000.0;
         double vy = vel.y / 1000.0;
-        double v2 = vx*vx + vy*vy;                     // km²/s²
-        double r  = std::sqrt(pos.x*pos.x + pos.y*pos.y); // km
-        double eps = 0.5*v2 - body.GM() / r;           // km²/s²
+        double v2 = vx*vx + vy*vy;
+        double r  = std::sqrt(pos.x*pos.x + pos.y*pos.y);
+        double eps = 0.5*v2 - body.GM() / r;
         if (eps >= 0) { return INFINITY; }
-        double a   = -body.GM() / (2*eps);             // km
-        double h   = pos.x * vy - pos.y * vx;          // km²/s
+        double a   = -body.GM() / (2*eps);
+        double h   = pos.x * vy - pos.y * vx;
         double e   = std::sqrt(1 + 2*eps*h*h / (body.GM()*body.GM()));
-        return a * (1 + e) - body.radius_km;           // apoapsis height in km
+        return a * (1 + e) - body.radius_km;
     };
 
     float dt = 1;
-
-#ifdef CSV_DUMP
-    std::ofstream csv("flight_log.csv");
-    csv << "t,alt_km,vel_m_s,vx_m_s,vy_m_s,posx_km,posy_km,thrust_kN,mass_t,pressure_atm,dir_angle_deg,apoapsis_km,stage,A_m2,drag_N\n";
-#endif
 
     const int nStage = kinematics.size();
     int stage = 0;
@@ -514,10 +511,8 @@ void simulate_flight(Body body, const RocketSolver::RocketConfig& rocket) {
     for (int i = 0; i < 500; ++i) {
         if (stageTime > currentStage.burnTime) {
             if (stage == nStage - 1) {
-                println("BURNED OUT");
                 break;
             }
-            println("STAGE");
             stage++;
             currentStage = kinematics[stage];
             stageTime = 0;
@@ -528,12 +523,10 @@ void simulate_flight(Body body, const RocketSolver::RocketConfig& rocket) {
         float altitude = std::sqrt(pos.x*pos.x + pos.y*pos.y) - body.radius_km;
         float pressure = body.getPressureAtAltitude_km(altitude);
 
-        // Gravity vector: always points toward planet center
         float r = altitude + body.radius_km;
         float g_mag = body.surfaceGravity * std::pow(body.radius_km / r, 2);
         vec grav = {-g_mag * pos.x / r, -g_mag * pos.y / r};
 
-        // Gravity turn: steer from vertical toward horizontal as pressure drops
         {
             float r = std::sqrt(pos.x*pos.x + pos.y*pos.y);
             vec up  {pos.x / r, pos.y / r};
@@ -558,10 +551,9 @@ void simulate_flight(Body body, const RocketSolver::RocketConfig& rocket) {
         float ispVac = currentStage.engine->enginePerf.vacuumISP;
         float thrust = (isp / ispVac) * currentStage.engine->MaxThrustkN * currentStage.nEngines;
 
-        // Drag: cross-sectional area from current stage's exposed hardware
         double A = currentStage.area_m2;
         constexpr double Cd = 0.2;
-        double rho = (double)pressure * body.sea_level_density_kgpm3 / body.seaLevel_atm;
+        double rho = (body.seaLevel_atm > 0) ? (double)pressure * body.sea_level_density_kgpm3 / body.seaLevel_atm : 0.0;
         double speed_d = std::sqrt((double)vel.x * vel.x + (double)vel.y * vel.y);
         double drag_mag = 0.5 * rho * speed_d * speed_d * A * Cd;
         float drag_N = (float)drag_mag;
@@ -583,33 +575,28 @@ void simulate_flight(Body body, const RocketSolver::RocketConfig& rocket) {
 
         float apo = getApoapsisHeight();
         float speed = std::sqrt(vel.x*vel.x + vel.y*vel.y);
-        println("t=", elapsed, "APO: ", apo, "km, Altitude: ", altitude, "km, Velocity: ", speed, "m/s, Mass: ", mass, "t");
 
-#ifdef CSV_DUMP
         double dir_angle_deg = std::atan2(dir.x, dir.y) * 180.0 / M_PI;
-        csv << elapsed << ","
-            << altitude << ","
-            << speed << ","
-            << vel.x << ","
-            << vel.y << ","
-            << pos.x << ","
-            << pos.y << ","
-            << thrust << ","
-            << mass << ","
-            << pressure << ","
-            << dir_angle_deg << ","
-            << apo << ","
-            << stage << ","
-            << A << ","
-            << drag_N << "\n";
-#endif
-        
+        data.t.push_back(elapsed);
+        data.altitude_km.push_back(altitude);
+        data.velocity_ms.push_back(speed);
+        data.vx_ms.push_back(vel.x);
+        data.vy_ms.push_back(vel.y);
+        data.posx_km.push_back(pos.x);
+        data.posy_km.push_back(pos.y);
+        data.thrust_kN.push_back(thrust);
+        data.mass_t.push_back(mass);
+        data.pressure_atm.push_back(pressure);
+        data.dir_angle_deg.push_back(dir_angle_deg);
+        data.apoapsis_km.push_back(apo);
+        data.stage.push_back(stage);
+        data.area_m2.push_back(A);
+        data.drag_N.push_back(drag_N);
+
         stageTime += dt;
         elapsed += dt;
     }
-#ifdef CSV_DUMP
-    exit(0);
-#endif
+    return data;
 }
 
 RocketSolver::RocketConfig RocketSolver::buildRocket(const std::vector<double>& deltaVPerStage, double payloadMass, double minTWR, double g0, double seaLevelAtm) {
@@ -628,11 +615,7 @@ RocketSolver::RocketConfig RocketSolver::buildRocket(const std::vector<double>& 
     }
     config.totalMass = stagePayload;
 
-    // Debug
-    if (config.totalMass < INFINITY) {
-        simulate_flight(KspSystem::Eve, config);
-    }
-    //
+
 
     return config;
 }

@@ -1,5 +1,6 @@
 #include "WindowSimulator.h"
 #include "imgui.h"
+#include "implot.h"
 #include <stdexcept>
 
 static const struct { const char* name; const Body* body; } bodyTable[] = {
@@ -230,6 +231,7 @@ void WindowSimulator::render() {
     if (configDirty) {
         recomputeMasses();
         updateKinematics();
+        simulateCurrentFlight();
         configDirty = false;
     }
 
@@ -427,4 +429,157 @@ void WindowSimulator::updateKinematics() {
         if (!stage.engine) { return; }
     }
     rocket.calcStageKinematics(kinematics);
+}
+
+void WindowSimulator::simulateCurrentFlight() {
+    if (!selectedBody || rocket.stages.empty()) {
+        flightData = {};
+        return;
+    }
+    for (const auto& stage : rocket.stages) {
+        if (!stage.engine) {
+            flightData = {};
+            return;
+        }
+    }
+    flightData = simulate_flight(*selectedBody, rocket);
+}
+
+void WindowSimulator::renderFlight() {
+    ImGui::Begin("Flight Simulation");
+    if (flightData.t.empty()) {
+        ImGui::TextWrapped("Adjust the rocket configuration to see flight simulation results.");
+        ImGui::End();
+        return;
+    }
+
+    for (int i = 0; i < (int)flightData.t.size(); ++i) {
+        if (std::isinf(flightData.apoapsis_km[i])) {
+            flightData.apoapsis_km[i] = 1e6f;
+        }
+    }
+
+    std::vector<float> stageTimes;
+    for (int i = 1; i < (int)flightData.stage.size(); ++i) {
+        if (flightData.stage[i] != flightData.stage[i - 1]) {
+            stageTimes.push_back(flightData.t[i - 1]);
+        }
+    }
+
+    float maxThrust = 0;
+    for (auto v : flightData.thrust_kN) {
+        if (v > maxThrust) maxThrust = v;
+    }
+
+    static const char* plotLabels[] = {
+        "Altitude", "Velocity", "Apoapsis", "Thrust", "Mass",
+        "Drag", "Pressure", "Direction", "Area", "Trajectory"
+    };
+
+    if (ImGui::BeginTable("##plotToggles", 5)) {
+        for (int i = 0; i < 10; ++i) {
+            if (i % 5 == 0) ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::Checkbox(plotLabels[i], &showPlot[i]);
+        }
+        ImGui::EndTable();
+    }
+
+    ImGui::Separator();
+
+    ImGui::BeginChild("##plots", ImVec2(-1, -1), false, ImGuiWindowFlags_HorizontalScrollbar);
+
+    for (int p = 0; p < 10; ++p) {
+        if (!showPlot[p]) continue;
+
+        if (p == 2 || p == 3)
+            ImPlot::SetNextAxisToFit(ImAxis_X1);
+        else
+            ImPlot::SetNextAxesToFit();
+
+        if (ImPlot::BeginPlot(plotLabels[p], ImVec2(-1, 250))) {
+            switch (p) {
+                case 0:
+                    ImPlot::SetupAxes("Time (s)", "Altitude (km)");
+                    ImPlot::PlotLine("Alt", flightData.t.data(), flightData.altitude_km.data(), (int)flightData.t.size());
+                    break;
+                case 1:
+                    ImPlot::SetupAxes("Time (s)", "Velocity (m/s)");
+                    ImPlot::PlotLine("V", flightData.t.data(), flightData.velocity_ms.data(), (int)flightData.t.size());
+                    break;
+                case 2:
+                    ImPlot::SetupAxes("Time (s)", "Apoapsis (km)");
+                    if (selectedBody && selectedBody->seaLevel_atm > 0)
+                        ImPlot::SetupAxisLimits(ImAxis_Y1, 0, selectedBody->atmHeight_km + 20.0f);
+                    ImPlot::PlotLine("Apo", flightData.t.data(), flightData.apoapsis_km.data(), (int)flightData.t.size());
+                    break;
+                case 3:
+                    ImPlot::SetupAxes("Time (s)", "Thrust (kN)");
+                    ImPlot::SetupAxisLimits(ImAxis_Y1, 0, maxThrust * 1.1f);
+                    ImPlot::PlotLine("T", flightData.t.data(), flightData.thrust_kN.data(), (int)flightData.t.size());
+                    break;
+                case 4:
+                    ImPlot::SetupAxes("Time (s)", "Mass (t)");
+                    ImPlot::PlotLine("M", flightData.t.data(), flightData.mass_t.data(), (int)flightData.t.size());
+                    break;
+                case 5:
+                    ImPlot::SetupAxes("Time (s)", "Drag (N)");
+                    ImPlot::PlotLine("D", flightData.t.data(), flightData.drag_N.data(), (int)flightData.t.size());
+                    break;
+                case 6:
+                    ImPlot::SetupAxes("Time (s)", "Pressure (atm)");
+                    ImPlot::PlotLine("P", flightData.t.data(), flightData.pressure_atm.data(), (int)flightData.t.size());
+                    break;
+                case 7:
+                    ImPlot::SetupAxes("Time (s)", "Angle (deg)");
+                    ImPlot::PlotLine("Dir", flightData.t.data(), flightData.dir_angle_deg.data(), (int)flightData.t.size());
+                    break;
+                case 8:
+                    ImPlot::SetupAxes("Time (s)", "Area (m\u00b2)");
+                    ImPlot::PlotLine("A", flightData.t.data(), flightData.area_m2.data(), (int)flightData.t.size());
+                    break;
+                case 9:
+                    ImPlot::SetupAxes("X (km)", "Y (km)");
+                    ImPlot::PlotLine("Pos", flightData.posx_km.data(), flightData.posy_km.data(), (int)flightData.t.size());
+                    break;
+            }
+            if (!stageTimes.empty()) ImPlot::PlotInfLines("Stage", stageTimes.data(), (int)stageTimes.size());
+            ImPlot::EndPlot();
+        }
+    }
+
+    ImGui::EndChild();
+
+    if (ImGui::CollapsingHeader("Raw Data")) {
+        if (ImGui::BeginTable("flight_table", 10, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
+            ImGui::TableSetupColumn("t");
+            ImGui::TableSetupColumn("alt_km");
+            ImGui::TableSetupColumn("vel_m_s");
+            ImGui::TableSetupColumn("mass_t");
+            ImGui::TableSetupColumn("thrust_kN");
+            ImGui::TableSetupColumn("drag_N");
+            ImGui::TableSetupColumn("apo_km");
+            ImGui::TableSetupColumn("press_atm");
+            ImGui::TableSetupColumn("dir_deg");
+            ImGui::TableSetupColumn("stage");
+            ImGui::TableHeadersRow();
+
+            int step = std::max(1, (int)flightData.t.size() / 100);
+            for (int i = 0; i < (int)flightData.t.size(); i += step) {
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0); ImGui::Text("%.0f", flightData.t[i]);
+                ImGui::TableSetColumnIndex(1); ImGui::Text("%.1f", flightData.altitude_km[i]);
+                ImGui::TableSetColumnIndex(2); ImGui::Text("%.0f", flightData.velocity_ms[i]);
+                ImGui::TableSetColumnIndex(3); ImGui::Text("%.1f", flightData.mass_t[i]);
+                ImGui::TableSetColumnIndex(4); ImGui::Text("%.1f", flightData.thrust_kN[i]);
+                ImGui::TableSetColumnIndex(5); ImGui::Text("%.1f", flightData.drag_N[i]);
+                ImGui::TableSetColumnIndex(6); ImGui::Text("%.1f", flightData.apoapsis_km[i]);
+                ImGui::TableSetColumnIndex(7); ImGui::Text("%.4f", flightData.pressure_atm[i]);
+                ImGui::TableSetColumnIndex(8); ImGui::Text("%.1f", flightData.dir_angle_deg[i]);
+                ImGui::TableSetColumnIndex(9); ImGui::Text("%d", flightData.stage[i]);
+            }
+            ImGui::EndTable();
+        }
+    }
+    ImGui::End();
 }
