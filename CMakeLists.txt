@@ -54,15 +54,28 @@ set(IMGUI_SOURCES
   ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp
 )
 
-add_executable(debug ${ROCKET_SOURCES} ${IMGUI_SOURCES})
-target_include_directories(debug PRIVATE ext src ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends)
+# ---- ImPlot ----
+FetchContent_Declare(
+  implot
+  GIT_REPOSITORY https://github.com/epezent/implot.git
+  GIT_TAG v0.16
+)
+FetchContent_MakeAvailable(implot)
+
+set(IMPLOT_SOURCES
+  ${implot_SOURCE_DIR}/implot.cpp
+  ${implot_SOURCE_DIR}/implot_items.cpp
+)
+
+add_executable(debug ${ROCKET_SOURCES} ${IMGUI_SOURCES} ${IMPLOT_SOURCES})
+target_include_directories(debug PRIVATE ext src ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends ${implot_SOURCE_DIR})
 target_compile_definitions(debug PRIVATE AGAVE_FONT_PATH="${AGAVE_FONT_PATH}")
 target_compile_options(debug PRIVATE -no-pie -g -O0 -fno-omit-frame-pointer -Wall -Wunused-value -Wshadow -pedantic)
 target_link_options(debug PRIVATE -no-pie)
 target_link_libraries(debug glfw OpenGL::GL)
 
-add_executable(release ${ROCKET_SOURCES} ${IMGUI_SOURCES})
-target_include_directories(release PRIVATE ext src ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends)
+add_executable(release ${ROCKET_SOURCES} ${IMGUI_SOURCES} ${IMPLOT_SOURCES})
+target_include_directories(release PRIVATE ext src ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends ${implot_SOURCE_DIR})
 target_compile_definitions(release PRIVATE AGAVE_FONT_PATH="${AGAVE_FONT_PATH}")
 target_compile_options(release PRIVATE -Wall -Wunused-value -Wshadow -pedantic -O3 -DNDEBUG)
 target_link_libraries(release glfw OpenGL::GL)

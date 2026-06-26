@@ -2,8 +2,9 @@ CompileFlags:
   Add:
     - -std=c++23
     - -Iext
-    - -I/home/vukan/rocket_optimizer/build/_deps/imgui-src
-    - -I/home/vukan/rocket_optimizer/build/_deps/imgui-src/backends
+    - -I/home/vukan/RocketPlanner/build/_deps/imgui-src
+    - -I/home/vukan/RocketPlanner/build/_deps/imgui-src/backends
+    - -I/home/vukan/RocketPlanner/build/_deps/implot-src
     - -Wall
     - -Wunused-value
     - -Wshadow
