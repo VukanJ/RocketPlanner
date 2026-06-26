@@ -25,6 +25,24 @@ struct FlightData {
     std::vector<int> stage;
     std::vector<FLT> area_m2;
     std::vector<FLT> drag_N;
+
+    void reserve(std::size_t n) {
+        t.reserve(n);
+        altitude_km.reserve(n);
+        velocity_ms.reserve(n);
+        vx_ms.reserve(n);
+        vy_ms.reserve(n);
+        posx_km.reserve(n);
+        posy_km.reserve(n);
+        thrust_kN.reserve(n);
+        mass_t.reserve(n);
+        pressure_atm.reserve(n);
+        dir_angle_deg.reserve(n);
+        apoapsis_km.reserve(n);
+        stage.reserve(n);
+        area_m2.reserve(n);
+        drag_N.reserve(n);
+    }
 };
 
 constexpr short MAX_ASPARAGUS_SYMMETRY = 4;
@@ -35,6 +53,7 @@ struct StageKinematics {
     float mf;
     float burnTime;
     float area_m2;
+    float vacuumDeltaV;
     const PartProperty* engine;
     int nEngines;
 };
@@ -67,6 +86,7 @@ public:
         void calcStageKinematics(std::vector<StageKinematics>& kinematics) const;
         void recomputeMasses(const std::vector<double>& fuelMass);
         int totalStages() const;
+        double remainingDeltaV(const std::vector<StageKinematics>& kinematics, float elapsed) const;
         double totalMass = INFINITY;
     };
 

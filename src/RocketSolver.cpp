@@ -7,11 +7,6 @@
 #include <cmath>
 #include <bitset>
 
-#define CSV_DUMP
-#ifdef CSV_DUMP
-#include <fstream>
-#endif
-
 static void softmaxFractions(const std::vector<double>& params, std::vector<double>& result) {
     int n = params.size() + 1;
     result.resize(n);
@@ -473,11 +468,35 @@ void RocketSolver::RocketConfig::calcStageKinematics(std::vector<StageKinematics
             kinematics[sptr].m0 = currMassTons;
             kinematics[sptr].mf = currMassTons - burnedFuel;
             kinematics[sptr].burnTime = (burnedFuel / S.engine->usedFuelDensity()) / (S.engine->enginePerf.fuelConsumptionRate_UPS * nEngines);
+            kinematics[sptr].vacuumDeltaV = S.engine->enginePerf.vacuumISP * 9.81f
+                * std::log(kinematics[sptr].m0 / kinematics[sptr].mf);
             currMassTons -= burnedFuel + detachedEngines * S.engine->mass + tankWeight;
             nEngines -= detachedEngines;
             sptr++;
         }
     }
+}
+
+double RocketSolver::RocketConfig::remainingDeltaV(const std::vector<StageKinematics>& kinematics, float elapsed) const {
+    float stageTime = elapsed;
+    for (int s = 0; s < (int)kinematics.size(); ++s) {
+        if (stageTime < kinematics[s].burnTime) {
+            float flowRate = (kinematics[s].m0 - kinematics[s].mf) / kinematics[s].burnTime;
+            float currentMass = kinematics[s].m0 - flowRate * stageTime;
+            float remFlow = flowRate * (kinematics[s].burnTime - stageTime);
+            float dV = 0;
+            if (remFlow > 0) {
+                dV += kinematics[s].engine->enginePerf.vacuumISP * KspSystem::Kerbin.surfaceGravity
+                    * std::log(currentMass / (currentMass - remFlow));
+            }
+            for (int s2 = s + 1; s2 < (int)kinematics.size(); ++s2) {
+                dV += kinematics[s2].vacuumDeltaV;
+            }
+            return dV;
+        }
+        stageTime -= kinematics[s].burnTime;
+    }
+    return 0;
 }
 
 FlightData<float> simulate_flight(Body body, const RocketSolver::RocketConfig& rocket) {
@@ -491,7 +510,7 @@ FlightData<float> simulate_flight(Body body, const RocketSolver::RocketConfig& r
     std::vector<StageKinematics> kinematics;
     rocket.calcStageKinematics(kinematics);
 
-    auto getApoapsisHeight = [&pos, &vel, &body]() -> float {
+    auto getApoapsis = [&pos, &vel, &body]() -> float {
         double vx = vel.x / 1000.0;
         double vy = vel.y / 1000.0;
         double v2 = vx*vx + vy*vy;
@@ -502,6 +521,19 @@ FlightData<float> simulate_flight(Body body, const RocketSolver::RocketConfig& r
         double h   = pos.x * vy - pos.y * vx;
         double e   = std::sqrt(1 + 2*eps*h*h / (body.GM()*body.GM()));
         return a * (1 + e) - body.radius_km;
+    };
+
+    auto getPeriapsis = [&pos, &vel, &body]() -> float {
+        double vx = vel.x / 1000.0;
+        double vy = vel.y / 1000.0;
+        double v2 = vx*vx + vy*vy;
+        double r  = std::sqrt(pos.x*pos.x + pos.y*pos.y);
+        double eps = 0.5*v2 - body.GM() / r;
+        if (eps >= 0) { return INFINITY; }
+        double a   = -body.GM() / (2*eps);
+        double h   = pos.x * vy - pos.y * vx;
+        double e   = std::sqrt(1 + 2*eps*h*h / (body.GM()*body.GM()));
+        return a * (1 - e) - body.radius_km;
     };
 
     float dt = 0.1;
@@ -517,6 +549,10 @@ FlightData<float> simulate_flight(Body body, const RocketSolver::RocketConfig& r
     float totalBurnTime = 0;
     for (auto& k : kinematics) totalBurnTime += k.burnTime;
     int maxIter = (int)(totalBurnTime / dt) + 200;
+
+    data.reserve(maxIter);
+
+    bool circularizationChecked = false;
 
     for (int i = 0; i < maxIter; ++i) {
         if (stageTime > currentStage.burnTime) {
@@ -583,8 +619,26 @@ FlightData<float> simulate_flight(Body body, const RocketSolver::RocketConfig& r
 
         mass -= flowRate * dt;
 
-        float apo = getApoapsisHeight();
+        float apo = getApoapsis();
         float speed = std::sqrt(vel.x*vel.x + vel.y*vel.y);
+
+        if (!circularizationChecked && apo > body.atmHeight_km + 10.0) {
+            circularizationChecked = true;
+            float periapsis = getPeriapsis();
+            std::cout << "Apoapsis " << apo << " periapsis " << periapsis << '\n';
+            float a = (apo + periapsis) / 2.0 + body.radius_km;
+            float va = sqrt(body.GM() * (2.0 / (apo + body.radius_km) - 1.0 / a));
+            float vc = sqrt(body.GM() / (apo + body.radius_km));
+            float deltaV = (vc - va) * 1000.0f;
+            float remaining = rocket.remainingDeltaV(kinematics, elapsed);
+            std::cout << "Need dV = " << deltaV << " m/s, remaining = " << remaining << " m/s";
+            if (remaining >= deltaV) {
+                std::cout << " — can circularize\n";
+            } else {
+                // Calculate periapsis height after burning remaining fuel
+                std::cout << '\n';
+            }
+        }
 
         double dir_angle_deg = std::atan2(dir.x, dir.y) * 180.0 / M_PI;
         data.t.push_back(elapsed);
