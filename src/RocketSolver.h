@@ -43,7 +43,7 @@ class RocketSolver {
 public:
     RocketSolver(const PartInfoList engines);
     struct AsparagusConfig {
-        int baseSymmetry = 0; // 0 = No asparagus
+        int baseSymmetry = 1; // 1 = No asparagus
         int numAsparagusStages = 0; // Number of asparagus stages connected to base stages
 
         // Bitmask indicating which asparagus stages have engines (1=engine, 0=no engine)

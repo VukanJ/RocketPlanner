@@ -1,7 +1,9 @@
 #include "WindowSimulator.h"
 #include "imgui.h"
 #include "implot.h"
+#include <print>
 #include <stdexcept>
+#include <iostream>
 
 static const struct { const char* name; const Body* body; } bodyTable[] = {
     { "Kerbin", &KspSystem::Kerbin },
@@ -103,17 +105,16 @@ void WindowSimulator::render() {
             }
 
             auto& asp = stage.asparagus_config;
-            if (ImGui::CollapsingHeader(("Asparagus##" + std::to_string(s)).c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
-                ImGui::Indent();
-                if (ImGui::SliderInt("Base symmetry", &asp.baseSymmetry, 0, MAX_ASPARAGUS_SYMMETRY)) {
-                    if (asp.baseSymmetry == 0) {
-                        asp.numAsparagusStages = 0;
-                        asp.fuelFractions = {1.0};
-                    }
-                    configDirty = true;
+            if (ImGui::SliderInt("Radial symmetry", &asp.baseSymmetry, 1, MAX_ASPARAGUS_SYMMETRY)) {
+                if (asp.baseSymmetry == 1) {
+                    asp.numAsparagusStages = 0;
+                    asp.fuelFractions = {1.0};
                 }
+                configDirty = true;
+            }
 
-                int maxStages = asp.baseSymmetry > 0 ? MAX_ASPARAGUS_SUBSTAGES : 0;
+            int maxStages = asp.baseSymmetry > 0 ? MAX_ASPARAGUS_SUBSTAGES : 0;
+            if (asp.baseSymmetry > 1) {
                 if (ImGui::SliderInt("Asparagus stages", &asp.numAsparagusStages, 0, maxStages)) {
                     if (asp.baseSymmetry == 0) {
                         asp.numAsparagusStages = 0;
@@ -121,80 +122,78 @@ void WindowSimulator::render() {
                     asp.fuelFractions.assign(asp.numAsparagusStages + 1, 1.0 / (asp.numAsparagusStages + 1));
                     configDirty = true;
                 }
+            }
 
-                std::uint16_t mask = (1 << asp.numAsparagusStages) - 1;
-                asp.hasEngine &= mask;
-
-                for (int a = 0; a < asp.numAsparagusStages; ++a) {
-                    bool has = (asp.hasEngine >> a) & 1;
-                    if (ImGui::Checkbox(("Stage " + std::to_string(a + 1) + " has engine").c_str(), &has)) {
-                        if (has) {
-                            asp.hasEngine |= (1 << a);
-                        } else {
-                            asp.hasEngine &= ~(1 << a);
-                        }
-                        configDirty = true;
+            std::uint16_t mask = (1 << asp.numAsparagusStages) - 1;
+            asp.hasEngine &= mask;
+            for (int a = 0; a < asp.numAsparagusStages; ++a) {
+                bool has = (asp.hasEngine >> a) & 1;
+                if (ImGui::Checkbox(("Stage " + std::to_string(a + 1) + " has engine").c_str(), &has)) {
+                    if (has) {
+                        asp.hasEngine |= (1 << a);
+                    } else {
+                        asp.hasEngine &= ~(1 << a);
                     }
+                    configDirty = true;
+                }
+            }
+
+            if (asp.numAsparagusStages > 0) {
+                int nFrac = (int)asp.fuelFractions.size();
+                if (nFrac != asp.numAsparagusStages + 1) {
+                    asp.fuelFractions.assign(asp.numAsparagusStages + 1, 1.0 / (asp.numAsparagusStages + 1));
+                    nFrac = asp.numAsparagusStages + 1;
                 }
 
-                if (asp.numAsparagusStages > 0) {
-                    int nFrac = (int)asp.fuelFractions.size();
-                    if (nFrac != asp.numAsparagusStages + 1) {
-                        asp.fuelFractions.assign(asp.numAsparagusStages + 1, 1.0 / (asp.numAsparagusStages + 1));
-                        nFrac = asp.numAsparagusStages + 1;
-                    }
+                double sum = 0.0;
+                for (int j = 0; j < nFrac; ++j) {
+                    sum += asp.fuelFractions[j];
+                }
 
-                    double sum = 0.0;
+                if (ImGui::Button(("Equal##" + std::to_string(s)).c_str())) {
                     for (int j = 0; j < nFrac; ++j) {
-                        sum += asp.fuelFractions[j];
+                        asp.fuelFractions[j] = 1.0 / nFrac;
                     }
+                    configDirty = true;
+                }
 
-                    if (ImGui::Button(("Equal##" + std::to_string(s)).c_str())) {
+                for (int f = 0; f < nFrac; ++f) {
+                    float val = (float)asp.fuelFractions[f];
+                    if (ImGui::SliderFloat(("Frac " + std::to_string(f + 1)).c_str(), &val, 0.0f, 1.0f, "%.3f")) {
+                        double oldVal = asp.fuelFractions[f];
+                        asp.fuelFractions[f] = val;
+                        if (asp.fuelFractions[f] < 0.0) {
+                            asp.fuelFractions[f] = 0.0;
+                        }
+                        double diff = asp.fuelFractions[f] - oldVal;
+                        double others = sum - oldVal;
+                        if (others > 0.0) {
+                            for (int j = 0; j < nFrac; ++j) {
+                                if (j == f) {
+                                    continue;
+                                }
+                                double frac = asp.fuelFractions[j] / others;
+                                asp.fuelFractions[j] -= diff * frac;
+                                if (asp.fuelFractions[j] < 0.0) {
+                                    asp.fuelFractions[j] = 0.0;
+                                }
+                            }
+                        }
+                        sum = 0.0;
                         for (int j = 0; j < nFrac; ++j) {
-                            asp.fuelFractions[j] = 1.0 / nFrac;
+                            sum += asp.fuelFractions[j];
+                        }
+                        if (sum > 0.0) {
+                            for (int j = 0; j < nFrac; ++j) {
+                                asp.fuelFractions[j] /= sum;
+                            }
+                            sum = 1.0;
                         }
                         configDirty = true;
                     }
-
-                    for (int f = 0; f < nFrac; ++f) {
-                        float val = (float)asp.fuelFractions[f];
-                        if (ImGui::SliderFloat(("Frac " + std::to_string(f + 1)).c_str(), &val, 0.0f, 1.0f, "%.3f")) {
-                            double oldVal = asp.fuelFractions[f];
-                            asp.fuelFractions[f] = val;
-                            if (asp.fuelFractions[f] < 0.0) {
-                                asp.fuelFractions[f] = 0.0;
-                            }
-                            double diff = asp.fuelFractions[f] - oldVal;
-                            double others = sum - oldVal;
-                            if (others > 0.0) {
-                                for (int j = 0; j < nFrac; ++j) {
-                                    if (j == f) {
-                                        continue;
-                                    }
-                                    double frac = asp.fuelFractions[j] / others;
-                                    asp.fuelFractions[j] -= diff * frac;
-                                    if (asp.fuelFractions[j] < 0.0) {
-                                        asp.fuelFractions[j] = 0.0;
-                                    }
-                                }
-                            }
-                            sum = 0.0;
-                            for (int j = 0; j < nFrac; ++j) {
-                                sum += asp.fuelFractions[j];
-                            }
-                            if (sum > 0.0) {
-                                for (int j = 0; j < nFrac; ++j) {
-                                    asp.fuelFractions[j] /= sum;
-                                }
-                                sum = 1.0;
-                            }
-                            configDirty = true;
-                        }
-                    }
-
-                    ImGui::Text("Sum: %.3f", sum);
                 }
-                ImGui::Unindent();
+
+                ImGui::Text("Sum: %.3f", sum);
             }
 
             ImGui::Spacing();
@@ -236,6 +235,8 @@ void WindowSimulator::render() {
     }
 
     ImGui::End();
+
+    ImGui::ShowDemoWindow();
 }
 
 void WindowSimulator::renderPictogram() {
@@ -278,6 +279,7 @@ void WindowSimulator::renderPictogram() {
         float maxExtent = coreR;
         float prevR = coreR;
         for (int r = 0; r < rings; ++r) {
+            if (sym < 2) { break; }
             float boosterFuel = (int)frac.size() > r + 1 ? (float)frac[r + 1] * totalFuel / sym : 0.0f;
             float boosterR = std::sqrt(boosterFuel / 3.14159f) * coreScale;
             if (boosterR < 4.0f) { boosterR = 4.0f; }
@@ -307,7 +309,8 @@ void WindowSimulator::renderPictogram() {
 
             prevR = coreR;
             for (int r = 0; r < rings; ++r) {
-                bool hasEngine = (st.asparagus_config.hasEngine >> r) & 1;
+                if (sym < 2) { break; }
+                bool hasEngine = (st.asparagus_config.hasEngine >> (rings - 1 - r)) & 1;
                 ImU32 bCol = hasEngine ? IM_COL32(200,200,80,255) : IM_COL32(120,120,120,255);
 
                 float boosterFuel = (int)frac.size() > r + 1 ? (float)frac[r + 1] * totalFuel / sym : 0.0f;

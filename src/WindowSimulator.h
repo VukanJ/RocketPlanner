@@ -28,6 +28,7 @@ public:
 private:
     bool configDirty = false;
     bool showPlot[10] = {true, true, true, true, true, true, true, true, true, true};
+
     void recomputeMasses();
     void updateKinematics();
     void simulateCurrentFlight();
