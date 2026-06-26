@@ -27,7 +27,7 @@ public:
 
 private:
     bool configDirty = false;
-    bool showPlot[10] = {true, true, true, true, true, true, true, true, true, true};
+    bool showPlot[11] = {true, true, true, true, true, true, true, true, true, true, true};
 
     void recomputeMasses();
     void updateKinematics();

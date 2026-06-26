@@ -105,7 +105,7 @@ int main(int argc, char** argv) {
         return EXIT_SUCCESS;
     }
 
-    if (args.is_flag_set("-i") || args.is_flag_set("--interactive")) {
+    if (true || args.is_flag_set("-i") || args.is_flag_set("--interactive")) {
         run_interactive();
         return EXIT_SUCCESS;
     }
