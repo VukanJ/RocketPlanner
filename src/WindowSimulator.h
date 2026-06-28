@@ -47,6 +47,8 @@ private:
     void insertDefaultStage();
 
     const PartProperty* defaultEngine;
+
+    float rocketConfigHeight_ = -1.0f;
 };
 
 #endif // WINDOW_SIMULATOR

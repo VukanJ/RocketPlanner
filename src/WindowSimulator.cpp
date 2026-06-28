@@ -86,20 +86,32 @@ void WindowSimulator::render() {
     ImGui::SetNextWindowSize(ImVec2(windowWidth, windowHeight - mbh));
     ImGui::SetNextWindowPos(ImVec2(0, mbh));
 
-    ImGui::Begin("Configure Rocket", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
+    ImGui::Begin("Configure Rocket", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoScrollbar);
 
     ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(0, 0));
-    if (ImGui::BeginTable("MainSplit", 2,
-        ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingStretchSame)) {
+    if (ImGui::BeginTable("MainSplit", 2, ImGuiTableFlags_Resizable)) {
+        ImGui::TableSetupColumn("Left", ImGuiTableColumnFlags_WidthFixed, 300.0f);
+        ImGui::TableSetupColumn("Right", ImGuiTableColumnFlags_WidthStretch);
 
         ImGui::TableNextColumn();
 
         ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 5);
         ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 2);
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
 
-        float leftAvailY = ImGui::GetContentRegionAvail().y;
-        ImGui::BeginChild("RocketConfig", ImVec2(-1, leftAvailY * 0.7f),
-                          ImGuiChildFlags_Borders | ImGuiChildFlags_ResizeY);
+        float cellH = ImGui::GetContentRegionAvail().y;
+        float infoMin = 40.0f;
+        float splitterH = 4.0f;
+
+        if (rocketConfigHeight_ < 0.0f)
+            rocketConfigHeight_ = std::clamp(cellH * 0.75f, 100.0f, 300.0f);
+
+        float maxConfig = std::max(cellH - infoMin - splitterH, 0.0f);
+        float minConfig = std::min(80.0f, maxConfig);
+        rocketConfigHeight_ = std::clamp(rocketConfigHeight_, minConfig, maxConfig);
+
+        ImGui::BeginChild("RocketConfig", ImVec2(-1, rocketConfigHeight_),
+                          ImGuiChildFlags_Borders);
         ImGui::Text("Mission Configuration");
         ImGui::BeginTabBar("ConfigTabs", ImGuiTabBarFlags_None);
         if (ImGui::BeginTabItem("Rocket")) {
@@ -113,11 +125,32 @@ void WindowSimulator::render() {
         ImGui::EndTabBar();
         ImGui::EndChild();
 
-        ImGui::BeginChild("OrbitalInfo", ImVec2(-1, 0),
-                          ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY);
-        renderOrbitalSuccessWindow();
-        ImGui::EndChild();
+        {
+            ImVec2 cursor = ImGui::GetCursorScreenPos();
+            float availW = ImGui::GetContentRegionAvail().x;
+            ImGui::GetWindowDrawList()->AddLine(
+                ImVec2(cursor.x, cursor.y + splitterH * 0.5f),
+                ImVec2(cursor.x + availW, cursor.y + splitterH * 0.5f),
+                ImGui::GetColorU32(ImGuiCol_Separator), 1.0f);
 
+            ImGui::InvisibleButton("##splitter", ImVec2(-1, splitterH));
+            if (ImGui::IsItemHovered())
+                ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
+            if (ImGui::IsItemActive()) {
+                rocketConfigHeight_ += ImGui::GetIO().MouseDelta.y;
+                rocketConfigHeight_ = std::clamp(rocketConfigHeight_, minConfig, maxConfig);
+            }
+        }
+
+        float infoH = std::max(cellH - rocketConfigHeight_ - splitterH, 0.0f);
+        {
+            ImGui::BeginChild("OrbitalInfo", ImVec2(-1, infoH),
+                              ImGuiChildFlags_Borders);
+            renderOrbitalSuccessWindow();
+            ImGui::EndChild();
+        }
+
+        ImGui::PopStyleVar();
         ImGui::PopStyleVar();
         ImGui::PopStyleVar();
 
@@ -327,8 +360,9 @@ void WindowSimulator::StagingConfigMenu() {
                 rocket.stages.erase(rocket.stages.begin() + s);
                 stageFuelMass.erase(stageFuelMass.begin() + s);
                 configDirty = true;
-                ImGui::PopStyleVar();
-                ImGui::PopStyleVar();
+        ImGui::PopStyleVar();
+        ImGui::PopStyleVar();
+        ImGui::PopStyleVar();
                 ImGui::PopStyleColor();
                 ImGui::EndChild();
                 ImGui::Unindent();
@@ -646,53 +680,56 @@ void WindowSimulator::renderFlight() {
     ImGui::BeginChild("##plots", ImVec2(-1, -1), false, ImGuiWindowFlags_HorizontalScrollbar);
 
     for (int p = 0; p < nPlots; ++p) {
-        if (!showPlot[p]) continue;
+        if (!showPlot[p]) { continue; }
 
-        if (p == 2 || p == 3)
+        if (p == 2 || p == 3) {
             ImPlot::SetNextAxisToFit(ImAxis_X1);
-        else
+        }
+        else {
             ImPlot::SetNextAxesToFit();
+        }
 
+        const char* timeLabel = "t [s]";
         if (ImPlot::BeginPlot(plotLabels[p], ImVec2(-1, 250))) {
             switch (p) {
                 case 0:
-                    ImPlot::SetupAxes("Time (s)", "Altitude (km)");
+                    ImPlot::SetupAxes(timeLabel, "Altitude (km)");
                     ImPlot::PlotLine("Alt", flightData.t.data(), flightData.altitude_km.data(), (int)flightData.t.size());
                     break;
                 case 1:
-                    ImPlot::SetupAxes("Time (s)", "Velocity (m/s)");
+                    ImPlot::SetupAxes(timeLabel, "Velocity (m/s)");
                     ImPlot::PlotLine("V", flightData.t.data(), flightData.velocity_ms.data(), (int)flightData.t.size());
                     break;
                 case 2:
-                    ImPlot::SetupAxes("Time (s)", "Apoapsis (km)");
+                    ImPlot::SetupAxes(timeLabel, "Apoapsis (km)");
                     if (selectedBody && selectedBody->seaLevel_atm > 0) {
                         ImPlot::SetupAxisLimits(ImAxis_Y1, 0, selectedBody->atmHeight_km + 20.0f);
                     }
                     ImPlot::PlotLine("Apo", flightData.t.data(), flightData.apoapsis_km.data(), (int)flightData.t.size());
                     break;
                 case 3:
-                    ImPlot::SetupAxes("Time (s)", "Thrust (kN)");
+                    ImPlot::SetupAxes(timeLabel, "Thrust (kN)");
                     ImPlot::SetupAxisLimits(ImAxis_Y1, 0, maxThrust * 1.1f);
                     ImPlot::PlotLine("T", flightData.t.data(), flightData.thrust_kN.data(), (int)flightData.t.size());
                     break;
                 case 4:
-                    ImPlot::SetupAxes("Time (s)", "Mass (t)");
+                    ImPlot::SetupAxes(timeLabel, "Mass (t)");
                     ImPlot::PlotLine("M", flightData.t.data(), flightData.mass_t.data(), (int)flightData.t.size());
                     break;
                 case 5:
-                    ImPlot::SetupAxes("Time (s)", "Drag (N)");
+                    ImPlot::SetupAxes(timeLabel, "Drag (N)");
                     ImPlot::PlotLine("D", flightData.t.data(), flightData.drag_N.data(), (int)flightData.t.size());
                     break;
                 case 6:
-                    ImPlot::SetupAxes("Time (s)", "Pressure (atm)");
+                    ImPlot::SetupAxes(timeLabel, "Pressure (atm)");
                     ImPlot::PlotLine("P", flightData.t.data(), flightData.pressure_atm.data(), (int)flightData.t.size());
                     break;
                 case 7:
-                    ImPlot::SetupAxes("Time (s)", "Angle (deg)");
+                    ImPlot::SetupAxes(timeLabel, "Angle (deg)");
                     ImPlot::PlotLine("Dir", flightData.t.data(), flightData.dir_angle_deg.data(), (int)flightData.t.size());
                     break;
                 case 8:
-                    ImPlot::SetupAxes("Time (s)", "Area (m\u00b2)");
+                    ImPlot::SetupAxes(timeLabel, "Area (m\u00b2)");
                     ImPlot::PlotLine("A", flightData.t.data(), flightData.area_m2.data(), (int)flightData.t.size());
                     break;
                 case 9:
@@ -700,7 +737,7 @@ void WindowSimulator::renderFlight() {
                     ImPlot::PlotLine("Pos", flightData.posx_km.data(), flightData.posy_km.data(), (int)flightData.t.size());
                     break;
                 case 10:
-                    ImPlot::SetupAxes("Time (s)", "Drag / Thrust");
+                    ImPlot::SetupAxes(timeLabel, "Drag / Thrust");
                     { // thrust_kN in kN, drag_N in N → ratio = thrust_kN * 1000 / drag_N
                         std::vector<float> ratio(flightData.t.size());
                         for (size_t i = 0; i < flightData.t.size(); ++i) {

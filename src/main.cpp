@@ -38,6 +38,7 @@ static void run_interactive() {
     }
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1);
+    glfwSetWindowSizeLimits(window, 400, 200, GLFW_DONT_CARE, GLFW_DONT_CARE);
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
