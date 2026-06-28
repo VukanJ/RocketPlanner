@@ -45,15 +45,109 @@ WindowSimulator::WindowSimulator(const PartInfoList& engines)
 
 void WindowSimulator::insertDefaultStage() {
     rocket.stages.emplace_back();
-    stageFuelMass.push_back(3.0);
+    stageFuelMass.push_back(30.0);
     rocket.stages.back().engine = defaultEngine;
     rocket.stages.back().engineMultiplicity = 1;
     configDirty = true;
 }
 
-void WindowSimulator::render() {
-    ImGui::Begin("Configure Rocket");
+void WindowSimulator::onWindowResized(int width, int height) {
+    windowWidth = width;
+    windowHeight = height;
+}
 
+void WindowSimulator::drawMenuBar() {
+    if (ImGui::BeginMainMenuBar()) {
+        if (ImGui::BeginMenu("Windows")) {
+            ImGui::MenuItem("ImGui Demo Window", nullptr, &showDemo);
+            ImGui::EndMenu();
+        }
+        bool dummy;
+        if (ImGui::BeginMenu("Appearance")) {
+            if (ImGui::MenuItem("Dark", nullptr, &dummy)) {
+                ImGui::StyleColorsDark();
+            }
+            if (ImGui::MenuItem("Light", nullptr, &dummy)) {
+                ImGui::StyleColorsLight();
+            }
+            if (ImGui::MenuItem("Classic", nullptr, &dummy)) {
+                ImGui::StyleColorsClassic();
+            }
+            ImGui::EndMenu();
+        }
+        ImGui::EndMainMenuBar();
+    }
+}
+
+void WindowSimulator::render() {
+    drawMenuBar();
+
+    float mbh = ImGui::GetFrameHeight();
+    ImGui::SetNextWindowSize(ImVec2(windowWidth, windowHeight - mbh));
+    ImGui::SetNextWindowPos(ImVec2(0, mbh));
+
+    ImGui::Begin("Configure Rocket", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
+
+    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 5);
+    ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 2);
+
+    ImGui::BeginChild("RocketConfig", ImVec2(-1, -1), 
+                      ImGuiChildFlags_Borders | ImGuiChildFlags_ResizeX);
+    ImGui::BeginTabBar("ConfigTabs", ImGuiTabBarFlags_None);
+    if (ImGui::BeginTabItem("Rocket")) {
+        StagingConfigMenu();
+        ImGui::EndTabItem();
+    }
+    if (ImGui::BeginTabItem("Body")) {
+        renderBodySelector();
+        ImGui::EndTabItem();
+    }
+    ImGui::EndTabBar();
+    ImGui::EndChild();
+    ImGui::PopStyleVar();
+    ImGui::PopStyleVar();
+
+    ImGui::SameLine();
+    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 5);
+    ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 2);
+    
+    ImGui::BeginChild("Flight Simulation", ImVec2(-1, -1), 
+                      ImGuiChildFlags_Borders);
+    ImGui::BeginTabBar("SimTabs", ImGuiTabBarFlags_None);
+
+    if (ImGui::BeginTabItem("Stage Kinematics")) {
+        renderKinematics();
+        ImGui::EndTabItem();
+    }
+    if (ImGui::BeginTabItem("Plots")) {
+        renderFlight();
+        ImGui::EndTabItem();
+    }
+    if (ImGui::BeginTabItem("Raw data")) {
+        renderRawData();
+        ImGui::EndTabItem();
+    }
+
+    ImGui::EndTabBar();
+    ImGui::EndChild();
+    ImGui::PopStyleVar();
+    ImGui::PopStyleVar();
+
+    if (configDirty) {
+        recomputeMasses();
+        updateKinematics();
+        simulateCurrentFlight();
+        configDirty = false;
+    }
+
+    ImGui::End();
+
+    if (showDemo) {
+        ImGui::ShowDemoWindow(&showDemo);
+    }
+}
+
+void WindowSimulator::StagingConfigMenu() {
     if (ImGui::Button("+ Add Stage")) {
         insertDefaultStage();
     }
@@ -64,22 +158,34 @@ void WindowSimulator::render() {
         ImGui::Separator();
 
         std::string headerLabel = "Stage " + std::to_string(s + 1)
-            + "  —  Full " + (stage.fullMass == INFINITY ? "∞" : std::to_string(stage.fullMass))
-            + " / Empty " + (stage.emptyMass == INFINITY ? "∞" : std::to_string(stage.emptyMass)) + " t";
+            + " Mass= " + std::to_string(stage.fullMass) + " t";
         if (ImGui::CollapsingHeader(headerLabel.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
+            ImGui::Indent();
 
-            int current = 0;
+            ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 1);
+            ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 0);
+            {
+                ImVec4 bg = ImGui::GetStyleColorVec4(ImGuiCol_WindowBg);
+                ImVec4 lighter = ImVec4(
+                    bg.x + (1.0f - bg.x) * 0.1f,
+                    bg.y + (1.0f - bg.y) * 0.1f,
+                    bg.z + (1.0f - bg.z) * 0.1f,
+                    bg.w);
+                ImGui::PushStyleColor(ImGuiCol_ChildBg, lighter);
+            }
+            ImGui::BeginChild("##Stage", ImVec2(-1, 0), ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AutoResizeY);
+            int currentEngineIdx = 0;
             for (int i = 0; i < (int)allEngines.size(); ++i) {
                 if (allEngines[i] == stage.engine) {
-                    current = i;
+                    currentEngineIdx = i;
                     break;
                 }
             }
 
-            if (ImGui::BeginCombo(("Engine##" + std::to_string(s)).c_str(),
+            if (ImGui::BeginCombo("##Engine",
                     stage.engine ? stage.engine->title.c_str() : "None")) {
                 for (int i = 0; i < (int)allEngines.size(); ++i) {
-                    bool selected = (current == i);
+                    bool selected = (currentEngineIdx == i);
                     if (ImGui::Selectable(allEngines[i]->title.c_str(), selected)) {
                         stage.engine = allEngines[i];
                         configDirty = true;
@@ -91,14 +197,14 @@ void WindowSimulator::render() {
                 ImGui::EndCombo();
             }
 
-            if (ImGui::SliderInt(("Count##" + std::to_string(s)).c_str(), &stage.engineMultiplicity, 1, 4)) {
+            if (ImGui::SliderInt("##mec", &stage.engineMultiplicity, 1, 4, "Main Engine Count: %i")) {
                 configDirty = true;
             }
             if (stage.engineMultiplicity < 0) {
                 stage.engineMultiplicity = 0;
             }
 
-            if (ImGui::InputDouble(("Fuel (t)##" + std::to_string(s)).c_str(), &stageFuelMass[s], 0.1, 1.0, "%.3f")) {
+            if (ImGui::InputDouble("##fuel", &stageFuelMass[s], 0.1, 1.0, "Fuel = %.3f t")) {
                 if (stageFuelMass[s] < 0.0) {
                     stageFuelMass[s] = 0.0;
                 }
@@ -106,7 +212,7 @@ void WindowSimulator::render() {
             }
 
             auto& asp = stage.asparagus_config;
-            if (ImGui::SliderInt("Radial symmetry", &asp.baseSymmetry, 1, MAX_ASPARAGUS_SYMMETRY)) {
+            if (ImGui::SliderInt("##radsymm", &asp.baseSymmetry, 1, MAX_ASPARAGUS_SYMMETRY, "Radial Symmetry: %i")) {
                 if (asp.baseSymmetry == 1) {
                     asp.numAsparagusStages = 0;
                     asp.fuelFractions = {1.0};
@@ -116,7 +222,7 @@ void WindowSimulator::render() {
 
             int maxStages = asp.baseSymmetry > 0 ? MAX_ASPARAGUS_SUBSTAGES : 0;
             if (asp.baseSymmetry > 1) {
-                if (ImGui::SliderInt("Asparagus stages", &asp.numAsparagusStages, 0, maxStages)) {
+                if (ImGui::SliderInt("##substages", &asp.numAsparagusStages, 0, maxStages, "Radial stages: %i")) {
                     if (asp.baseSymmetry == 0) {
                         asp.numAsparagusStages = 0;
                     }
@@ -151,7 +257,7 @@ void WindowSimulator::render() {
                     sum += asp.fuelFractions[j];
                 }
 
-                if (ImGui::Button(("Equal##" + std::to_string(s)).c_str())) {
+                if (ImGui::Button("Equalize Fuel Fractions")) {
                     for (int j = 0; j < nFrac; ++j) {
                         asp.fuelFractions[j] = 1.0 / nFrac;
                     }
@@ -160,7 +266,7 @@ void WindowSimulator::render() {
 
                 for (int f = 0; f < nFrac; ++f) {
                     float val = (float)asp.fuelFractions[f];
-                    if (ImGui::SliderFloat(("Frac " + std::to_string(f + 1)).c_str(), &val, 0.0f, 1.0f, "%.3f")) {
+                    if (ImGui::SliderFloat(("##frac " + std::to_string(f)).c_str(), &val, 0.0f, 1.0f, "frac = %.3f")) {
                         double oldVal = asp.fuelFractions[f];
                         asp.fuelFractions[f] = val;
                         if (asp.fuelFractions[f] < 0.0) {
@@ -202,6 +308,11 @@ void WindowSimulator::render() {
                 rocket.stages.erase(rocket.stages.begin() + s);
                 stageFuelMass.erase(stageFuelMass.begin() + s);
                 configDirty = true;
+                ImGui::PopStyleVar();
+                ImGui::PopStyleVar();
+                ImGui::PopStyleColor();
+                ImGui::EndChild();
+                ImGui::Unindent();
                 ImGui::PopID();
                 --s;
                 continue;
@@ -220,24 +331,24 @@ void WindowSimulator::render() {
                     std::swap(rocket.stages[s], rocket.stages[s + 1]);
                     std::swap(stageFuelMass[s], stageFuelMass[s + 1]);
                     configDirty = true;
+                    ImGui::PopStyleVar();
+                    ImGui::PopStyleVar();
+                    ImGui::PopStyleColor();
+                    ImGui::EndChild();
+                    ImGui::Unindent();
+                    ImGui::PopID();
                     --s;
                     continue;
                 }
             }
+            ImGui::PopStyleVar();
+            ImGui::PopStyleVar();
+            ImGui::PopStyleColor();
+            ImGui::EndChild();
+            ImGui::Unindent();
         }
         ImGui::PopID();
     }
-
-    if (configDirty) {
-        recomputeMasses();
-        updateKinematics();
-        simulateCurrentFlight();
-        configDirty = false;
-    }
-
-    ImGui::End();
-
-    ImGui::ShowDemoWindow();
 }
 
 void WindowSimulator::renderPictogram() {
@@ -354,7 +465,6 @@ void WindowSimulator::renderPictogram() {
 }
 
 void WindowSimulator::renderBodySelector() {
-    ImGui::Begin("Body Selector");
     const char* currentName = "None";
     for (auto& entry : bodyTable) {
         if (selectedBody == entry.body) {
@@ -366,6 +476,7 @@ void WindowSimulator::renderBodySelector() {
             bool isSelected = selectedBody == entry.body;
             if (ImGui::Selectable(entry.name, isSelected)) {
                 selectedBody = entry.body;
+                configDirty = true;
             }
             if (isSelected) {
                 ImGui::SetItemDefaultFocus();
@@ -382,19 +493,17 @@ void WindowSimulator::renderBodySelector() {
             ImGui::Text("Rot. period: %.0f s", selectedBody->rotPeriod_s);
         }
     }
-    ImGui::End();
 }
 
 void WindowSimulator::renderKinematics() {
-    ImGui::Begin("Stage Kinematics");
     if (ImGui::BeginTable("kinematics", 7, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
-        ImGui::TableSetupColumn("#");
+        ImGui::TableSetupColumn("#Stage");
         ImGui::TableSetupColumn("m0 [t]");
         ImGui::TableSetupColumn("mf [t]");
         ImGui::TableSetupColumn("burn [s]");
         ImGui::TableSetupColumn("dV [m/s]");
-        ImGui::TableSetupColumn("area [m2]");
         ImGui::TableSetupColumn("TWR");
+        ImGui::TableSetupColumn("Airstream Area [m2]");
         ImGui::TableHeadersRow();
 
         double totalDV = 0;
@@ -412,14 +521,13 @@ void WindowSimulator::renderKinematics() {
             ImGui::TableSetColumnIndex(2); ImGui::Text("%.1f", k.mf);
             ImGui::TableSetColumnIndex(3); ImGui::Text("%.1f", k.burnTime);
             ImGui::TableSetColumnIndex(4); ImGui::Text("%.0f", dV);
-            ImGui::TableSetColumnIndex(5); ImGui::Text("%.3f", k.area_m2);
-            ImGui::TableSetColumnIndex(6); ImGui::Text("%.2f", twr);
+            ImGui::TableSetColumnIndex(5); ImGui::Text("%.2f", twr);
+            ImGui::TableSetColumnIndex(6); ImGui::Text("%.3f", k.area_m2);
         }
         ImGui::EndTable();
         ImGui::Text("Total Δv = %f m/s", totalDV);
         ImGui::Text("Total burn = %f s", totalBurn);
     }
-    ImGui::End();
 }
 
 void WindowSimulator::recomputeMasses() {
@@ -450,11 +558,34 @@ void WindowSimulator::simulateCurrentFlight() {
 }
 
 void WindowSimulator::renderFlight() {
-    ImGui::Begin("Flight Simulation");
     if (flightData.t.empty()) {
         ImGui::TextWrapped("Adjust the rocket configuration to see flight simulation results.");
-        ImGui::End();
         return;
+    }
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0.5, 0, 1.0));
+    if (ImGui::Button("Save CSV")) {
+        std::ofstream csv("flight_data.csv");
+        csv << "t,alt_km,vel_m_s,mass_t,thrust_kN,drag_N,apo_km,pressure_atm,dir_deg,area_m2,stage\n";
+        for (size_t i = 0; i < flightData.t.size(); ++i) {
+            csv << flightData.t[i] << ','
+                << flightData.altitude_km[i] << ','
+                << flightData.velocity_ms[i] << ','
+                << flightData.mass_t[i] << ','
+                << flightData.thrust_kN[i] << ','
+                << flightData.drag_N[i] << ','
+                << flightData.apoapsis_km[i] << ','
+                << flightData.pressure_atm[i] << ','
+                << flightData.dir_angle_deg[i] << ','
+                << flightData.area_m2[i] << ','
+                << flightData.stage[i] << '\n';
+        }
+        std::clog << "CSV saved\n";
+    }
+    ImGui::PopStyleColor();
+    ImGui::SameLine();
+    ImGui::TextDisabled("(?)");
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Saves flight_data.csv to working directory");
     }
 
     for (int i = 0; i < (int)flightData.t.size(); ++i) {
@@ -478,7 +609,7 @@ void WindowSimulator::renderFlight() {
     static const char* plotLabels[] = {
         "Altitude", "Velocity", "Apoapsis", "Thrust", "Mass",
         "Drag", "Pressure", "Direction", "Area", "Trajectory",
-        "D/T ratio"
+        "Drag/Thrust ratio"
     };
     constexpr int nPlots = sizeof(plotLabels) / sizeof(plotLabels[0]);
 
@@ -567,35 +698,11 @@ void WindowSimulator::renderFlight() {
 
     ImGui::EndChild();
 
-    if (ImGui::Button("Save CSV")) {
-        std::ofstream csv("flight_data.csv");
-        csv << "t,alt_km,vel_m_s,mass_t,thrust_kN,drag_N,apo_km,pressure_atm,dir_deg,area_m2,stage\n";
-        for (size_t i = 0; i < flightData.t.size(); ++i) {
-            csv << flightData.t[i] << ','
-                << flightData.altitude_km[i] << ','
-                << flightData.velocity_ms[i] << ','
-                << flightData.mass_t[i] << ','
-                << flightData.thrust_kN[i] << ','
-                << flightData.drag_N[i] << ','
-                << flightData.apoapsis_km[i] << ','
-                << flightData.pressure_atm[i] << ','
-                << flightData.dir_angle_deg[i] << ','
-                << flightData.area_m2[i] << ','
-                << flightData.stage[i] << '\n';
-        }
-    }
-    ImGui::SameLine();
-    ImGui::TextDisabled("(?)");
-    if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("Saves flight_data.csv to working directory");
-
-    ImGui::End();
 }
 
 void WindowSimulator::renderRawData() {
     if (flightData.t.empty()) return;
 
-    ImGui::Begin("Raw Data");
     if (ImGui::BeginTable("flight_table", 10, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
         ImGui::TableSetupColumn("t");
         ImGui::TableSetupColumn("alt_km");
@@ -625,5 +732,4 @@ void WindowSimulator::renderRawData() {
         }
         ImGui::EndTable();
     }
-    ImGui::End();
 }

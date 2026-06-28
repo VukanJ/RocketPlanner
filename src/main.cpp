@@ -49,14 +49,23 @@ static void run_interactive() {
         if (font) io.FontDefault = font;
     }
 #endif
-    ImGui::StyleColorsLight();
-
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init("#version 130");
     
     const auto kspPath = findKSP();
     Rocket rocket(kspPath, "Rocket Optimizer");
     WindowSimulator ws(rocket.allEngines());
+
+    glfwSetWindowUserPointer(window, &ws);
+    glfwSetWindowSizeCallback(window, [](GLFWwindow* win, int w, int h) {
+        auto* sim = static_cast<WindowSimulator*>(glfwGetWindowUserPointer(win));
+        if (sim) sim->onWindowResized(w, h);
+    });
+    {
+        int w, h;
+        glfwGetWindowSize(window, &w, &h);
+        ws.onWindowResized(w, h);
+    }
 
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
@@ -66,11 +75,11 @@ static void run_interactive() {
         ImGui::NewFrame();
 
         ws.render();
-        ws.renderKinematics();
-        ws.renderBodySelector();
-        ws.renderPictogram();
-        ws.renderFlight();
-        ws.renderRawData();
+        //ws.renderKinematics();
+        //ws.renderBodySelector();
+        //ws.renderPictogram();
+        //ws.renderFlight();
+        //ws.renderRawData();
 
 
         ImGui::Render();

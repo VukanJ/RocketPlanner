@@ -11,12 +11,19 @@ class WindowSimulator {
 public:
     WindowSimulator(const PartInfoList& engines);
 
+    void onWindowResized(int width, int height);
+
     void render();
     void renderKinematics();
     void renderPictogram();
     void renderBodySelector();
     void renderFlight();
     void renderRawData();
+
+    void StagingConfigMenu();
+
+    int windowWidth = 1280;
+    int windowHeight = 720;
 
     RocketSolver::RocketConfig rocket;
     PartInfoList allEngines;
@@ -28,8 +35,10 @@ public:
 
 private:
     bool configDirty = false;
-    bool showPlot[11] = {true, true, true, true, true, true, true, true, true, true, true};
+    bool showDemo = false;
+    bool showPlot[11] = {false, false, true, false, false, false, false, false, false, false, true};
 
+    void drawMenuBar();
     void recomputeMasses();
     void updateKinematics();
     void simulateCurrentFlight();
