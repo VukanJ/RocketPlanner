@@ -88,49 +88,68 @@ void WindowSimulator::render() {
 
     ImGui::Begin("Configure Rocket", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
 
-    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 5);
-    ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 2);
+    ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(0, 0));
+    if (ImGui::BeginTable("MainSplit", 2,
+        ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingStretchSame)) {
 
-    ImGui::BeginChild("RocketConfig", ImVec2(-1, -1), 
-                      ImGuiChildFlags_Borders | ImGuiChildFlags_ResizeX);
-    ImGui::BeginTabBar("ConfigTabs", ImGuiTabBarFlags_None);
-    if (ImGui::BeginTabItem("Rocket")) {
-        StagingConfigMenu();
-        ImGui::EndTabItem();
-    }
-    if (ImGui::BeginTabItem("Body")) {
-        renderBodySelector();
-        ImGui::EndTabItem();
-    }
-    ImGui::EndTabBar();
-    ImGui::EndChild();
-    ImGui::PopStyleVar();
-    ImGui::PopStyleVar();
+        ImGui::TableNextColumn();
 
-    ImGui::SameLine();
-    ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 5);
-    ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 2);
-    
-    ImGui::BeginChild("Flight Simulation", ImVec2(-1, -1), 
-                      ImGuiChildFlags_Borders);
-    ImGui::BeginTabBar("SimTabs", ImGuiTabBarFlags_None);
+        ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 5);
+        ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 2);
 
-    if (ImGui::BeginTabItem("Stage Kinematics")) {
-        renderKinematics();
-        ImGui::EndTabItem();
-    }
-    if (ImGui::BeginTabItem("Plots")) {
-        renderFlight();
-        ImGui::EndTabItem();
-    }
-    if (ImGui::BeginTabItem("Raw data")) {
-        renderRawData();
-        ImGui::EndTabItem();
-    }
+        float leftAvailY = ImGui::GetContentRegionAvail().y;
+        ImGui::BeginChild("RocketConfig", ImVec2(-1, leftAvailY * 0.7f),
+                          ImGuiChildFlags_Borders | ImGuiChildFlags_ResizeY);
+        ImGui::Text("Mission Configuration");
+        ImGui::BeginTabBar("ConfigTabs", ImGuiTabBarFlags_None);
+        if (ImGui::BeginTabItem("Rocket")) {
+            StagingConfigMenu();
+            ImGui::EndTabItem();
+        }
+        if (ImGui::BeginTabItem("Body")) {
+            renderBodySelector();
+            ImGui::EndTabItem();
+        }
+        ImGui::EndTabBar();
+        ImGui::EndChild();
 
-    ImGui::EndTabBar();
-    ImGui::EndChild();
-    ImGui::PopStyleVar();
+        ImGui::BeginChild("OrbitalInfo", ImVec2(-1, 0),
+                          ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY);
+        renderOrbitalSuccessWindow();
+        ImGui::EndChild();
+
+        ImGui::PopStyleVar();
+        ImGui::PopStyleVar();
+
+        ImGui::TableNextColumn();
+
+        ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 5);
+        ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 2);
+
+        ImGui::BeginChild("Flight Simulation", ImVec2(-1, -1),
+                          ImGuiChildFlags_Borders);
+        ImGui::BeginTabBar("SimTabs", ImGuiTabBarFlags_None);
+
+        if (ImGui::BeginTabItem("Stage Kinematics")) {
+            renderKinematics();
+            ImGui::EndTabItem();
+        }
+        if (ImGui::BeginTabItem("Plots")) {
+            renderFlight();
+            ImGui::EndTabItem();
+        }
+        if (ImGui::BeginTabItem("Raw data")) {
+            renderRawData();
+            ImGui::EndTabItem();
+        }
+
+        ImGui::EndTabBar();
+        ImGui::EndChild();
+        ImGui::PopStyleVar();
+        ImGui::PopStyleVar();
+
+        ImGui::EndTable();
+    }
     ImGui::PopStyleVar();
 
     if (configDirty) {
@@ -698,6 +717,13 @@ void WindowSimulator::renderFlight() {
 
     ImGui::EndChild();
 
+}
+
+void WindowSimulator::renderOrbitalSuccessWindow() {
+    ImGui::Text("Information");
+    ImGui::Text("Apoapsis in Vacuum?");
+    ImGui::Text("Can circularize?");
+    ImGui::Text("ΔV left");
 }
 
 void WindowSimulator::renderRawData() {

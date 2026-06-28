@@ -19,6 +19,7 @@ public:
     void renderBodySelector();
     void renderFlight();
     void renderRawData();
+    void renderOrbitalSuccessWindow();
 
     void StagingConfigMenu();
 
