@@ -625,7 +625,6 @@ FlightData<float> simulate_flight(Body body, const RocketSolver::RocketConfig& r
         if (!circularizationChecked && apo > body.atmHeight_km + 10.0) {
             circularizationChecked = true;
             float periapsis = getPeriapsis();
-            std::cout << "Apoapsis " << apo << " periapsis " << periapsis << '\n';
             float a = (apo + periapsis) / 2.0 + body.radius_km;
             float va = sqrt(body.GM() * (2.0 / (apo + body.radius_km) - 1.0 / a));
             float vc = sqrt(body.GM() / (apo + body.radius_km));

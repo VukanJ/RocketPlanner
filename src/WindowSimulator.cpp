@@ -117,8 +117,12 @@ void WindowSimulator::render() {
             StagingConfigMenu();
             ImGui::EndTabItem();
         }
-        if (ImGui::BeginTabItem("Body")) {
+        if (ImGui::BeginTabItem((std::string("Body (") + selectedBody->name + ')').c_str())) {
             renderBodySelector();
+            ImGui::EndTabItem();
+        }
+        if (ImGui::BeginTabItem("GravityTurn")) {
+            renderGravityTurnConfig();
             ImGui::EndTabItem();
         }
         ImGui::EndTabBar();
@@ -360,9 +364,8 @@ void WindowSimulator::StagingConfigMenu() {
                 rocket.stages.erase(rocket.stages.begin() + s);
                 stageFuelMass.erase(stageFuelMass.begin() + s);
                 configDirty = true;
-        ImGui::PopStyleVar();
-        ImGui::PopStyleVar();
-        ImGui::PopStyleVar();
+                ImGui::PopStyleVar();
+                ImGui::PopStyleVar();
                 ImGui::PopStyleColor();
                 ImGui::EndChild();
                 ImGui::Unindent();
@@ -402,6 +405,10 @@ void WindowSimulator::StagingConfigMenu() {
         }
         ImGui::PopID();
     }
+}
+
+void WindowSimulator::renderGravityTurnConfig() {
+    ImGui::Text("Start turn at pressure: ");
 }
 
 void WindowSimulator::renderPictogram() {
@@ -538,12 +545,15 @@ void WindowSimulator::renderBodySelector() {
         ImGui::EndCombo();
     }
     if (selectedBody) {
-        ImGui::Text("Surface g: %.2f m/s²", selectedBody->surfaceGravity);
-        ImGui::Text("Radius: %.0f km", selectedBody->radius_km);
-        ImGui::Text("Atmosphere: %.4f atm", selectedBody->seaLevel_atm);
+        ImGui::BulletText("Surface g: %.2f m/s²", selectedBody->surfaceGravity);
+        ImGui::BulletText("Radius: %.0f km", selectedBody->radius_km);
         if (selectedBody->seaLevel_atm > 0.0f) {
-            ImGui::Text("Atm height: %.0f km", selectedBody->atmHeight_km);
-            ImGui::Text("Rot. period: %.0f s", selectedBody->rotPeriod_s);
+            ImGui::BulletText("Atmosphere: %.4f atm", selectedBody->seaLevel_atm);
+            ImGui::BulletText("Atm height: %.0f km", selectedBody->atmHeight_km);
+            ImGui::BulletText("Rot. period: %.0f s", selectedBody->rotPeriod_s);
+        }
+        else {
+            ImGui::BulletText("No Atmosphere");
         }
     }
 }
