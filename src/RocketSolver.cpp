@@ -499,7 +499,7 @@ double RocketSolver::RocketConfig::remainingDeltaV(const std::vector<StageKinema
     return 0;
 }
 
-FlightData<float> simulate_flight(Body body, const RocketSolver::RocketConfig& rocket) {
+FlightData<float> simulate_flight(Body body, const RocketSolver::RocketConfig& rocket, LaunchSuccess& launchSuccess) {
     struct vec { float x = 0; float y = 0; };
     vec pos {0, (float)body.radius_km};
     vec vel {(float)(2.0f * M_PI * body.radius_km * 1000.0f / body.rotPeriod_s), 0};
@@ -629,15 +629,12 @@ FlightData<float> simulate_flight(Body body, const RocketSolver::RocketConfig& r
             float a = (apo + periapsis) / 2.0 + body.radius_km;
             float va = sqrt(body.GM() * (2.0 / (apo + body.radius_km) - 1.0 / a));
             float vc = sqrt(body.GM() / (apo + body.radius_km));
-            float deltaV = (vc - va) * 1000.0f;
-            float remaining = rocket.remainingDeltaV(kinematics, elapsed);
-            std::cout << "Need dV = " << deltaV << " m/s, remaining = " << remaining << " m/s";
-            if (remaining >= deltaV) {
-                std::cout << " — can circularize\n";
-            } else {
-                // Calculate periapsis height after burning remaining fuel
-                std::cout << '\n';
-            }
+            float circ_dV = (vc - va) * 1000.0f;
+            float avail_dV = rocket.remainingDeltaV(kinematics, elapsed);
+
+            launchSuccess.apoapsis_safe_height = apo > body.atmHeight_km + 10.0;
+            launchSuccess.circularization_dv = circ_dV;
+            launchSuccess.availableDeltaV = avail_dV;
         }
 
         double dir_angle_deg = std::atan2(dir.x, dir.y) * 180.0 / M_PI;

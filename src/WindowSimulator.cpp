@@ -97,7 +97,6 @@ void WindowSimulator::render() {
 
         ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 5);
         ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 2);
-        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
 
         float cellH = ImGui::GetContentRegionAvail().y;
         float infoMin = 40.0f;
@@ -126,6 +125,7 @@ void WindowSimulator::render() {
         ImGui::EndChild();
 
         {
+            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
             ImVec2 cursor = ImGui::GetCursorScreenPos();
             float availW = ImGui::GetContentRegionAvail().x;
             ImGui::GetWindowDrawList()->AddLine(
@@ -140,6 +140,7 @@ void WindowSimulator::render() {
                 rocketConfigHeight_ += ImGui::GetIO().MouseDelta.y;
                 rocketConfigHeight_ = std::clamp(rocketConfigHeight_, minConfig, maxConfig);
             }
+            ImGui::PopStyleVar();
         }
 
         float infoH = std::max(cellH - rocketConfigHeight_ - splitterH, 0.0f);
@@ -150,7 +151,6 @@ void WindowSimulator::render() {
             ImGui::EndChild();
         }
 
-        ImGui::PopStyleVar();
         ImGui::PopStyleVar();
         ImGui::PopStyleVar();
 
@@ -607,7 +607,8 @@ void WindowSimulator::simulateCurrentFlight() {
             return;
         }
     }
-    flightData = simulate_flight(*selectedBody, rocket);
+    lsuccess = LaunchSuccess { }; // Reset
+    flightData = simulate_flight(*selectedBody, rocket, lsuccess);
 }
 
 void WindowSimulator::renderFlight() {
@@ -757,10 +758,31 @@ void WindowSimulator::renderFlight() {
 }
 
 void WindowSimulator::renderOrbitalSuccessWindow() {
-    ImGui::Text("Information");
-    ImGui::Text("Apoapsis in Vacuum?");
-    ImGui::Text("Can circularize?");
-    ImGui::Text("ΔV left");
+    auto colorText = [](bool cond){
+        if (cond) {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0, 1, 0, 1));
+        }
+        else {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1, 0, 0, 1));
+        }
+    };
+
+    ImGui::Text("Launch Information");
+    colorText(lsuccess.apoapsis_safe_height);
+    ImGui::BulletText("Vacuum Apoapsis? %s", lsuccess.apoapsis_safe_height ? "Yes" : "No");
+    ImGui::PopStyleColor();
+
+    bool canCircularize = lsuccess.circularization_dv <= lsuccess.availableDeltaV;
+    colorText(canCircularize);
+    ImGui::BulletText("Can circularize? %s", canCircularize ? "Yes" : "No");
+    ImGui::Indent();
+    ImGui::BulletText("Δv available %f m/s", lsuccess.availableDeltaV);
+
+    ImGui::BulletText("Δv needed %f m/s", lsuccess.circularization_dv);
+    ImGui::BulletText("Δv left %f m/s", lsuccess.availableDeltaV - lsuccess.circularization_dv);
+    ImGui::PopStyleColor();
+
+    ImGui::Unindent();
 }
 
 void WindowSimulator::renderRawData() {

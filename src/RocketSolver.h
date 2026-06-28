@@ -45,6 +45,14 @@ struct FlightData {
     }
 };
 
+struct LaunchSuccess {
+    bool apoapsis_safe_height = false;
+    float circularization_dv = INFINITY;
+    float availableDeltaV = 0;
+    float timeToApoapsis = INFINITY;
+    float burnTimeRequired = INFINITY;
+};
+
 constexpr short MAX_ASPARAGUS_SYMMETRY = 4;
 constexpr short MAX_ASPARAGUS_SUBSTAGES = 3;
 
@@ -100,6 +108,6 @@ private:
 };
 
 
-FlightData<float> simulate_flight(Body body, const RocketSolver::RocketConfig& rocket);
+FlightData<float> simulate_flight(Body body, const RocketSolver::RocketConfig& rocket, LaunchSuccess&);
 
 #endif // ROCKET_SOLVER_H

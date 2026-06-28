@@ -47,6 +47,7 @@ private:
     void insertDefaultStage();
 
     const PartProperty* defaultEngine;
+    LaunchSuccess lsuccess;
 
     float rocketConfigHeight_ = -1.0f;
 };
