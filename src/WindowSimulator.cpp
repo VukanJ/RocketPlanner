@@ -253,6 +253,16 @@ void WindowSimulator::StagingConfigMenu() {
                 ImGui::EndCombo();
             }
 
+            bool circ_stage = false;
+            if (ImGui::Checkbox("Vacuum stage", &circ_stage)) {
+                std::println("WIP");
+            }
+            ImGui::SameLine();
+            ImGui::TextDisabled("(?)");
+            if (ImGui::IsItemHovered()) {
+                ImGui::SetTooltip("Whether this stage fires for orbit circularization after reaching vacuum.");
+            }
+
             if (ImGui::SliderInt("##mec", &stage.engineMultiplicity, 1, 4, "Main Engine Count: %i")) {
                 configDirty = true;
             }
