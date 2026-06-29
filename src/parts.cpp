@@ -4,6 +4,8 @@
 #include <algorithm>
 #include <cmath>
 #include "LoadKspParts.h"
+#include "PartSerializer.h"
+#include "utils.h"
 #include "kspConstants.h"
 #include "helper.h"
 
@@ -89,27 +91,9 @@ PartProperty::PartProperty(PartType part_type,
     }
 }
 
-std::string partTypeToString(PartType type) {
-    switch (type) {
-        case PartType::CrewedCommandPod: return "Crewed Command Pod";
-        case PartType::DronePod:         return "DronePod";
-        case PartType::LFTank:           return "LF-Tank";
-        case PartType::LFOXTank:         return "LOX-Tank";
-        case PartType::MPTank:           return "MonoProp-Tank";
-        case PartType::XenonTank:        return "Xenon-Tank";
-        case PartType::LFEngine:         return "LF-Engine";
-        case PartType::LOXEngine:        return "LOX-Engine";
-        case PartType::MPEngine:         return "MonoProp-Engine";
-        case PartType::XenonEngine:      return "Xenon-Engine";
-        case PartType::SolidBooster:     return "Solid Fuel Booster";
-        case PartType::JetEngine:        return "Jet Engine";
-        default: return "Unknown Part Type";
-    }
-}
-
 void PartProperty::print() const {
     std::cout << "Part: " << title << "\n";
-    std::cout << "\tType: " << partTypeToString(type) << "\n";
+    std::cout << "\tType: " << partTypeToDisplayName(type) << "\n";
     std::cout << "\tMass: " << mass << " tons\n";
     if (hasResources) {
         std::cout << "\tMass (Full): " << getMass(1.0) << " tons\n";
@@ -221,7 +205,17 @@ double PartProperty::usedFuelDensity() const {
 }
 
 void PartCatalogue::loadPartCatalogue(const std::filesystem::path& path) {
-    loadPartCatalogueFromKSP(path, allParts);
+    auto jsonPath = std::filesystem::path("parts_cache.json");
+    if (std::filesystem::exists(jsonPath)) {
+        if (!loadPartsFromJSON(jsonPath, allParts) || allParts.empty()) {
+            allParts.clear();
+            loadPartCatalogueFromKSP(path, allParts);
+        }
+    }
+    else {
+        loadPartCatalogueFromKSP(path, allParts);
+        savePartsToJSON(jsonPath, allParts);
+    }
     for (const auto& part : allParts) {
         //part.print();
         switch (part.type) {
