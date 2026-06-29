@@ -2,3 +2,4 @@ build
 *.pdf
 *.csv
 *.ini
+parts_cache.json
