@@ -207,14 +207,14 @@ double PartProperty::usedFuelDensity() const {
 void PartCatalogue::loadPartCatalogue(const std::filesystem::path& path) {
     auto jsonPath = std::filesystem::path("parts_cache.json");
     if (std::filesystem::exists(jsonPath)) {
-        if (!loadPartsFromJSON(jsonPath, allParts) || allParts.empty()) {
-            allParts.clear();
-            loadPartCatalogueFromKSP(path, allParts);
-        }
+        loadPartsFromJSON(jsonPath, allParts);
     }
-    else {
+    else if (!path.empty()) {
         loadPartCatalogueFromKSP(path, allParts);
         savePartsToJSON(jsonPath, allParts);
+    }
+    else {
+        std::cerr << "ERROR: No parts cache found and no KSP installation available.\n";
     }
     for (const auto& part : allParts) {
         //part.print();

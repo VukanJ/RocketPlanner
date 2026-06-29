@@ -22,7 +22,7 @@ std::string findKSP() {
         return kspSteamPath.string();
     }
 
-    throw std::runtime_error("KSP installation not found. Please ensure KSP is installed and try again.");
+    std::cout << "KSP installation not found. Using cached parts if available." << std::endl;
     return "";
 }
 
