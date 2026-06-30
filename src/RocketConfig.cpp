@@ -10,6 +10,7 @@ int RocketConfig::totalStages() const {
 
 void RocketConfig::recomputeMasses(const std::vector<double>& fuelMass) {
     double belowMass = 0.0;
+    totalMass = 0;
     for (int i = stages.size() - 1; i >= 0; --i) {
         auto& stage = stages[i];
         double enginesMass = 0.0;
@@ -21,7 +22,7 @@ void RocketConfig::recomputeMasses(const std::vector<double>& fuelMass) {
                 enginesMass += stage.engine->getMass() * boosters;
             }
         }
-        stage.emptyMass = enginesMass + fuelMass[i] / 9.0 + belowMass;
+        stage.emptyMass = enginesMass + fuelMass[i] / 9.0 + belowMass + stage.payloadMass;
         stage.fullMass = stage.emptyMass + fuelMass[i];
         if (stage.asparagus_config.baseSymmetry == 0) {
             stage.asparagus_config.fuelFractions = {1.0};
@@ -30,6 +31,7 @@ void RocketConfig::recomputeMasses(const std::vector<double>& fuelMass) {
             stage.asparagus_config.fuelFractions.assign(stage.asparagus_config.numAsparagusStages + 1, 1.0 / (stage.asparagus_config.numAsparagusStages + 1));
         }
         belowMass = stage.fullMass;
+        totalMass += stage.fullMass;
     }
 }
 

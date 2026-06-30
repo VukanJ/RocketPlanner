@@ -30,6 +30,7 @@ struct AsparagusConfig {
 
 struct StageInfo {
     double fullMass = INFINITY;
+    double payloadMass = 0;  // Dead weight in this stage
     double emptyMass = INFINITY;
     const PartProperty* engine = nullptr;
     const PartProperty* boosterEngine = nullptr;  // Radial engines
@@ -38,12 +39,14 @@ struct StageInfo {
     AsparagusConfig asparagus_config;
 };
 
-struct RocketConfig {
-    std::vector<StageInfo> stages;
+class RocketConfig {
+public:
     void calcStageKinematics(std::vector<StageKinematics>& kinematics) const;
     void recomputeMasses(const std::vector<double>& fuelMass);
     int totalStages() const;
     double remainingDeltaV(const std::vector<StageKinematics>& kinematics, float elapsed) const;
+
+    std::vector<StageInfo> stages;
     double totalMass = INFINITY;
 };
 

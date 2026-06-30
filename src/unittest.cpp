@@ -306,3 +306,46 @@ TEST(KinematicsDeathTest, EmptyConfigNoCrash) {
     EXPECT_NO_FATAL_FAILURE(cfg.calcStageKinematics(kin));
     EXPECT_TRUE(kin.empty());
 }
+
+TEST_F(KinematicsTest, MassComputation) {
+    RocketConfig RC;
+    PartProperty engine0{makeTestEngine(0.4, 100, 100)};
+    PartProperty engine1{makeTestEngine(0.1, 100, 100)};
+    std::vector<StageKinematics> kin;
+
+    RC.stages.emplace_back();
+    RC.stages.emplace_back();
+    RC.stages[0].engine = &engine0;
+    RC.stages[1].engine = &engine1;
+
+    RC.stages[0].payloadMass = 0.1;
+    RC.stages[1].payloadMass = 2.1;
+
+    double fuelMass0 = 5;
+    double fuelMass1 = 6;
+
+    RC.stages[0].engineMultiplicity = 2;
+    RC.stages[1].engineMultiplicity = 1;
+
+    RC.recomputeMasses({fuelMass0, fuelMass1});
+
+    double stage0_full_mass = RC.stages[0].engineMultiplicity * RC.stages[0].engine->mass;
+    stage0_full_mass += fuelMass0 + fuelMass0 / 9.0;
+    stage0_full_mass += RC.stages[0].payloadMass;
+
+    double stage1_full_mass = RC.stages[1].engineMultiplicity * RC.stages[1].engine->mass;
+    stage1_full_mass += fuelMass1 + fuelMass1 / 9.0;
+    stage1_full_mass += RC.stages[1].payloadMass;
+
+    double rocket0_mass = stage0_full_mass + stage1_full_mass;
+    double rocket1_mass = stage1_full_mass;
+
+    // Check fullMass
+    EXPECT_NEAR(rocket0_mass, RC.stages[0].fullMass, 1e-5);
+    EXPECT_NEAR(rocket1_mass, RC.stages[1].fullMass, 1e-5);
+    // Check emptyMass
+    EXPECT_NEAR(rocket0_mass - fuelMass0, RC.stages[0].emptyMass, 1e-5);
+    EXPECT_NEAR(rocket1_mass - fuelMass1, RC.stages[1].emptyMass, 1e-5);
+    // Check total rocket mass
+    EXPECT_NEAR(rocket0_mass + rocket1_mass, RC.totalMass, 1e-5);
+}
