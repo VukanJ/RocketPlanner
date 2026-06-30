@@ -7,7 +7,7 @@ static double computeCentroid(const std::vector<std::vector<double>>& simplex,
                               std::vector<double>& centroid, int exclude) {
     int n = centroid.size();
     std::fill(centroid.begin(), centroid.end(), 0.0);
-    for (int i = 0; i < (int)simplex.size(); ++i) {
+    for (int i = 0; i < simplex.size(); ++i) {
         if (i == exclude) continue;
         for (int j = 0; j < n; ++j) {
             centroid[j] += simplex[i][j];

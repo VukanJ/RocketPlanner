@@ -28,11 +28,11 @@ static PartProperty makeTestEngine(double engineMass, double thrustkN, double va
 // emptyMass = payload + nEngine*engineMass + fuelMass/9  (tanks included)
 // fullMass  = emptyMass + fuelMass
 // fuelFractions = {1.0}
-static RocketSolver::StageInfo makeNonAsparagusStage(
+static StageInfo makeNonAsparagusStage(
     double payloadMass, const PartProperty& engine,
     int engineMultiplicity, double fuelMass)
 {
-    RocketSolver::StageInfo s;
+    StageInfo s;
     double engineMass  = engine.getMass();
     double tankMass    = fuelMass / 9.0;
     s.emptyMass        = payloadMass + engineMultiplicity * engineMass + tankMass;
@@ -52,13 +52,13 @@ static RocketSolver::StageInfo makeNonAsparagusStage(
 // massNoFuelNoTanks = payload + coreEngineMass + boosterEngineMass
 // emptyMass = massNoFuelNoTanks + tankMass
 // fullMass  = massNoFuelNoTanks + tankMass + fuelMass
-static RocketSolver::StageInfo makeAsparagusStage(
+static StageInfo makeAsparagusStage(
     double payloadMass, const PartProperty& engine,
     int engineMultiplicity, int baseSymmetry,
     int numAsparagusStages, std::uint16_t hasEngine,
     const std::vector<double>& fuelFractions)
 {
-    RocketSolver::StageInfo s;
+    StageInfo s;
     double engineMass  = engine.getMass();
     double fuelMass    = 0;
     for (double f : fuelFractions) fuelMass += f;
@@ -86,26 +86,26 @@ static RocketSolver::StageInfo makeAsparagusStage(
 // ---------------------------------------------------------------------------
 
 TEST(TotalStagesTest, EmptyConfig) {
-    RocketSolver::RocketConfig cfg;
+    RocketConfig cfg;
     EXPECT_EQ(cfg.totalStages(), 0);
 }
 
 TEST(TotalStagesTest, SingleNoAsparagus) {
-    RocketSolver::RocketConfig cfg;
+    RocketConfig cfg;
     cfg.stages.resize(1);
     cfg.stages[0].asparagus_config.numAsparagusStages = 0;
     EXPECT_EQ(cfg.totalStages(), 1);
 }
 
 TEST(TotalStagesTest, SingleWithAsparagus) {
-    RocketSolver::RocketConfig cfg;
+    RocketConfig cfg;
     cfg.stages.resize(1);
     cfg.stages[0].asparagus_config.numAsparagusStages = 2;
     EXPECT_EQ(cfg.totalStages(), 3);
 }
 
 TEST(TotalStagesTest, MixedStages) {
-    RocketSolver::RocketConfig cfg;
+    RocketConfig cfg;
     cfg.stages.resize(3);
     cfg.stages[0].asparagus_config.numAsparagusStages = 1; // 2 substages
     cfg.stages[1].asparagus_config.numAsparagusStages = 0; // 1 substage
@@ -136,7 +136,7 @@ TEST_F(KinematicsTest, TwoStageNonAsparagusMassChain) {
     auto s1 = makeNonAsparagusStage(payloadMass, engine_, 1, fuelMass1); // top
     auto s0 = makeNonAsparagusStage(s1.fullMass, engine_, 2, fuelMass0); // bottom
 
-    RocketSolver::RocketConfig cfg;
+    RocketConfig cfg;
     cfg.stages = {s0, s1};
 
     std::vector<StageKinematics> kin;
@@ -197,7 +197,7 @@ TEST_F(KinematicsTest, AsparagusThenNonAsparagusMassChain) {
                                  hasEngine,
                                  fuelFractions);
 
-    RocketSolver::RocketConfig cfg;
+    RocketConfig cfg;
     cfg.stages = {s0, s1};
 
     std::vector<StageKinematics> kin;
@@ -256,7 +256,7 @@ TEST_F(KinematicsTest, DropTankAsparagus) {
                                  1, baseSymmetry, numSub, hasEngine,
                                  fuelFractions);
 
-    RocketSolver::RocketConfig cfg;
+    RocketConfig cfg;
     cfg.stages = {s0};
 
     std::vector<StageKinematics> kin;
@@ -287,7 +287,7 @@ TEST_F(KinematicsTest, DropTankAsparagus) {
 TEST_F(KinematicsTest, SingleStageNonAsparagus) {
     auto s0 = makeNonAsparagusStage(10.0, engine_, 3, 8.0);
 
-    RocketSolver::RocketConfig cfg;
+    RocketConfig cfg;
     cfg.stages = {s0};
 
     std::vector<StageKinematics> kin;
@@ -301,7 +301,7 @@ TEST_F(KinematicsTest, SingleStageNonAsparagus) {
 
 // Edge: empty config produces empty kinematics, no crash.
 TEST(KinematicsDeathTest, EmptyConfigNoCrash) {
-    RocketSolver::RocketConfig cfg;
+    RocketConfig cfg;
     std::vector<StageKinematics> kin;
     EXPECT_NO_FATAL_FAILURE(cfg.calcStageKinematics(kin));
     EXPECT_TRUE(kin.empty());

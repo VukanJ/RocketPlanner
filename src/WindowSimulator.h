@@ -2,6 +2,8 @@
 #define WINDOW_SIMULATOR
 
 #include "RocketSolver.h"
+#include "RocketConfig.h"
+#include "FlightSimulator.h"
 #include "kspConstants.h"
 
 #include <vector>
@@ -27,7 +29,7 @@ public:
     int windowWidth = 1280;
     int windowHeight = 720;
 
-    RocketSolver::RocketConfig rocket;
+    RocketConfig rocket;
     PartInfoList allEngines;
     std::vector<std::string> engineNames;
     std::vector<StageKinematics> kinematics;

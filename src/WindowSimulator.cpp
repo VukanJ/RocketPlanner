@@ -208,7 +208,7 @@ void WindowSimulator::StagingConfigMenu() {
         insertDefaultStage();
     }
 
-    for (int s = 0; s < (int)rocket.stages.size(); ++s) {
+    for (int s = 0; s < rocket.stages.size(); ++s) {
         auto& stage = rocket.stages[s];
         ImGui::PushID(s);
         ImGui::Separator();
@@ -231,7 +231,7 @@ void WindowSimulator::StagingConfigMenu() {
             }
             ImGui::BeginChild("##Stage", ImVec2(-1, 0), ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AutoResizeY);
             int currentEngineIdx = 0;
-            for (int i = 0; i < (int)allEngines.size(); ++i) {
+            for (int i = 0; i < allEngines.size(); ++i) {
                 if (allEngines[i] == stage.engine) {
                     currentEngineIdx = i;
                     break;
@@ -240,7 +240,7 @@ void WindowSimulator::StagingConfigMenu() {
 
             if (ImGui::BeginCombo("##Engine",
                     stage.engine ? stage.engine->title.c_str() : "None")) {
-                for (int i = 0; i < (int)allEngines.size(); ++i) {
+                for (int i = 0; i < allEngines.size(); ++i) {
                     bool selected = (currentEngineIdx == i);
                     if (ImGui::Selectable(allEngines[i]->title.c_str(), selected)) {
                         stage.engine = allEngines[i];
@@ -312,7 +312,7 @@ void WindowSimulator::StagingConfigMenu() {
             }
 
             if (asp.numAsparagusStages > 0) {
-                int nFrac = (int)asp.fuelFractions.size();
+                int nFrac = asp.fuelFractions.size();
                 if (nFrac != asp.numAsparagusStages + 1) {
                     asp.fuelFractions.assign(asp.numAsparagusStages + 1, 1.0 / (asp.numAsparagusStages + 1));
                     nFrac = asp.numAsparagusStages + 1;
@@ -391,7 +391,7 @@ void WindowSimulator::StagingConfigMenu() {
                     configDirty = true;
                 }
             }
-            if (s < (int)rocket.stages.size() - 1) {
+            if (s < rocket.stages.size() - 1) {
                 ImGui::SameLine();
                 if (ImGui::ArrowButton("##dn", ImGuiDir_Down)) {
                     std::swap(rocket.stages[s], rocket.stages[s + 1]);
@@ -441,7 +441,7 @@ void WindowSimulator::renderPictogram() {
                        IM_COL32(160,200,80,255), IM_COL32(200,160,80,255),
                        IM_COL32(160,80,200,255), IM_COL32(80,200,160,255) };
 
-    for (int i = 0; i < (int)rocket.stages.size(); ++i) {
+    for (int i = 0; i < rocket.stages.size(); ++i) {
         const auto& st = rocket.stages[i];
         const auto& frac = st.asparagus_config.fuelFractions;
         float totalFuel = (float)stageFuelMass[i];
@@ -449,7 +449,7 @@ void WindowSimulator::renderPictogram() {
         int rings = st.asparagus_config.numAsparagusStages;
 
         float coreFuel = totalFuel;
-        if (rings > 0 && (int)frac.size() == rings + 1) {
+        if (rings > 0 && frac.size() == rings + 1) {
             coreFuel = (float)frac[0] * totalFuel;
         }
 
@@ -462,7 +462,7 @@ void WindowSimulator::renderPictogram() {
         float prevR = coreR;
         for (int r = 0; r < rings; ++r) {
             if (sym < 2) { break; }
-            float boosterFuel = (int)frac.size() > r + 1 ? (float)frac[r + 1] * totalFuel / sym : 0.0f;
+            float boosterFuel = frac.size() > r + 1 ? (float)frac[r + 1] * totalFuel / sym : 0.0f;
             float boosterR = std::sqrt(boosterFuel / 3.14159f) * coreScale;
             if (boosterR < 4.0f) { boosterR = 4.0f; }
             float minRing = prevR + boosterR + 2.0f;
@@ -495,7 +495,7 @@ void WindowSimulator::renderPictogram() {
                 bool hasEngine = (st.asparagus_config.hasEngine >> (rings - 1 - r)) & 1;
                 ImU32 bCol = hasEngine ? IM_COL32(200,200,80,255) : IM_COL32(120,120,120,255);
 
-                float boosterFuel = (int)frac.size() > r + 1 ? (float)frac[r + 1] * totalFuel / sym : 0.0f;
+                float boosterFuel = frac.size() > r + 1 ? (float)frac[r + 1] * totalFuel / sym : 0.0f;
                 float boosterR = std::sqrt(boosterFuel / 3.14159f) * coreScale;
                 if (boosterR < 4.0f) { boosterR = 4.0f; }
 
@@ -521,7 +521,7 @@ void WindowSimulator::renderPictogram() {
             const char* orderLabel = nullptr;
             ImU32 orderColor;
             if (i == 0) { orderLabel = "FIRST"; orderColor = IM_COL32(80,255,80,220); }
-            else if (i == (int)rocket.stages.size() - 1) { orderLabel = "LAST"; orderColor = IM_COL32(255,160,80,220); }
+            else if (i == rocket.stages.size() - 1) { orderLabel = "LAST"; orderColor = IM_COL32(255,160,80,220); }
             if (orderLabel) {
                 ImVec2 ts = ImGui::CalcTextSize(orderLabel);
                 draw->AddText(ImVec2(cx - ts.x * 0.5f, origin.y + 2.0f), orderColor, orderLabel);
@@ -581,7 +581,7 @@ void WindowSimulator::renderKinematics() {
 
         double totalDV = 0;
         double totalBurn = 0;
-        for (int i = 0; i < (int)kinematics.size(); ++i) {
+        for (int i = 0; i < kinematics.size(); ++i) {
             const auto& k = kinematics[i];
             double dV = k.engine ? k.engine->enginePerf.vacuumISP * 9.81f * std::log(k.m0 / k.mf) : 0.0f;
             double g0 = selectedBody ? selectedBody->surfaceGravity : 9.81f;
@@ -662,14 +662,14 @@ void WindowSimulator::renderFlight() {
         ImGui::SetTooltip("Saves flight_data.csv to working directory");
     }
 
-    for (int i = 0; i < (int)flightData.t.size(); ++i) {
+    for (int i = 0; i < flightData.t.size(); ++i) {
         if (std::isinf(flightData.apoapsis_km[i])) {
             flightData.apoapsis_km[i] = 1e6f;
         }
     }
 
     std::vector<float> stageTimes;
-    for (int i = 1; i < (int)flightData.stage.size(); ++i) {
+    for (int i = 1; i < flightData.stage.size(); ++i) {
         if (flightData.stage[i] != flightData.stage[i - 1]) {
             stageTimes.push_back(flightData.t[i - 1]);
         }
@@ -715,47 +715,47 @@ void WindowSimulator::renderFlight() {
             switch (p) {
                 case 0:
                     ImPlot::SetupAxes(timeLabel, "Altitude (km)");
-                    ImPlot::PlotLine("Alt", flightData.t.data(), flightData.altitude_km.data(), (int)flightData.t.size());
+                    ImPlot::PlotLine("Alt", flightData.t.data(), flightData.altitude_km.data(), flightData.t.size());
                     break;
                 case 1:
                     ImPlot::SetupAxes(timeLabel, "Velocity (m/s)");
-                    ImPlot::PlotLine("V", flightData.t.data(), flightData.velocity_ms.data(), (int)flightData.t.size());
+                    ImPlot::PlotLine("V", flightData.t.data(), flightData.velocity_ms.data(), flightData.t.size());
                     break;
                 case 2:
                     ImPlot::SetupAxes(timeLabel, "Apoapsis (km)");
                     if (selectedBody && selectedBody->seaLevel_atm > 0) {
                         ImPlot::SetupAxisLimits(ImAxis_Y1, 0, selectedBody->atmHeight_km + 20.0f);
                     }
-                    ImPlot::PlotLine("Apo", flightData.t.data(), flightData.apoapsis_km.data(), (int)flightData.t.size());
+                    ImPlot::PlotLine("Apo", flightData.t.data(), flightData.apoapsis_km.data(), flightData.t.size());
                     break;
                 case 3:
                     ImPlot::SetupAxes(timeLabel, "Thrust (kN)");
                     ImPlot::SetupAxisLimits(ImAxis_Y1, 0, maxThrust * 1.1f);
-                    ImPlot::PlotLine("T", flightData.t.data(), flightData.thrust_kN.data(), (int)flightData.t.size());
+                    ImPlot::PlotLine("T", flightData.t.data(), flightData.thrust_kN.data(), flightData.t.size());
                     break;
                 case 4:
                     ImPlot::SetupAxes(timeLabel, "Mass (t)");
-                    ImPlot::PlotLine("M", flightData.t.data(), flightData.mass_t.data(), (int)flightData.t.size());
+                    ImPlot::PlotLine("M", flightData.t.data(), flightData.mass_t.data(), flightData.t.size());
                     break;
                 case 5:
                     ImPlot::SetupAxes(timeLabel, "Drag (N)");
-                    ImPlot::PlotLine("D", flightData.t.data(), flightData.drag_N.data(), (int)flightData.t.size());
+                    ImPlot::PlotLine("D", flightData.t.data(), flightData.drag_N.data(), flightData.t.size());
                     break;
                 case 6:
                     ImPlot::SetupAxes(timeLabel, "Pressure (atm)");
-                    ImPlot::PlotLine("P", flightData.t.data(), flightData.pressure_atm.data(), (int)flightData.t.size());
+                    ImPlot::PlotLine("P", flightData.t.data(), flightData.pressure_atm.data(), flightData.t.size());
                     break;
                 case 7:
                     ImPlot::SetupAxes(timeLabel, "Angle (deg)");
-                    ImPlot::PlotLine("Dir", flightData.t.data(), flightData.dir_angle_deg.data(), (int)flightData.t.size());
+                    ImPlot::PlotLine("Dir", flightData.t.data(), flightData.dir_angle_deg.data(), flightData.t.size());
                     break;
                 case 8:
                     ImPlot::SetupAxes(timeLabel, "Area (m\u00b2)");
-                    ImPlot::PlotLine("A", flightData.t.data(), flightData.area_m2.data(), (int)flightData.t.size());
+                    ImPlot::PlotLine("A", flightData.t.data(), flightData.area_m2.data(), flightData.t.size());
                     break;
                 case 9:
                     ImPlot::SetupAxes("X (km)", "Y (km)");
-                    ImPlot::PlotLine("Pos", flightData.posx_km.data(), flightData.posy_km.data(), (int)flightData.t.size());
+                    ImPlot::PlotLine("Pos", flightData.posx_km.data(), flightData.posy_km.data(), flightData.t.size());
                     break;
                 case 10:
                     ImPlot::SetupAxes(timeLabel, "Drag / Thrust");
@@ -764,11 +764,11 @@ void WindowSimulator::renderFlight() {
                         for (size_t i = 0; i < flightData.t.size(); ++i) {
                             ratio[i] = flightData.thrust_kN[i] > 0 ? flightData.drag_N[i] / (flightData.thrust_kN[i] * 1000.0f) : 0;
                         }
-                        ImPlot::PlotLine("D/T", flightData.t.data(), ratio.data(), (int)ratio.size());
+                        ImPlot::PlotLine("D/T", flightData.t.data(), ratio.data(), ratio.size());
                     }
                     break;
             }
-            if (!stageTimes.empty()) { ImPlot::PlotInfLines("Stage", stageTimes.data(), (int)stageTimes.size()); }
+            if (!stageTimes.empty()) { ImPlot::PlotInfLines("Stage", stageTimes.data(), stageTimes.size()); }
             ImPlot::EndPlot();
         }
     }
@@ -821,8 +821,8 @@ void WindowSimulator::renderRawData() {
         ImGui::TableSetupColumn("stage");
         ImGui::TableHeadersRow();
 
-        int step = std::max(1, (int)flightData.t.size() / 100);
-        for (int i = 0; i < (int)flightData.t.size(); i += step) {
+        int step = std::max(1, static_cast<int>(flightData.t.size()) / 100);
+        for (int i = 0; i < flightData.t.size(); i += step) {
             ImGui::TableNextRow();
             ImGui::TableSetColumnIndex(0); ImGui::Text("%.2f", flightData.t[i]);
             ImGui::TableSetColumnIndex(1); ImGui::Text("%.3f", flightData.altitude_km[i]);

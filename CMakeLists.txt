@@ -15,6 +15,8 @@ set(ROCKET_SOURCES
   src/NelderMead.cpp
   src/cmdargs.cpp
   src/WindowSimulator.cpp
+  src/RocketConfig.cpp
+  src/FlightSimulator.cpp
 )
 
 # ---- Agave Font ----
@@ -84,7 +86,7 @@ target_link_libraries(release glfw OpenGL::GL)
 # ---- GoogleTest ----
 find_package(GTest REQUIRED)
 
-add_executable(unittest src/unittest.cpp src/rocket.cpp src/parts.cpp src/PartSerializer.cpp src/stage.cpp src/LoadKspParts.cpp src/NelderMead.cpp src/RocketSolver.cpp)
+add_executable(unittest src/unittest.cpp src/rocket.cpp src/parts.cpp src/PartSerializer.cpp src/stage.cpp src/LoadKspParts.cpp src/NelderMead.cpp src/RocketSolver.cpp src/RocketConfig.cpp)
 target_include_directories(unittest PRIVATE ext src /usr/include)
 target_compile_options(unittest PRIVATE -g -O0 -Wall -Wunused-value -Wshadow -pedantic)
 target_link_libraries(unittest GTest::gtest_main)

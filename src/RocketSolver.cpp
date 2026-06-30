@@ -32,7 +32,7 @@ static void softmaxFractions(const std::vector<double>& params, std::vector<doub
 
 static void deltaVFromParams(const std::vector<double>& params, double target, std::vector<double>& result) {
     softmaxFractions(params, result);
-    for (int i = 0; i < (int)result.size(); ++i) {
+    for (int i = 0; i < result.size(); ++i) {
         result[i] *= target;
     }
 }
@@ -213,7 +213,7 @@ void RocketSolver::solve(double targetDeltaV, double payloadMass, double minTWR,
     println("Best: ", bestConfig.stages.size(), " stages, total mass: ", bestConfig.totalMass, "t");
 }
 
-RocketSolver::StageInfo inline calcStageMass(const PartProperty* engine, 
+StageInfo inline calcStageMass(const PartProperty* engine, 
                                              int engineMultiplicity, 
                                              double targetDeltaV, 
                                              double payloadMass, 
@@ -229,7 +229,7 @@ RocketSolver::StageInfo inline calcStageMass(const PartProperty* engine,
     //if (callCount % 10000 == 0) {
     //    println("calcStageMass calls: ", callCount);
     //}
-    RocketSolver::StageInfo info;
+    StageInfo info;
 
     if (asparagusBaseSymmetry > 0) {
         // Asparagus
@@ -320,7 +320,7 @@ RocketSolver::StageInfo inline calcStageMass(const PartProperty* engine,
 }
 
 
-RocketSolver::StageInfo RocketSolver::solveSingleStage(double targetDeltaV, double payloadMass, double minTWR, double g0, double atmPressure) {
+StageInfo RocketSolver::solveSingleStage(double targetDeltaV, double payloadMass, double minTWR, double g0, double atmPressure) {
     // Find best stage configuration for single stage rocket
     // Best = lowest wet mass rocket fulfilling the Δv and TWR requirements
     StageInfo bestStage;
@@ -406,260 +406,7 @@ void integrate_ascent(float liftoffTWR, Body body) {
 
 }
 
-int RocketSolver::RocketConfig::totalStages() const {
-    int tot = 0;
-    for (const auto& stage : stages) {
-        tot += 1 + stage.asparagus_config.numAsparagusStages;
-    }
-    return tot;
-}
-
-void RocketSolver::RocketConfig::recomputeMasses(const std::vector<double>& fuelMass) {
-    double belowMass = 0.0;
-    for (int i = (int)stages.size() - 1; i >= 0; --i) {
-        auto& stage = stages[i];
-        double enginesMass = 0.0;
-        if (stage.engine) {
-            enginesMass = stage.engine->getMass() * stage.engineMultiplicity;
-            auto& asp = stage.asparagus_config;
-            if (asp.baseSymmetry > 0 && asp.numAsparagusStages > 0) {
-                int boosters = std::popcount((unsigned int)asp.hasEngine) * asp.baseSymmetry;
-                enginesMass += stage.engine->getMass() * boosters;
-            }
-        }
-        stage.emptyMass = enginesMass + fuelMass[i] / 9.0 + belowMass;
-        stage.fullMass = stage.emptyMass + fuelMass[i];
-        if (stage.asparagus_config.baseSymmetry == 0) {
-            stage.asparagus_config.fuelFractions = {1.0};
-        }
-        else if ((int)stage.asparagus_config.fuelFractions.size() != stage.asparagus_config.numAsparagusStages + 1) {
-            stage.asparagus_config.fuelFractions.assign(stage.asparagus_config.numAsparagusStages + 1, 1.0 / (stage.asparagus_config.numAsparagusStages + 1));
-        }
-        belowMass = stage.fullMass;
-    }
-}
-
-void RocketSolver::RocketConfig::calcStageKinematics(std::vector<StageKinematics>& kinematics) const {
-    // Compute staging sequences of the rocket 
-    // and calculate initial and final masses of that stage, as well as 
-    // observables independent of atmospheric flight
-    const int totStages = totalStages();
-    kinematics.resize(totStages);
-
-    int sptr = 0;
-    for (std::size_t stage = 0; stage < stages.size(); ++stage) {
-        const auto& S = stages[stage];
-        const double totalFuel_tons = S.fullMass - S.emptyMass;
-        double currMassTons = S.fullMass;
-        int symmetryFac = S.asparagus_config.baseSymmetry;
-        symmetryFac = symmetryFac > 1 ? symmetryFac : 0;
-        const int asparagus = S.asparagus_config.numAsparagusStages;
-
-        int nEngines = S.engineMultiplicity + std::popcount(S.asparagus_config.hasEngine) * symmetryFac;
-
-        for (int sub = 0; sub < asparagus + 1; ++sub) {
-            kinematics[sptr].engine = S.engine;
-            kinematics[sptr].nEngines = nEngines;
-            int n_radial_attached = symmetryFac * asparagus - sub * symmetryFac;
-            kinematics[sptr].area_m2 = Constants::mk2_area_m2 + Constants::mk1_area_m2 * n_radial_attached;
-            double burnedFuel = S.asparagus_config.fuelFractions[sub] * totalFuel_tons;
-            double tankWeight = burnedFuel / 9.0;
-            int detachedEngines = ((S.asparagus_config.hasEngine >> sub) & 0x1) * symmetryFac;
-            kinematics[sptr].m0 = currMassTons;
-            kinematics[sptr].mf = currMassTons - burnedFuel;
-            kinematics[sptr].burnTime = (burnedFuel / S.engine->usedFuelDensity()) / (S.engine->enginePerf.fuelConsumptionRate_UPS * nEngines);
-            kinematics[sptr].vacuumDeltaV = S.engine->enginePerf.vacuumISP * 9.81f
-                * std::log(kinematics[sptr].m0 / kinematics[sptr].mf);
-            currMassTons -= burnedFuel + detachedEngines * S.engine->mass + tankWeight;
-            nEngines -= detachedEngines;
-            sptr++;
-        }
-    }
-}
-
-double RocketSolver::RocketConfig::remainingDeltaV(const std::vector<StageKinematics>& kinematics, float elapsed) const {
-    float stageTime = elapsed;
-    for (int s = 0; s < (int)kinematics.size(); ++s) {
-        if (stageTime < kinematics[s].burnTime) {
-            float flowRate = (kinematics[s].m0 - kinematics[s].mf) / kinematics[s].burnTime;
-            float currentMass = kinematics[s].m0 - flowRate * stageTime;
-            float remFlow = flowRate * (kinematics[s].burnTime - stageTime);
-            float dV = 0;
-            if (remFlow > 0) {
-                dV += kinematics[s].engine->enginePerf.vacuumISP * KspSystem::Kerbin.surfaceGravity
-                    * std::log(currentMass / (currentMass - remFlow));
-            }
-            for (int s2 = s + 1; s2 < (int)kinematics.size(); ++s2) {
-                dV += kinematics[s2].vacuumDeltaV;
-            }
-            return dV;
-        }
-        stageTime -= kinematics[s].burnTime;
-    }
-    return 0;
-}
-
-FlightData<float> simulate_flight(Body body, const RocketSolver::RocketConfig& rocket, LaunchSuccess& launchSuccess) {
-    struct vec { float x = 0; float y = 0; };
-    vec pos {0, (float)body.radius_km};
-    vec vel {(float)(2.0f * M_PI * body.radius_km * 1000.0f / body.rotPeriod_s), 0};
-    vec dir {0, 1};
-
-    FlightData<float> data;
-
-    std::vector<StageKinematics> kinematics;
-    rocket.calcStageKinematics(kinematics);
-
-    auto getApoapsis = [&pos, &vel, &body]() -> float {
-        double vx = vel.x / 1000.0;
-        double vy = vel.y / 1000.0;
-        double v2 = vx*vx + vy*vy;
-        double r  = std::sqrt(pos.x*pos.x + pos.y*pos.y);
-        double eps = 0.5*v2 - body.GM() / r;
-        if (eps >= 0) { return INFINITY; }
-        double a   = -body.GM() / (2*eps);
-        double h   = pos.x * vy - pos.y * vx;
-        double e   = std::sqrt(1 + 2*eps*h*h / (body.GM()*body.GM()));
-        return a * (1 + e) - body.radius_km;
-    };
-
-    auto getPeriapsis = [&pos, &vel, &body]() -> float {
-        double vx = vel.x / 1000.0;
-        double vy = vel.y / 1000.0;
-        double v2 = vx*vx + vy*vy;
-        double r  = std::sqrt(pos.x*pos.x + pos.y*pos.y);
-        double eps = 0.5*v2 - body.GM() / r;
-        if (eps >= 0) { return INFINITY; }
-        double a   = -body.GM() / (2*eps);
-        double h   = pos.x * vy - pos.y * vx;
-        double e   = std::sqrt(1 + 2*eps*h*h / (body.GM()*body.GM()));
-        return a * (1 - e) - body.radius_km;
-    };
-
-    float dt = 0.1;
-
-    const int nStage = kinematics.size();
-    int stage = 0;
-    StageKinematics currentStage = kinematics[0];
-    float elapsed = 0;
-    float stageTime = 0;
-    float mass = currentStage.m0;
-    float flowRate = (currentStage.m0 - currentStage.mf) / currentStage.burnTime;
-
-    float totalBurnTime = 0;
-    for (auto& k : kinematics) totalBurnTime += k.burnTime;
-    int maxIter = (int)(totalBurnTime / dt) + 200;
-
-    data.reserve(maxIter);
-
-    bool circularizationChecked = false;
-
-    for (int i = 0; i < maxIter; ++i) {
-        if (stageTime > currentStage.burnTime) {
-            if (stage == nStage - 1) {
-                break;
-            }
-            stage++;
-            currentStage = kinematics[stage];
-            stageTime = 0;
-            mass = currentStage.m0;
-            flowRate = (currentStage.m0 - currentStage.mf) / currentStage.burnTime;
-        }
-
-        float altitude = std::sqrt(pos.x*pos.x + pos.y*pos.y) - body.radius_km;
-        float pressure = body.getPressureAtAltitude_km(altitude);
-
-        float r = altitude + body.radius_km;
-        float g_mag = body.surfaceGravity * std::pow(body.radius_km / r, 2);
-        vec grav = {-g_mag * pos.x / r, -g_mag * pos.y / r};
-
-        {
-            float r = std::sqrt(pos.x*pos.x + pos.y*pos.y);
-            vec up  {pos.x / r, pos.y / r};
-            vec east{up.y, -up.x};
-            float angle_rad;
-            constexpr float startATM = 1.0f;
-            if (pressure > startATM) {
-                angle_rad = 0.0f;
-            }
-            else if (pressure <= 0.0f) {
-                angle_rad = 85.0f * M_PI / 180.0f;
-            }
-            else {
-                float t = pressure / startATM;
-                angle_rad = (1.0f - t) * 85.0f * M_PI / 180.0f;
-            }
-            dir.x = cos(angle_rad) * up.x + sin(angle_rad) * east.x;
-            dir.y = cos(angle_rad) * up.y + sin(angle_rad) * east.y;
-        }
-
-        float isp = currentStage.engine->enginePerf.getISP(pressure);
-        float ispVac = currentStage.engine->enginePerf.vacuumISP;
-        float thrust = (isp / ispVac) * currentStage.engine->MaxThrustkN * currentStage.nEngines;
-
-        double A = currentStage.area_m2;
-        constexpr double Cd = 0.2;
-        double rho = (body.seaLevel_atm > 0) ? (double)pressure * body.sea_level_density_kgpm3 / body.seaLevel_atm : 0.0;
-        double speed_d = std::sqrt((double)vel.x * vel.x + (double)vel.y * vel.y);
-        double drag_mag = 0.5 * rho * speed_d * speed_d * A * Cd;
-        float drag_N = (float)drag_mag;
-        vec drag_accel{0, 0};
-        if (speed_d > 1e-6) {
-            float ax = (float)(-drag_mag / (mass * 1000.0) * vel.x / speed_d);
-            float ay = (float)(-drag_mag / (mass * 1000.0) * vel.y / speed_d);
-            drag_accel = {ax, ay};
-        }
-
-        float accel_x = thrust * dir.x / mass + drag_accel.x + grav.x;
-        float accel_y = thrust * dir.y / mass + drag_accel.y + grav.y;
-        vel.x += accel_x * dt;
-        vel.y += accel_y * dt;
-        pos.x += vel.x * dt / 1000.0;
-        pos.y += vel.y * dt / 1000.0;
-
-        mass -= flowRate * dt;
-
-        float apo = getApoapsis();
-        float speed = std::sqrt(vel.x*vel.x + vel.y*vel.y);
-
-        if (!circularizationChecked && apo > body.atmHeight_km + 10.0) {
-            circularizationChecked = true;
-            float periapsis = getPeriapsis();
-            float a = (apo + periapsis) / 2.0 + body.radius_km;
-            float va = sqrt(body.GM() * (2.0 / (apo + body.radius_km) - 1.0 / a));
-            float vc = sqrt(body.GM() / (apo + body.radius_km));
-            float circ_dV = (vc - va) * 1000.0f;
-            float avail_dV = rocket.remainingDeltaV(kinematics, elapsed);
-
-            launchSuccess.apoapsis_safe_height = apo > body.atmHeight_km + 10.0;
-            launchSuccess.circularization_dv = circ_dV;
-            launchSuccess.availableDeltaV = avail_dV;
-        }
-
-        double dir_angle_deg = std::atan2(dir.x, dir.y) * 180.0 / M_PI;
-        data.t.push_back(elapsed);
-        data.altitude_km.push_back(altitude);
-        data.velocity_ms.push_back(speed);
-        data.vx_ms.push_back(vel.x);
-        data.vy_ms.push_back(vel.y);
-        data.posx_km.push_back(pos.x);
-        data.posy_km.push_back(pos.y);
-        data.thrust_kN.push_back(thrust);
-        data.mass_t.push_back(mass);
-        data.pressure_atm.push_back(pressure);
-        data.dir_angle_deg.push_back(dir_angle_deg);
-        data.apoapsis_km.push_back(apo);
-        data.stage.push_back(stage);
-        data.area_m2.push_back(A);
-        data.drag_N.push_back(drag_N);
-
-        stageTime += dt;
-        elapsed += dt;
-    }
-    return data;
-}
-
-RocketSolver::RocketConfig RocketSolver::buildRocket(const std::vector<double>& deltaVPerStage, double payloadMass, double minTWR, double g0, double seaLevelAtm) {
+RocketConfig RocketSolver::buildRocket(const std::vector<double>& deltaVPerStage, double payloadMass, double minTWR, double g0, double seaLevelAtm) {
     // deltaVPerStage = [deltaV_stage1, deltaV_stage2, ..., deltaV_stage_last]
     const int nStages = deltaVPerStage.size();
     RocketConfig config;

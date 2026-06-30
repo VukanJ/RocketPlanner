@@ -9,7 +9,7 @@
 using json = nlohmann::json;
 
 void to_json(json& j, const ResourceContainer& rc) {
-    j = json{
+    j = json {
         {"liquidFuel",     rc.liquidFuel},
         {"oxidizer",       rc.oxidizer},
         {"monoPropellant", rc.monoPropellant},
@@ -31,10 +31,10 @@ void to_json(json& j, const EngineISPInfo& ei) {
     for (const auto& [p, isp] : ei.isp) {
         curve.push_back({p, isp});
     }
-    j = json{
-        {"vacuumISP",              ei.vacuumISP},
+    j = json {
+        {"vacuumISP",               ei.vacuumISP},
         {"fuelConsumptionRate_UPS", ei.fuelConsumptionRate_UPS},
-        {"ispCurve",               curve}
+        {"ispCurve",                curve}
     };
 }
 
@@ -93,7 +93,8 @@ bool loadPartsFromJSON(const std::filesystem::path& jsonPath, std::vector<PartPr
     json arr;
     try {
         in >> arr;
-    } catch (const json::exception& e) {
+    }
+    catch (const json::exception& e) {
         std::cerr << "ERROR: Failed to parse " << jsonPath << ": " << e.what() << '\n';
         return false;
     }
