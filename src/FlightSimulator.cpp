@@ -8,8 +8,8 @@ FlightSimulator::FlightSimulator() {
 template <FlightSimulator::SimOpt SIM>
 void FlightSimulator::simulate_launch(const Body& body, const RocketConfig& rocket,
                                       float gtClimbAlt, float gtTurnSpread, float gtFinalPitch) {
-    vec2f pos {0, (float)body.radius_km};
-    vec2f vel {(float)(2.0f * M_PI * body.radius_km * 1000.0f / body.rotPeriod_s), 0};
+    vec2f pos {0, body.radius_km};
+    vec2f vel {static_cast<float>(2.0f * M_PI * body.radius_km * 1000.0f / body.rotPeriod_s), 0};
     vec2f dir {0, 1};
     launchSuccess = LaunchSuccess {};
 
@@ -89,8 +89,8 @@ void FlightSimulator::simulate_launch(const Body& body, const RocketConfig& rock
         float drag_mag = 0.5 * rho * speed_d * speed_d * A * Cd;
         vec2f drag_accel{0, 0};
         if (speed_d > 1e-6) {
-            float ax = (float)(-drag_mag / (mass * 1000.0) * vel.x / speed_d);
-            float ay = (float)(-drag_mag / (mass * 1000.0) * vel.y / speed_d);
+            float ax = (-drag_mag / (mass * 1000.0) * vel.x / speed_d);
+            float ay = (-drag_mag / (mass * 1000.0) * vel.y / speed_d);
             drag_accel = {ax, ay};
         }
 
