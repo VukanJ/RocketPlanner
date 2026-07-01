@@ -24,8 +24,30 @@ static const struct { const char* name; const Body* body; } bodyTable[] = {
     { "Eeloo",  &KspSystem::Eeloo },
 };
 
+static const WindowSimulator::PlotDesc s_plots[] = {
+    {"Altitude",          "t [s]",     "Altitude (km)",   &FlightData<float>::t,           &FlightData<float>::altitude_km},
+    {"Velocity",          "t [s]",     "Velocity (m/s)",  &FlightData<float>::t,           &FlightData<float>::velocity_ms},
+    {"Apoapsis",          "t [s]",     "Apoapsis (km)",   &FlightData<float>::t,           &FlightData<float>::apoapsis_km,   nullptr, false, true},
+    {"Thrust",            "t [s]",     "Thrust (kN)",     &FlightData<float>::t,           &FlightData<float>::thrust_kN,     nullptr, false, true},
+    {"Mass",              "t [s]",     "Mass (t)",        &FlightData<float>::t,           &FlightData<float>::mass_t},
+    {"Drag",              "t [s]",     "Drag (N)",        &FlightData<float>::t,           &FlightData<float>::drag_N},
+    {"Pressure",          "t [s]",     "Pressure (atm)",  &FlightData<float>::t,           &FlightData<float>::pressure_atm},
+    {"Pitch (90=Horiz)",  "t [s]",     "Angle (deg)",     &FlightData<float>::t,           &FlightData<float>::dir_angle_deg},
+    {"Area",              "t [s]",     "Area (m\u00b2)",  &FlightData<float>::t,           &FlightData<float>::area_m2},
+    {"Trajectory",        "X (km)",    "Y (km)",          &FlightData<float>::posx_km,     &FlightData<float>::posy_km},
+    {"Drag/Thrust ratio", "t [s]",     "Drag / Thrust",   &FlightData<float>::t,           nullptr,
+        [](const FlightData<float>& d, std::vector<float>& out) {
+            out.resize(d.t.size());
+            for (size_t i = 0; i < d.t.size(); ++i)
+                out[i] = d.thrust_kN[i] > 0 ? d.drag_N[i] / (d.thrust_kN[i] * 1000) : 0;
+        }, false, true},
+    {"Pitch vs Altitude", "Altitude (km)", "Angle (deg)", &FlightData<float>::altitude_km, &FlightData<float>::dir_angle_deg},
+    {"Vel vs Altitude",   "Altitude (km)", "Velocity (m/s)",  &FlightData<float>::altitude_km, &FlightData<float>::velocity_ms},
+};
+static constexpr int nPlots = sizeof(s_plots) / sizeof(s_plots[0]);
+
 WindowSimulator::WindowSimulator(const PartInfoList& engines)
-    : allEngines(engines), selectedBody(&KspSystem::Kerbin)
+    : allEngines(engines), selectedBody(&KspSystem::Kerbin), showPlot(nPlots, false)
 {
     engineNames.reserve(allEngines.size());
     for (const auto* e : allEngines) {
@@ -38,6 +60,9 @@ WindowSimulator::WindowSimulator(const PartInfoList& engines)
     if (defaultEngine == nullptr) {
         throw std::runtime_error("Faulty engine list");
     }
+
+    showPlot[2] = true;  // Apoapsis on by default
+    showPlot[10] = true; // Drag/Thrust ratio on by default
 
     selectedBody = &KspSystem::Kerbin;
     insertDefaultStage();
@@ -268,6 +293,13 @@ void WindowSimulator::StagingConfigMenu() {
             }
             if (stage.engineMultiplicity < 0) {
                 stage.engineMultiplicity = 0;
+            }
+
+            if (ImGui::SliderFloat("##payload", &stage.payloadMass, 0, 20.0, "Freight = %.3f t")) {
+                if (stage.payloadMass < 0.0) {
+                    stage.payloadMass = 0.0;
+                }
+                configDirty = true;
             }
 
             if (ImGui::InputDouble("##fuel", &stageFuelMass[s], 0.1, 1.0, "Fuel = %.3f t")) {
@@ -680,18 +712,13 @@ void WindowSimulator::renderFlight() {
         if (v > maxThrust) { maxThrust = v; }
     }
 
-    static const char* plotLabels[] = {
-        "Altitude", "Velocity", "Apoapsis", "Thrust", "Mass",
-        "Drag", "Pressure", "Direction", "Area", "Trajectory",
-        "Drag/Thrust ratio"
-    };
-    constexpr int nPlots = sizeof(plotLabels) / sizeof(plotLabels[0]);
-
     if (ImGui::BeginTable("##plotToggles", 5)) {
         for (int i = 0; i < nPlots; ++i) {
             if (i % 5 == 0) ImGui::TableNextRow();
             ImGui::TableNextColumn();
-            ImGui::Checkbox(plotLabels[i], &showPlot[i]);
+            bool v = showPlot[i];
+            ImGui::Checkbox(s_plots[i].label, &v);
+            showPlot[i] = v;
         }
         ImGui::EndTable();
     }
@@ -703,72 +730,38 @@ void WindowSimulator::renderFlight() {
     for (int p = 0; p < nPlots; ++p) {
         if (!showPlot[p]) { continue; }
 
-        if (p == 2 || p == 3) {
+        const auto& desc = s_plots[p];
+
+        if (desc.auto_fit_x && desc.auto_fit_y) {
+            ImPlot::SetNextAxesToFit();
+        } else if (desc.auto_fit_x) {
             ImPlot::SetNextAxisToFit(ImAxis_X1);
         }
-        else {
-            ImPlot::SetNextAxesToFit();
-        }
 
-        const char* timeLabel = "t [s]";
-        if (ImPlot::BeginPlot(plotLabels[p], ImVec2(-1, 250))) {
-            switch (p) {
-                case 0:
-                    ImPlot::SetupAxes(timeLabel, "Altitude (km)");
-                    ImPlot::PlotLine("Alt", flightData.t.data(), flightData.altitude_km.data(), flightData.t.size());
-                    break;
-                case 1:
-                    ImPlot::SetupAxes(timeLabel, "Velocity (m/s)");
-                    ImPlot::PlotLine("V", flightData.t.data(), flightData.velocity_ms.data(), flightData.t.size());
-                    break;
-                case 2:
-                    ImPlot::SetupAxes(timeLabel, "Apoapsis (km)");
-                    if (selectedBody && selectedBody->seaLevel_atm > 0) {
-                        ImPlot::SetupAxisLimits(ImAxis_Y1, 0, selectedBody->atmHeight_km + 20.0f);
-                    }
-                    ImPlot::PlotLine("Apo", flightData.t.data(), flightData.apoapsis_km.data(), flightData.t.size());
-                    break;
-                case 3:
-                    ImPlot::SetupAxes(timeLabel, "Thrust (kN)");
-                    ImPlot::SetupAxisLimits(ImAxis_Y1, 0, maxThrust * 1.1f);
-                    ImPlot::PlotLine("T", flightData.t.data(), flightData.thrust_kN.data(), flightData.t.size());
-                    break;
-                case 4:
-                    ImPlot::SetupAxes(timeLabel, "Mass (t)");
-                    ImPlot::PlotLine("M", flightData.t.data(), flightData.mass_t.data(), flightData.t.size());
-                    break;
-                case 5:
-                    ImPlot::SetupAxes(timeLabel, "Drag (N)");
-                    ImPlot::PlotLine("D", flightData.t.data(), flightData.drag_N.data(), flightData.t.size());
-                    break;
-                case 6:
-                    ImPlot::SetupAxes(timeLabel, "Pressure (atm)");
-                    ImPlot::PlotLine("P", flightData.t.data(), flightData.pressure_atm.data(), flightData.t.size());
-                    break;
-                case 7:
-                    ImPlot::SetupAxes(timeLabel, "Angle (deg)");
-                    ImPlot::PlotLine("Dir", flightData.t.data(), flightData.dir_angle_deg.data(), flightData.t.size());
-                    break;
-                case 8:
-                    ImPlot::SetupAxes(timeLabel, "Area (m\u00b2)");
-                    ImPlot::PlotLine("A", flightData.t.data(), flightData.area_m2.data(), flightData.t.size());
-                    break;
-                case 9:
-                    ImPlot::SetupAxes("X (km)", "Y (km)");
-                    ImPlot::PlotLine("Pos", flightData.posx_km.data(), flightData.posy_km.data(), flightData.t.size());
-                    break;
-                case 10:
-                    ImPlot::SetupAxes(timeLabel, "Drag / Thrust");
-                    { // thrust_kN in kN, drag_N in N → ratio = thrust_kN * 1000 / drag_N
-                        std::vector<float> ratio(flightData.t.size());
-                        for (size_t i = 0; i < flightData.t.size(); ++i) {
-                            ratio[i] = flightData.thrust_kN[i] > 0 ? flightData.drag_N[i] / (flightData.thrust_kN[i] * 1000.0f) : 0;
-                        }
-                        ImPlot::PlotLine("D/T", flightData.t.data(), ratio.data(), ratio.size());
-                    }
-                    break;
+        if (ImPlot::BeginPlot(desc.label, ImVec2(-1, 250))) {
+            ImPlot::SetupAxes(desc.x_label, desc.y_label);
+
+            if (p == 2 && selectedBody && selectedBody->seaLevel_atm > 0) {
+                ImPlot::SetupAxisLimits(ImAxis_Y1, 0, selectedBody->atmHeight_km + 20.0f);
             }
-            if (!stageTimes.empty()) { ImPlot::PlotInfLines("Stage", stageTimes.data(), stageTimes.size()); }
+            if (p == 3) {
+                ImPlot::SetupAxisLimits(ImAxis_Y1, 0, maxThrust * 1.1f);
+            }
+
+            const float* x_data = (flightData.*(desc.x_field)).data();
+            const float* y_data = nullptr;
+            std::vector<float> scratch;
+
+            if (desc.y_field) {
+                y_data = (flightData.*(desc.y_field)).data();
+            } else if (desc.compute_y) {
+                desc.compute_y(flightData, scratch);
+                y_data = scratch.data();
+            }
+
+            ImPlot::PlotLine(desc.label, x_data, y_data, (int)flightData.t.size());
+
+            if (!stageTimes.empty()) { ImPlot::PlotInfLines("Stage", stageTimes.data(), (int)stageTimes.size()); }
             ImPlot::EndPlot();
         }
     }

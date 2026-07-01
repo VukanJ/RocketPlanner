@@ -11,6 +11,19 @@
 
 class WindowSimulator {
 public:
+    using FlightDataMember = std::vector<float> FlightData<float>::*;
+
+    struct PlotDesc {
+        const char* label;
+        const char* x_label;
+        const char* y_label;
+        FlightDataMember x_field = nullptr;
+        FlightDataMember y_field = nullptr;
+        void (*compute_y)(const FlightData<float>&, std::vector<float>&) = nullptr;
+        bool auto_fit_x = true;
+        bool auto_fit_y = true;
+    };
+
     WindowSimulator(const PartInfoList& engines);
 
     void onWindowResized(int width, int height);
@@ -40,7 +53,7 @@ public:
 private:
     bool configDirty = false;
     bool showDemo = false;
-    bool showPlot[11] = {false, false, true, false, false, false, false, false, false, false, true};
+    std::vector<bool> showPlot;
 
     void drawMenuBar();
     void recomputeMasses();

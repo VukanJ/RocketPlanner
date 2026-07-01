@@ -74,30 +74,42 @@ FlightData<float> simulate_flight(Body body, const RocketConfig& rocket, LaunchS
         float g_mag = body.surfaceGravity * std::pow(body.radius_km / r, 2);
         vec grav = {-g_mag * pos.x / r, -g_mag * pos.y / r};
 
-        {
-            float X = std::sqrt(pos.x*pos.x + pos.y*pos.y);
-            vec up  {pos.x / X, pos.y / X};
-            vec east{up.y, -up.x};
-            float angle_rad;
-            constexpr float startATM = 1.0f;
-            if (pressure > startATM) {
-                angle_rad = 0.0f;
-            }
-            else if (pressure <= 0.0f) {
-                angle_rad = 85.0f * M_PI / 180.0f;
-            }
-            else {
-                float t = pressure / startATM;
-                angle_rad = (1.0f - t) * 85.0f * M_PI / 180.0f;
-            }
-            dir.x = cos(angle_rad) * up.x + sin(angle_rad) * east.x;
-            dir.y = cos(angle_rad) * up.y + sin(angle_rad) * east.y;
-        }
-
         float isp = currentStage.engine->enginePerf.getISP(pressure);
         float ispVac = currentStage.engine->enginePerf.vacuumISP;
         float thrust = (isp / ispVac) * currentStage.engine->MaxThrustkN * currentStage.nEngines;
 
+        float pitch_angle = 0;
+        if (body.seaLevel_atm > 0) {
+            // Gravity turn
+            float X = std::sqrt(pos.x*pos.x + pos.y*pos.y);
+            vec up  {pos.x / X, pos.y / X};
+            vec east{up.y, -up.x};
+            constexpr float startATM = 1.0f;
+            if (pressure > startATM) {
+                pitch_angle = 0.0f;
+            }
+            else if (pressure <= 0.0f) {
+                pitch_angle = 85.0f * M_PI / 180.0f;
+            }
+            else {
+                float t = pressure / startATM;
+                pitch_angle = (1.0f - t) * 85.0f * M_PI / 180.0f;
+            }
+            dir.x = cos(pitch_angle) * up.x + sin(pitch_angle) * east.x;
+            dir.y = cos(pitch_angle) * up.y + sin(pitch_angle) * east.y;
+        }
+        else {
+            // Gravity turn (no atmosphere)
+            float X = std::sqrt(pos.x*pos.x + pos.y*pos.y);
+            vec up {pos.x / X, pos.y / X};
+            vec east{up.y, -up.x};
+
+            pitch_angle = std::clamp(acos(mass * g_mag / thrust), 0.0, M_PI); // Upwards pointing TWR=1
+            dir.x = cos(pitch_angle) * up.x + sin(pitch_angle) * east.x;
+            dir.y = cos(pitch_angle) * up.y + sin(pitch_angle) * east.y;
+        }
+
+        mass -= flowRate * dt;
         double A = currentStage.area_m2;
         constexpr double Cd = 0.2;
         double rho = (body.seaLevel_atm > 0) ? (double)pressure * body.sea_level_density_kgpm3 / body.seaLevel_atm : 0.0;
@@ -118,7 +130,6 @@ FlightData<float> simulate_flight(Body body, const RocketConfig& rocket, LaunchS
         pos.x += vel.x * dt / 1000.0;
         pos.y += vel.y * dt / 1000.0;
 
-        mass -= flowRate * dt;
 
         float apo = getApoapsis();
         float speed = std::sqrt(vel.x*vel.x + vel.y*vel.y);
@@ -137,7 +148,6 @@ FlightData<float> simulate_flight(Body body, const RocketConfig& rocket, LaunchS
             launchSuccess.availableDeltaV = avail_dV;
         }
 
-        double dir_angle_deg = std::atan2(dir.x, dir.y) * 180.0 / M_PI;
         data.t.push_back(elapsed);
         data.altitude_km.push_back(altitude);
         data.velocity_ms.push_back(speed);
@@ -148,7 +158,7 @@ FlightData<float> simulate_flight(Body body, const RocketConfig& rocket, LaunchS
         data.thrust_kN.push_back(thrust);
         data.mass_t.push_back(mass);
         data.pressure_atm.push_back(pressure);
-        data.dir_angle_deg.push_back(dir_angle_deg);
+        data.dir_angle_deg.push_back(pitch_angle * 180.0 / M_PI);
         data.apoapsis_km.push_back(apo);
         data.stage.push_back(stage);
         data.area_m2.push_back(A);

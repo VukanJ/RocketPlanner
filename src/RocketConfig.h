@@ -8,8 +8,8 @@
 // Abstract kinematic rocket description
 
 struct StageKinematics {
-    float m0;
-    float mf;
+    float m0; // mass of rocket at stage ignition
+    float mf; // mass of rocket at stage burnout
     float burnTime;
     float area_m2;
     float vacuumDeltaV;
@@ -29,13 +29,13 @@ struct AsparagusConfig {
 };
 
 struct StageInfo {
-    double fullMass = INFINITY;
-    double payloadMass = 0;  // Dead weight in this stage
-    double emptyMass = INFINITY;
+    float fullMass = INFINITY;
+    float payloadMass = 0;  // Dead weight in this stage
+    float emptyMass = INFINITY;
     const PartProperty* engine = nullptr;
     const PartProperty* boosterEngine = nullptr;  // Radial engines
     int engineMultiplicity = 0;
-    double TWR = 0;
+    float TWR = 0;
     AsparagusConfig asparagus_config;
 };
 
