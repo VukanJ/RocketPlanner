@@ -452,7 +452,7 @@ void WindowSimulator::renderGravityTurnConfig() {
     ImGui::Text("Gravity Turn Parameters");
 
     bool changed = false;
-    changed |= ImGui::SliderFloat("Vertical climb (km)", &gtClimbAlt, 0.0f, 70.0f, "%.1f");
+    changed |= ImGui::SliderFloat("Vertical climb (km)", &gtClimbAlt, 0.1f, 70.0f, "%.1f");
     if (ImGui::IsItemHovered()) {
         ImGui::SetTooltip("Altitude to fly straight up before starting the turn.\nEve: 10-20 km, Kerbin: 0-5 km, Duna: 0 km.");
     }
@@ -726,7 +726,7 @@ void WindowSimulator::renderFlight() {
     std::vector<float> stageTimes;
     for (int i = 1; i < data.stage.size(); ++i) {
         if (data.stage[i] != data.stage[i - 1]) {
-            data.t.push_back(data.t[i - 1]);
+            stageTimes.push_back(data.t[i - 1]);
         }
     }
 

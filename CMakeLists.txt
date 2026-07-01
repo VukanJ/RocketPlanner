@@ -73,14 +73,14 @@ set(IMPLOT_SOURCES
 add_executable(debug ${ROCKET_SOURCES} ${IMGUI_SOURCES} ${IMPLOT_SOURCES})
 target_include_directories(debug PRIVATE ext src ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends ${implot_SOURCE_DIR} /usr/include)
 target_compile_definitions(debug PRIVATE AGAVE_FONT_PATH="${AGAVE_FONT_PATH}")
-target_compile_options(debug PRIVATE -no-pie -g -O0 -fno-omit-frame-pointer -Wall -Wunused-value -Wshadow -pedantic)
+target_compile_options(debug PRIVATE -no-pie -g -O0 -fno-omit-frame-pointer -march=native -Wall -Wunused-value -Wshadow -pedantic)
 target_link_options(debug PRIVATE -no-pie)
 target_link_libraries(debug glfw OpenGL::GL)
 
 add_executable(release ${ROCKET_SOURCES} ${IMGUI_SOURCES} ${IMPLOT_SOURCES})
 target_include_directories(release PRIVATE ext src ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends ${implot_SOURCE_DIR} /usr/include)
 target_compile_definitions(release PRIVATE AGAVE_FONT_PATH="${AGAVE_FONT_PATH}")
-target_compile_options(release PRIVATE -Wall -Wunused-value -Wshadow -pedantic -O3 -DNDEBUG)
+target_compile_options(release PRIVATE -march=native -Wall -Wunused-value -Wshadow -pedantic -O3 -DNDEBUG)
 target_link_libraries(release glfw OpenGL::GL)
 
 # ---- GoogleTest ----
@@ -88,7 +88,7 @@ find_package(GTest REQUIRED)
 
 add_executable(unittest src/unittest.cpp src/rocket.cpp src/parts.cpp src/PartSerializer.cpp src/stage.cpp src/LoadKspParts.cpp src/NelderMead.cpp src/RocketSolver.cpp src/RocketConfig.cpp)
 target_include_directories(unittest PRIVATE ext src /usr/include)
-target_compile_options(unittest PRIVATE -g -O0 -Wall -Wunused-value -Wshadow -pedantic)
+target_compile_options(unittest PRIVATE -g -O0 -march=native -Wall -Wunused-value -Wshadow -pedantic)
 target_link_libraries(unittest GTest::gtest_main)
 add_test(NAME unittest COMMAND unittest)
 

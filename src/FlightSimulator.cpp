@@ -66,31 +66,29 @@ void FlightSimulator::simulate_launch(const Body& body, const RocketConfig& rock
         vec2f east {up.y, -up.x};
 
         // Altitude-based turn schedule
-        float turnEnd  = std::max(body.atmHeight_km, gtClimbAlt + 0.1f);
-        float progress = std::clamp((altitude - gtClimbAlt) / (turnEnd - gtClimbAlt), 0.0f, 1.0f);
+        float progress = std::clamp((altitude - gtClimbAlt) / gtClimbAlt, 0.0f, 1.0f);
         float shaped   = std::pow(progress, gtTurnSpread);
         float schedulePitch = shaped * gtFinalPitch * DEG2RAD;
 
-        // TWR-balanced pitch (what physics allows)
+        // TWR-balanced pitch
         float twrPitch = thrust > 0 ? std::acos(std::clamp(mass * g_mag / thrust, 0.0f, 1.0f)) : 0.0f;
 
         // Blend: schedule dominates early in the turn (climb phase),
         // TWR dominates later. Smoothly transitions with progress.
-        float blend = 1.0f - progress;
-        float pitch_angle = schedulePitch * blend + twrPitch * (1.0f - blend);
+        float pitch_angle = schedulePitch * (1.0f - progress) + twrPitch * progress;
 
         dir.x = cos(pitch_angle) * up.x + sin(pitch_angle) * east.x;
         dir.y = cos(pitch_angle) * up.y + sin(pitch_angle) * east.y;
 
         mass -= flowRate * dt;
         float A = currentStage.area_m2;
-        float rho = (body.seaLevel_atm > 0) ? pressure * body.sea_level_density_kgpm3 / body.seaLevel_atm : 0.0;
-        float speed_d = std::sqrtf(vel.x * vel.x + vel.y * vel.y);
-        float drag_mag = 0.5 * rho * speed_d * speed_d * A * Cd;
-        vec2f drag_accel{0, 0};
-        if (speed_d > 1e-6) {
-            float ax = (-drag_mag / (mass * 1000.0) * vel.x / speed_d);
-            float ay = (-drag_mag / (mass * 1000.0) * vel.y / speed_d);
+        float air_density = (body.seaLevel_atm > 0) ? pressure * body.sea_level_density_kgpm3 / body.seaLevel_atm : 0.0;
+        float speed = std::sqrtf(vel.x * vel.x + vel.y * vel.y);
+        float drag_mag = 0.5 * air_density * speed * speed * A * Cd;
+        vec2f drag_accel {0, 0};
+        if (speed > 1e-6) {
+            float ax = (-drag_mag / (mass * 1000.0) * vel.x / speed);
+            float ay = (-drag_mag / (mass * 1000.0) * vel.y / speed);
             drag_accel = {ax, ay};
         }
 
@@ -102,7 +100,6 @@ void FlightSimulator::simulate_launch(const Body& body, const RocketConfig& rock
         pos.y += vel.y * dt / 1000.0;
 
         const float APO = getOrbitExtent<Apoapsis>(pos, vel, R, GM) - body.radius_km;
-        const float speed = std::sqrt(vel.x*vel.x + vel.y*vel.y);
 
         if (!circularizationChecked && APO > body.atmHeight_km + 10.0) {
             // Calculate whether it is possible to circularize the orbit

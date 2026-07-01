@@ -66,7 +66,7 @@ private:
 
     float rocketConfigHeight_ = -1.0f;
 
-    float gtClimbAlt = 0.0f;      // km — go straight up this high before turning
+    float gtClimbAlt = 0.1f;      // km — go straight up this high before turning
     float gtTurnSpread = 1.0f;    // exponent — 0.3=aggressive, 1=linear, 3=gradual
     float gtFinalPitch = 85.0f;   // deg — target pitch from vertical
 };
