@@ -30,13 +30,13 @@ struct Body {
     const float sea_level_density_kgpm3;
     const float rotPeriod_s;
 
-    inline double GM() const {
+    inline float GM() const {
         return (surfaceGravity / 1000.0) * radius_km * radius_km;
     }
 
-    double getPressureAtAltitude_km(float altitude) const {
+    float getPressureAtAltitude_km(float altitude) const {
         if (altitude >= atmHeight_km || seaLevel_atm <= 0.0f) return 0.0f;
-        return seaLevel_atm * std::exp(-altitude / atm_falloff_km);
+        return seaLevel_atm * std::expf(-altitude / atm_falloff_km);
     }
 };
 

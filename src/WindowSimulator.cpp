@@ -41,8 +41,7 @@ static const WindowSimulator::PlotDesc s_plots[] = {
             for (size_t i = 0; i < d.t.size(); ++i)
                 out[i] = d.thrust_kN[i] > 0 ? d.drag_N[i] / (d.thrust_kN[i] * 1000) : 0;
         }, false, true},
-    {"Pitch vs Altitude", "Altitude (km)", "Angle (deg)", &FlightData<float>::altitude_km, &FlightData<float>::dir_angle_deg},
-    {"Vel vs Altitude",   "Altitude (km)", "Velocity (m/s)",  &FlightData<float>::altitude_km, &FlightData<float>::velocity_ms},
+    {"Pitch vs Altitude", "Altitude (km)", "Angle (deg)", &FlightData<float>::altitude_km, &FlightData<float>::dir_angle_deg}
 };
 static constexpr int nPlots = sizeof(s_plots) / sizeof(s_plots[0]);
 
@@ -450,7 +449,32 @@ void WindowSimulator::StagingConfigMenu() {
 }
 
 void WindowSimulator::renderGravityTurnConfig() {
-    ImGui::Text("Start turn at pressure: ");
+    ImGui::Text("Gravity Turn Parameters");
+
+    bool changed = false;
+    changed |= ImGui::SliderFloat("Vertical climb (km)", &gtClimbAlt, 0.0f, 70.0f, "%.1f");
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Altitude to fly straight up before starting the turn.\nEve: 10-20 km, Kerbin: 0-5 km, Duna: 0 km.");
+    }
+
+    changed |= ImGui::SliderFloat("Turn aggressiveness", &gtTurnSpread, 0.3f, 3.0f, "%.1f");
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("How quickly the turn progresses.\n0.3 = aggressive pitch-over, 1.0 = linear, 3.0 = gradual hold-then-snap.\nHigh TWR rockets can handle more aggressive turns.");
+    }
+
+    changed |= ImGui::SliderFloat("Final pitch", &gtFinalPitch, 10.0f, 89.0f, "%.0f deg");
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Target pitch angle from vertical in vacuum.\n85\u00b0 = 5\u00b0 from horizontal.");
+    }
+
+    if (ImGui::Button("Reset to defaults")) {
+        gtClimbAlt = 0.0f;
+        gtTurnSpread = 1.0f;
+        gtFinalPitch = 85.0f;
+        changed = true;
+    }
+
+    if (changed) { configDirty = true; }
 }
 
 void WindowSimulator::renderPictogram() {
@@ -650,21 +674,18 @@ void WindowSimulator::updateKinematics() {
 
 void WindowSimulator::simulateCurrentFlight() {
     if (!selectedBody || rocket.stages.empty()) {
-        flightData = {};
         return;
     }
     for (const auto& stage : rocket.stages) {
         if (!stage.engine) {
-            flightData = {};
             return;
         }
     }
-    lsuccess = LaunchSuccess { }; // Reset
-    flightData = simulate_flight(*selectedBody, rocket, lsuccess);
+    flight_sim.simulate_launch<FlightSimulator::SimOpt::RECORD>(*selectedBody, rocket, gtClimbAlt, gtTurnSpread, gtFinalPitch);
 }
 
 void WindowSimulator::renderFlight() {
-    if (flightData.t.empty()) {
+    if (flight_sim.flight_data.t.empty()) {
         ImGui::TextWrapped("Adjust the rocket configuration to see flight simulation results.");
         return;
     }
@@ -672,18 +693,18 @@ void WindowSimulator::renderFlight() {
     if (ImGui::Button("Save CSV")) {
         std::ofstream csv("flight_data.csv");
         csv << "t,alt_km,vel_m_s,mass_t,thrust_kN,drag_N,apo_km,pressure_atm,dir_deg,area_m2,stage\n";
-        for (size_t i = 0; i < flightData.t.size(); ++i) {
-            csv << flightData.t[i] << ','
-                << flightData.altitude_km[i] << ','
-                << flightData.velocity_ms[i] << ','
-                << flightData.mass_t[i] << ','
-                << flightData.thrust_kN[i] << ','
-                << flightData.drag_N[i] << ','
-                << flightData.apoapsis_km[i] << ','
-                << flightData.pressure_atm[i] << ','
-                << flightData.dir_angle_deg[i] << ','
-                << flightData.area_m2[i] << ','
-                << flightData.stage[i] << '\n';
+        for (size_t i = 0; i < flight_sim.flight_data.t.size(); ++i) {
+            csv << flight_sim.flight_data.t[i] << ','
+                << flight_sim.flight_data.altitude_km[i] << ','
+                << flight_sim.flight_data.velocity_ms[i] << ','
+                << flight_sim.flight_data.mass_t[i] << ','
+                << flight_sim.flight_data.thrust_kN[i] << ','
+                << flight_sim.flight_data.drag_N[i] << ','
+                << flight_sim.flight_data.apoapsis_km[i] << ','
+                << flight_sim.flight_data.pressure_atm[i] << ','
+                << flight_sim.flight_data.dir_angle_deg[i] << ','
+                << flight_sim.flight_data.area_m2[i] << ','
+                << flight_sim.flight_data.stage[i] << '\n';
         }
         std::clog << "CSV saved\n";
     }
@@ -694,21 +715,23 @@ void WindowSimulator::renderFlight() {
         ImGui::SetTooltip("Saves flight_data.csv to working directory");
     }
 
-    for (int i = 0; i < flightData.t.size(); ++i) {
-        if (std::isinf(flightData.apoapsis_km[i])) {
-            flightData.apoapsis_km[i] = 1e6f;
+    auto& data = flight_sim.flight_data;
+
+    for (int i = 0; i < data.t.size(); ++i) {
+        if (std::isinf(data.apoapsis_km[i])) {
+            data.apoapsis_km[i] = 1e6f;
         }
     }
 
     std::vector<float> stageTimes;
-    for (int i = 1; i < flightData.stage.size(); ++i) {
-        if (flightData.stage[i] != flightData.stage[i - 1]) {
-            stageTimes.push_back(flightData.t[i - 1]);
+    for (int i = 1; i < data.stage.size(); ++i) {
+        if (data.stage[i] != data.stage[i - 1]) {
+            data.t.push_back(data.t[i - 1]);
         }
     }
 
     float maxThrust = 0;
-    for (auto v : flightData.thrust_kN) {
+    for (auto v : data.thrust_kN) {
         if (v > maxThrust) { maxThrust = v; }
     }
 
@@ -748,18 +771,18 @@ void WindowSimulator::renderFlight() {
                 ImPlot::SetupAxisLimits(ImAxis_Y1, 0, maxThrust * 1.1f);
             }
 
-            const float* x_data = (flightData.*(desc.x_field)).data();
+            const float* x_data = (data.*(desc.x_field)).data();
             const float* y_data = nullptr;
             std::vector<float> scratch;
 
             if (desc.y_field) {
-                y_data = (flightData.*(desc.y_field)).data();
+                y_data = (data.*(desc.y_field)).data();
             } else if (desc.compute_y) {
-                desc.compute_y(flightData, scratch);
+                desc.compute_y(data, scratch);
                 y_data = scratch.data();
             }
 
-            ImPlot::PlotLine(desc.label, x_data, y_data, (int)flightData.t.size());
+            ImPlot::PlotLine(desc.label, x_data, y_data, data.t.size());
 
             if (!stageTimes.empty()) { ImPlot::PlotInfLines("Stage", stageTimes.data(), (int)stageTimes.size()); }
             ImPlot::EndPlot();
@@ -781,6 +804,7 @@ void WindowSimulator::renderOrbitalSuccessWindow() {
     };
 
     ImGui::Text("Launch Information");
+    auto& lsuccess = flight_sim.launchSuccess;
     colorText(lsuccess.apoapsis_safe_height);
     ImGui::BulletText("Vacuum Apoapsis? %s", lsuccess.apoapsis_safe_height ? "Yes" : "No");
     ImGui::PopStyleColor();
@@ -799,7 +823,8 @@ void WindowSimulator::renderOrbitalSuccessWindow() {
 }
 
 void WindowSimulator::renderRawData() {
-    if (flightData.t.empty()) return;
+    const std::size_t size = flight_sim.flight_data.t.size();
+    if (size == 0) return;
 
     if (ImGui::BeginTable("flight_table", 10, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
         ImGui::TableSetupColumn("t");
@@ -814,19 +839,19 @@ void WindowSimulator::renderRawData() {
         ImGui::TableSetupColumn("stage");
         ImGui::TableHeadersRow();
 
-        int step = std::max(1, static_cast<int>(flightData.t.size()) / 100);
-        for (int i = 0; i < flightData.t.size(); i += step) {
+        int step = std::max(1, static_cast<int>(size) / 100);
+        for (int i = 0; i < size; i += step) {
             ImGui::TableNextRow();
-            ImGui::TableSetColumnIndex(0); ImGui::Text("%.2f", flightData.t[i]);
-            ImGui::TableSetColumnIndex(1); ImGui::Text("%.3f", flightData.altitude_km[i]);
-            ImGui::TableSetColumnIndex(2); ImGui::Text("%.1f", flightData.velocity_ms[i]);
-            ImGui::TableSetColumnIndex(3); ImGui::Text("%.1f", flightData.mass_t[i]);
-            ImGui::TableSetColumnIndex(4); ImGui::Text("%.1f", flightData.thrust_kN[i]);
-            ImGui::TableSetColumnIndex(5); ImGui::Text("%.1f", flightData.drag_N[i]);
-            ImGui::TableSetColumnIndex(6); ImGui::Text("%.1f", flightData.apoapsis_km[i]);
-            ImGui::TableSetColumnIndex(7); ImGui::Text("%.4f", flightData.pressure_atm[i]);
-            ImGui::TableSetColumnIndex(8); ImGui::Text("%.1f", flightData.dir_angle_deg[i]);
-            ImGui::TableSetColumnIndex(9); ImGui::Text("%d", flightData.stage[i]);
+            ImGui::TableSetColumnIndex(0); ImGui::Text("%.2f", flight_sim.flight_data.t[i]);
+            ImGui::TableSetColumnIndex(1); ImGui::Text("%.3f", flight_sim.flight_data.altitude_km[i]);
+            ImGui::TableSetColumnIndex(2); ImGui::Text("%.1f", flight_sim.flight_data.velocity_ms[i]);
+            ImGui::TableSetColumnIndex(3); ImGui::Text("%.1f", flight_sim.flight_data.mass_t[i]);
+            ImGui::TableSetColumnIndex(4); ImGui::Text("%.1f", flight_sim.flight_data.thrust_kN[i]);
+            ImGui::TableSetColumnIndex(5); ImGui::Text("%.1f", flight_sim.flight_data.drag_N[i]);
+            ImGui::TableSetColumnIndex(6); ImGui::Text("%.1f", flight_sim.flight_data.apoapsis_km[i]);
+            ImGui::TableSetColumnIndex(7); ImGui::Text("%.4f", flight_sim.flight_data.pressure_atm[i]);
+            ImGui::TableSetColumnIndex(8); ImGui::Text("%.1f", flight_sim.flight_data.dir_angle_deg[i]);
+            ImGui::TableSetColumnIndex(9); ImGui::Text("%d",   flight_sim.flight_data.stage[i]);
         }
         ImGui::EndTable();
     }

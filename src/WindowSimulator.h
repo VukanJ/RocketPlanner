@@ -48,7 +48,6 @@ public:
     std::vector<StageKinematics> kinematics;
     std::vector<double> stageFuelMass;
     const Body* selectedBody;
-    FlightData<float> flightData;
 
 private:
     bool configDirty = false;
@@ -63,9 +62,13 @@ private:
     void insertDefaultStage();
 
     const PartProperty* defaultEngine;
-    LaunchSuccess lsuccess;
+    FlightSimulator flight_sim;
 
     float rocketConfigHeight_ = -1.0f;
+
+    float gtClimbAlt = 0.0f;      // km — go straight up this high before turning
+    float gtTurnSpread = 1.0f;    // exponent — 0.3=aggressive, 1=linear, 3=gradual
+    float gtFinalPitch = 85.0f;   // deg — target pitch from vertical
 };
 
 #endif // WINDOW_SIMULATOR

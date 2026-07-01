@@ -41,6 +41,24 @@ struct FlightData {
         area_m2.reserve(n);
         drag_N.reserve(n);
     }
+
+    void clear() {
+        t.clear();
+        altitude_km.clear();
+        velocity_ms.clear();
+        vx_ms.clear();
+        vy_ms.clear();
+        posx_km.clear();
+        posy_km.clear();
+        thrust_kN.clear();
+        mass_t.clear();
+        pressure_atm.clear();
+        dir_angle_deg.clear();
+        apoapsis_km.clear();
+        stage.clear();
+        area_m2.clear();
+        drag_N.clear();
+    }
 };
 
 struct LaunchSuccess {
@@ -51,6 +69,54 @@ struct LaunchSuccess {
     float burnTimeRequired = INFINITY;
 };
 
-FlightData<float> simulate_flight(Body body, const RocketConfig& rocket, LaunchSuccess&);
+template <typename F=float>
+struct vec2 { F x = 0; F y = 0; };
+
+using vec2f = vec2<float>;
+
+float getApoapsis(const vec2<float>& pos, const vec2<float>& vel, float r_km, float GM, float body_R);
+float getPeriapsis(const vec2<float>& pos, const vec2<float>& vel, float r_km, float GM, float body_R);
+
+enum ApoPer {Apoapsis, Periapsis};
+
+template <ApoPer AP, typename FLT=float>
+FLT getOrbitExtent(const vec2<FLT>& pos, const vec2<FLT>& vel, FLT r_km, FLT GM) {
+    FLT vx = vel.x / 1000.0;
+    FLT vy = vel.y / 1000.0;
+    FLT v2 = vx*vx + vy*vy;
+    FLT eps = 0.5f * v2 - GM / r_km;
+    if (eps >= 0) { return INFINITY; }
+    FLT a   = -GM / (2.0f * eps);
+    FLT h   = pos.x * vy - pos.y * vx;
+    FLT e   = std::sqrt(1.0f + 2.0f*eps*h*h / (GM * GM));
+    if constexpr (AP == Apoapsis) {
+        return a * (1.0f + e);
+    }
+    else if constexpr (AP == Periapsis){
+        return a * (1.0f - e);
+    }
+    else {
+        static_assert(true, "Invalid option");
+    }
+}
+
+
+class FlightSimulator {
+public:
+    FlightSimulator();
+    enum class SimOpt { FAST, RECORD };
+
+    template <SimOpt SIM>
+    void simulate_launch(const Body& body, const RocketConfig& rocket,
+                         float gtClimbAlt = 0.0f, 
+                         float gtTurnSpread = 1.0f, 
+                         float gtFinalPitch = 85.0f);
+
+    float dt = 0.1;
+    const double Cd = 0.2; // Drag Coefficient
+
+    FlightData<float> flight_data;
+    LaunchSuccess launchSuccess;
+};
 
 #endif // FLIGHT_SIMULATOR_H

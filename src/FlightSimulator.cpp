@@ -1,43 +1,20 @@
 #include "FlightSimulator.h"
 
-FlightData<float> simulate_flight(Body body, const RocketConfig& rocket, LaunchSuccess& launchSuccess) {
-    struct vec { float x = 0; float y = 0; };
-    vec pos {0, (float)body.radius_km};
-    vec vel {(float)(2.0f * M_PI * body.radius_km * 1000.0f / body.rotPeriod_s), 0};
-    vec dir {0, 1};
+static constexpr double DEG2RAD = M_PI / 180.0;
 
-    FlightData<float> data;
+FlightSimulator::FlightSimulator() {
+}
+
+template <FlightSimulator::SimOpt SIM>
+void FlightSimulator::simulate_launch(const Body& body, const RocketConfig& rocket,
+                                      float gtClimbAlt, float gtTurnSpread, float gtFinalPitch) {
+    vec2f pos {0, (float)body.radius_km};
+    vec2f vel {(float)(2.0f * M_PI * body.radius_km * 1000.0f / body.rotPeriod_s), 0};
+    vec2f dir {0, 1};
+    launchSuccess = LaunchSuccess {};
 
     std::vector<StageKinematics> kinematics;
     rocket.calcStageKinematics(kinematics);
-
-    auto getApoapsis = [&pos, &vel, &body]() -> float {
-        double vx = vel.x / 1000.0;
-        double vy = vel.y / 1000.0;
-        double v2 = vx*vx + vy*vy;
-        double r  = std::sqrt(pos.x*pos.x + pos.y*pos.y);
-        double eps = 0.5*v2 - body.GM() / r;
-        if (eps >= 0) { return INFINITY; }
-        double a   = -body.GM() / (2*eps);
-        double h   = pos.x * vy - pos.y * vx;
-        double e   = std::sqrt(1 + 2*eps*h*h / (body.GM()*body.GM()));
-        return a * (1 + e) - body.radius_km;
-    };
-
-    auto getPeriapsis = [&pos, &vel, &body]() -> float {
-        double vx = vel.x / 1000.0;
-        double vy = vel.y / 1000.0;
-        double v2 = vx*vx + vy*vy;
-        double r  = std::sqrt(pos.x*pos.x + pos.y*pos.y);
-        double eps = 0.5*v2 - body.GM() / r;
-        if (eps >= 0) { return INFINITY; }
-        double a   = -body.GM() / (2*eps);
-        double h   = pos.x * vy - pos.y * vx;
-        double e   = std::sqrt(1 + 2*eps*h*h / (body.GM()*body.GM()));
-        return a * (1 - e) - body.radius_km;
-    };
-
-    float dt = 0.1;
 
     const int nStage = kinematics.size();
     int stage = 0;
@@ -46,17 +23,22 @@ FlightData<float> simulate_flight(Body body, const RocketConfig& rocket, LaunchS
     float stageTime = 0;
     float mass = currentStage.m0;
     float flowRate = (currentStage.m0 - currentStage.mf) / currentStage.burnTime;
+    const float GM = body.GM();
 
     float totalBurnTime = 0;
-    for (auto& k : kinematics) totalBurnTime += k.burnTime;
-    int maxIter = (int)(totalBurnTime / dt) + 200;
+    for (auto& k : kinematics) { totalBurnTime += k.burnTime; }
+    int maxIter = static_cast<int>((totalBurnTime / dt) + 200);
 
-    data.reserve(maxIter);
+    if constexpr (SIM == SimOpt::RECORD) {
+        flight_data.clear();
+        flight_data.reserve(maxIter);
+    }
 
     bool circularizationChecked = false;
 
     for (int i = 0; i < maxIter; ++i) {
         if (stageTime > currentStage.burnTime) {
+            // Staging event
             if (stage == nStage - 1) {
                 break;
             }
@@ -67,56 +49,45 @@ FlightData<float> simulate_flight(Body body, const RocketConfig& rocket, LaunchS
             flowRate = (currentStage.m0 - currentStage.mf) / currentStage.burnTime;
         }
 
-        float altitude = std::sqrt(pos.x*pos.x + pos.y*pos.y) - body.radius_km;
+        float R = std::sqrt(pos.x*pos.x + pos.y*pos.y);
+        float altitude = R - body.radius_km;
         float pressure = body.getPressureAtAltitude_km(altitude);
 
-        float r = altitude + body.radius_km;
-        float g_mag = body.surfaceGravity * std::pow(body.radius_km / r, 2);
-        vec grav = {-g_mag * pos.x / r, -g_mag * pos.y / r};
+        float g_mag = body.surfaceGravity * std::pow(body.radius_km / R, 2);
+        vec2f grav = {-g_mag * pos.x / R, -g_mag * pos.y / R};
 
+        // Calculate current, pressure dependent thrust
         float isp = currentStage.engine->enginePerf.getISP(pressure);
         float ispVac = currentStage.engine->enginePerf.vacuumISP;
         float thrust = (isp / ispVac) * currentStage.engine->MaxThrustkN * currentStage.nEngines;
 
-        float pitch_angle = 0;
-        if (body.seaLevel_atm > 0) {
-            // Gravity turn
-            float X = std::sqrt(pos.x*pos.x + pos.y*pos.y);
-            vec up  {pos.x / X, pos.y / X};
-            vec east{up.y, -up.x};
-            constexpr float startATM = 1.0f;
-            if (pressure > startATM) {
-                pitch_angle = 0.0f;
-            }
-            else if (pressure <= 0.0f) {
-                pitch_angle = 85.0f * M_PI / 180.0f;
-            }
-            else {
-                float t = pressure / startATM;
-                pitch_angle = (1.0f - t) * 85.0f * M_PI / 180.0f;
-            }
-            dir.x = cos(pitch_angle) * up.x + sin(pitch_angle) * east.x;
-            dir.y = cos(pitch_angle) * up.y + sin(pitch_angle) * east.y;
-        }
-        else {
-            // Gravity turn (no atmosphere)
-            float X = std::sqrt(pos.x*pos.x + pos.y*pos.y);
-            vec up {pos.x / X, pos.y / X};
-            vec east{up.y, -up.x};
+        // Calculate rocket orientation w.r.t planet center
+        vec2f up {pos.x / R, pos.y / R};
+        vec2f east {up.y, -up.x};
 
-            pitch_angle = std::clamp(acos(mass * g_mag / thrust), 0.0, M_PI); // Upwards pointing TWR=1
-            dir.x = cos(pitch_angle) * up.x + sin(pitch_angle) * east.x;
-            dir.y = cos(pitch_angle) * up.y + sin(pitch_angle) * east.y;
-        }
+        // Altitude-based turn schedule
+        float turnEnd  = std::max(body.atmHeight_km, gtClimbAlt + 0.1f);
+        float progress = std::clamp((altitude - gtClimbAlt) / (turnEnd - gtClimbAlt), 0.0f, 1.0f);
+        float shaped   = std::pow(progress, gtTurnSpread);
+        float schedulePitch = shaped * gtFinalPitch * DEG2RAD;
+
+        // TWR-balanced pitch (what physics allows)
+        float twrPitch = thrust > 0 ? std::acos(std::clamp(mass * g_mag / thrust, 0.0f, 1.0f)) : 0.0f;
+
+        // Blend: schedule dominates early in the turn (climb phase),
+        // TWR dominates later. Smoothly transitions with progress.
+        float blend = 1.0f - progress;
+        float pitch_angle = schedulePitch * blend + twrPitch * (1.0f - blend);
+
+        dir.x = cos(pitch_angle) * up.x + sin(pitch_angle) * east.x;
+        dir.y = cos(pitch_angle) * up.y + sin(pitch_angle) * east.y;
 
         mass -= flowRate * dt;
-        double A = currentStage.area_m2;
-        constexpr double Cd = 0.2;
-        double rho = (body.seaLevel_atm > 0) ? (double)pressure * body.sea_level_density_kgpm3 / body.seaLevel_atm : 0.0;
-        double speed_d = std::sqrt((double)vel.x * vel.x + (double)vel.y * vel.y);
-        double drag_mag = 0.5 * rho * speed_d * speed_d * A * Cd;
-        float drag_N = (float)drag_mag;
-        vec drag_accel{0, 0};
+        float A = currentStage.area_m2;
+        float rho = (body.seaLevel_atm > 0) ? pressure * body.sea_level_density_kgpm3 / body.seaLevel_atm : 0.0;
+        float speed_d = std::sqrtf(vel.x * vel.x + vel.y * vel.y);
+        float drag_mag = 0.5 * rho * speed_d * speed_d * A * Cd;
+        vec2f drag_accel{0, 0};
         if (speed_d > 1e-6) {
             float ax = (float)(-drag_mag / (mass * 1000.0) * vel.x / speed_d);
             float ay = (float)(-drag_mag / (mass * 1000.0) * vel.y / speed_d);
@@ -130,43 +101,46 @@ FlightData<float> simulate_flight(Body body, const RocketConfig& rocket, LaunchS
         pos.x += vel.x * dt / 1000.0;
         pos.y += vel.y * dt / 1000.0;
 
+        const float APO = getOrbitExtent<Apoapsis>(pos, vel, R, GM) - body.radius_km;
+        const float speed = std::sqrt(vel.x*vel.x + vel.y*vel.y);
 
-        float apo = getApoapsis();
-        float speed = std::sqrt(vel.x*vel.x + vel.y*vel.y);
-
-        if (!circularizationChecked && apo > body.atmHeight_km + 10.0) {
+        if (!circularizationChecked && APO > body.atmHeight_km + 10.0) {
+            // Calculate whether it is possible to circularize the orbit
             circularizationChecked = true;
-            float periapsis = getPeriapsis();
-            float a = (apo + periapsis) / 2.0 + body.radius_km;
-            float va = sqrt(body.GM() * (2.0 / (apo + body.radius_km) - 1.0 / a));
-            float vc = sqrt(body.GM() / (apo + body.radius_km));
+            float PER = getOrbitExtent<Periapsis>(pos, vel, R, GM) - body.radius_km;
+            float a = (APO + PER) / 2.0 + body.radius_km;
+            float va = sqrt(GM * (2.0 / (APO + body.radius_km) - 1.0 / a));
+            float vc = sqrt(GM / (APO + body.radius_km));
             float circ_dV = (vc - va) * 1000.0f;
             float avail_dV = rocket.remainingDeltaV(kinematics, elapsed);
 
-            launchSuccess.apoapsis_safe_height = apo > body.atmHeight_km + 10.0;
+            launchSuccess.apoapsis_safe_height = APO > body.atmHeight_km + 10.0;
             launchSuccess.circularization_dv = circ_dV;
             launchSuccess.availableDeltaV = avail_dV;
         }
 
-        data.t.push_back(elapsed);
-        data.altitude_km.push_back(altitude);
-        data.velocity_ms.push_back(speed);
-        data.vx_ms.push_back(vel.x);
-        data.vy_ms.push_back(vel.y);
-        data.posx_km.push_back(pos.x);
-        data.posy_km.push_back(pos.y);
-        data.thrust_kN.push_back(thrust);
-        data.mass_t.push_back(mass);
-        data.pressure_atm.push_back(pressure);
-        data.dir_angle_deg.push_back(pitch_angle * 180.0 / M_PI);
-        data.apoapsis_km.push_back(apo);
-        data.stage.push_back(stage);
-        data.area_m2.push_back(A);
-        data.drag_N.push_back(drag_N);
+        if constexpr (SIM == SimOpt::RECORD) {
+            flight_data.t.push_back(elapsed);
+            flight_data.altitude_km.push_back(altitude);
+            flight_data.velocity_ms.push_back(speed);
+            flight_data.vx_ms.push_back(vel.x);
+            flight_data.vy_ms.push_back(vel.y);
+            flight_data.posx_km.push_back(pos.x);
+            flight_data.posy_km.push_back(pos.y);
+            flight_data.thrust_kN.push_back(thrust);
+            flight_data.mass_t.push_back(mass);
+            flight_data.pressure_atm.push_back(pressure);
+            flight_data.dir_angle_deg.push_back(pitch_angle * 180.0 / M_PI);
+            flight_data.apoapsis_km.push_back(APO);
+            flight_data.stage.push_back(stage);
+            flight_data.area_m2.push_back(A);
+            flight_data.drag_N.push_back(drag_mag);
+        }
 
         stageTime += dt;
         elapsed += dt;
     }
-    return data;
 }
 
+template void FlightSimulator::simulate_launch<FlightSimulator::SimOpt::RECORD>(const Body&, const RocketConfig&, float, float, float);
+template void FlightSimulator::simulate_launch<FlightSimulator::SimOpt::FAST>(const Body&, const RocketConfig&, float, float, float);
