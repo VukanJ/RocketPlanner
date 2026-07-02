@@ -51,6 +51,7 @@ public:
 
 private:
     bool configDirty = false;
+    bool fuelUnitIsTons = true;
     bool showDemo = false;
     std::vector<bool> showPlot;
 
@@ -65,6 +66,7 @@ private:
     FlightSimulator flight_sim;
 
     float rocketConfigHeight_ = -1.0f;
+    float extraDeltaV = 0;
 
     float gtClimbAlt = 0.1f;      // km — go straight up this high before turning
     float gtTurnSpread = 1.0f;    // exponent — 0.3=aggressive, 1=linear, 3=gradual

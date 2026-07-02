@@ -228,6 +228,21 @@ void WindowSimulator::render() {
 }
 
 void WindowSimulator::StagingConfigMenu() {
+    ImGui::Text("Fuel unit:");
+    ImGui::SameLine();
+    if (ImGui::RadioButton("Tons", fuelUnitIsTons)) {
+        fuelUnitIsTons = true;
+    }
+    ImGui::SameLine();
+    if (ImGui::RadioButton("Liters", !fuelUnitIsTons)) {
+        fuelUnitIsTons = false;
+    }
+    ImGui::SameLine();
+    ImGui::TextDisabled("(?)");
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("KSP fuel units (liters) are converted to tons using each stage's engine fuel density.");
+    }
+
     if (ImGui::Button("+ Add Stage")) {
         insertDefaultStage();
     }
@@ -277,16 +292,6 @@ void WindowSimulator::StagingConfigMenu() {
                 ImGui::EndCombo();
             }
 
-            bool circ_stage = false;
-            if (ImGui::Checkbox("Vacuum stage", &circ_stage)) {
-                std::println("WIP");
-            }
-            ImGui::SameLine();
-            ImGui::TextDisabled("(?)");
-            if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("Whether this stage fires for orbit circularization after reaching vacuum.");
-            }
-
             if (ImGui::SliderInt("##mec", &stage.engineMultiplicity, 1, 4, "Main Engine Count: %i")) {
                 configDirty = true;
             }
@@ -301,11 +306,23 @@ void WindowSimulator::StagingConfigMenu() {
                 configDirty = true;
             }
 
-            if (ImGui::InputDouble("##fuel", &stageFuelMass[s], 0.1, 1.0, "Fuel = %.3f t")) {
-                if (stageFuelMass[s] < 0.0) {
-                    stageFuelMass[s] = 0.0;
+            {
+                double density = stage.engine ? stage.engine->usedFuelDensity() : Constants::LiquidFuelDensity;
+                if (density <= 0.0) { density = Constants::LiquidFuelDensity; }
+
+                if (fuelUnitIsTons) {
+                    if (ImGui::InputDouble("##fuel", &stageFuelMass[s], 0.1, 1.0, "Fuel = %.3f t")) {
+                        if (stageFuelMass[s] < 0.0) { stageFuelMass[s] = 0.0; }
+                        configDirty = true;
+                    }
+                } else {
+                    double fuelUnits = stageFuelMass[s] / density;
+                    if (ImGui::InputDouble("##fuel", &fuelUnits, 0.1 / density, 1.0 / density, "Fuel = %.0f u")) {
+                        if (fuelUnits < 0.0) { fuelUnits = 0.0; }
+                        stageFuelMass[s] = fuelUnits * density;
+                        configDirty = true;
+                    }
                 }
-                configDirty = true;
             }
 
             auto& asp = stage.asparagus_config;
@@ -468,7 +485,7 @@ void WindowSimulator::renderGravityTurnConfig() {
     }
 
     if (ImGui::Button("Reset to defaults")) {
-        gtClimbAlt = 0.0f;
+        gtClimbAlt = 0.1f;
         gtTurnSpread = 1.0f;
         gtFinalPitch = 85.0f;
         changed = true;
@@ -794,6 +811,14 @@ void WindowSimulator::renderFlight() {
 }
 
 void WindowSimulator::renderOrbitalSuccessWindow() {
+    ImGui::Text("Launch Information and Target Config");
+
+    if (ImGui::SliderFloat("##targetOrbit", &flight_sim.targetOrbit_km, 5, 300, "Target Orbit: %f km")) {
+        configDirty = true;
+    }
+    if (ImGui::SliderFloat("##deltaVextra", &extraDeltaV, 0, 30000, "Extra delta v: %f km")) {
+        configDirty = true;
+    }
     auto colorText = [](bool cond){
         if (cond) {
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0, 1, 0, 1));
@@ -803,21 +828,38 @@ void WindowSimulator::renderOrbitalSuccessWindow() {
         }
     };
 
-    ImGui::Text("Launch Information");
     auto& lsuccess = flight_sim.launchSuccess;
-    colorText(lsuccess.apoapsis_safe_height);
-    ImGui::BulletText("Vacuum Apoapsis? %s", lsuccess.apoapsis_safe_height ? "Yes" : "No");
-    ImGui::PopStyleColor();
 
-    bool canCircularize = lsuccess.circularization_dv <= lsuccess.availableDeltaV;
-    colorText(canCircularize);
-    ImGui::BulletText("Can circularize? %s", canCircularize ? "Yes" : "No");
-    ImGui::Indent();
-    ImGui::BulletText("Δv available %f m/s", lsuccess.availableDeltaV);
+    bool good_apo = flight_sim.targetOrbit_km > selectedBody->atmHeight_km;
+    if (!good_apo) {
+        colorText(false);
+        ImGui::BulletText("Target Orbit in Atmosphere!");
+        ImGui::PopStyleColor();
+    }
+    else {
+        good_apo = lsuccess.finalApoapsis >= flight_sim.targetOrbit_km;
+        colorText(good_apo);
+        ImGui::BulletText("Apoapsis reached? %s", good_apo ? "Yes" : "No");
+        ImGui::PopStyleColor();
 
-    ImGui::BulletText("Δv needed %f m/s", lsuccess.circularization_dv);
-    ImGui::BulletText("Δv left %f m/s", lsuccess.availableDeltaV - lsuccess.circularization_dv);
-    ImGui::PopStyleColor();
+        bool canCircularize = lsuccess.circularization_dv <= lsuccess.availableDeltaV;
+        colorText(canCircularize);
+        ImGui::BulletText("Can circularize? %s", canCircularize ? "Yes" : "No");
+        ImGui::Indent();
+        ImGui::BulletText("Δv available %f m/s", lsuccess.availableDeltaV);
+
+        ImGui::BulletText("Δv needed %f m/s", lsuccess.circularization_dv);
+        ImGui::PopStyleColor();
+
+        bool enoughDVLeft = lsuccess.availableDeltaV >= extraDeltaV;
+        colorText(enoughDVLeft);
+        ImGui::BulletText("Δv left %f m/s", lsuccess.availableDeltaV - lsuccess.circularization_dv);
+        ImGui::PopStyleColor();
+    }
+
+    ImGui::Text("Launch outcome");
+    ImGui::Text("Apoapsis:  %f km", lsuccess.finalApoapsis);
+    ImGui::Text("Periapsis: %f km", lsuccess.finalPeriapsis);
 
     ImGui::Unindent();
 }

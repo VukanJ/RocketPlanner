@@ -66,7 +66,8 @@ void FlightSimulator::simulate_launch(const Body& body, const RocketConfig& rock
         vec2f east {up.y, -up.x};
 
         // Altitude-based turn schedule
-        float progress = std::clamp((altitude - gtClimbAlt) / gtClimbAlt, 0.0f, 1.0f);
+        float turnEnd  = std::max(body.atmHeight_km, gtClimbAlt + 0.1f);
+        float progress = std::clamp((altitude - gtClimbAlt) / (turnEnd - gtClimbAlt), 0.0f, 1.0f);
         float shaped   = std::pow(progress, gtTurnSpread);
         float schedulePitch = shaped * gtFinalPitch * DEG2RAD;
 
@@ -101,7 +102,7 @@ void FlightSimulator::simulate_launch(const Body& body, const RocketConfig& rock
 
         const float APO = getOrbitExtent<Apoapsis>(pos, vel, R, GM) - body.radius_km;
 
-        if (!circularizationChecked && APO > body.atmHeight_km + 10.0) {
+        if (!circularizationChecked && APO > targetOrbit_km) {
             // Calculate whether it is possible to circularize the orbit
             circularizationChecked = true;
             float PER = getOrbitExtent<Periapsis>(pos, vel, R, GM) - body.radius_km;
@@ -111,9 +112,23 @@ void FlightSimulator::simulate_launch(const Body& body, const RocketConfig& rock
             float circ_dV = (vc - va) * 1000.0f;
             float avail_dV = rocket.remainingDeltaV(kinematics, elapsed);
 
-            launchSuccess.apoapsis_safe_height = APO > body.atmHeight_km + 10.0;
             launchSuccess.circularization_dv = circ_dV;
             launchSuccess.availableDeltaV = avail_dV;
+
+            launchSuccess.finalApoapsis = std::min(APO, targetOrbit_km);
+            {
+                float dvForCirc = std::min(circ_dV, avail_dV);
+                float v_new = va + dvForCirc / 1000.0f;
+                float r_apo = APO + body.radius_km;
+                float a_new = 1.0f / (2.0f / r_apo - v_new * v_new / GM);
+                float r_peri_new = 2.0f * a_new - r_apo;
+                launchSuccess.finalPeriapsis = std::min(r_peri_new - body.radius_km, targetOrbit_km);
+            }
+            launchSuccess.deltaVLeft = avail_dV;
+
+            if (APO >= targetOrbit_km) {
+                break;
+            }
         }
 
         if constexpr (SIM == SimOpt::RECORD) {

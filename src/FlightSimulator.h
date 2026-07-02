@@ -62,11 +62,14 @@ struct FlightData {
 };
 
 struct LaunchSuccess {
-    bool apoapsis_safe_height = false;
     float circularization_dv = INFINITY;
     float availableDeltaV = 0;
     float timeToApoapsis = INFINITY;
     float burnTimeRequired = INFINITY;
+
+    float finalApoapsis = -INFINITY;
+    float finalPeriapsis = -INFINITY;
+    float deltaVLeft = 0;
 };
 
 template <typename F=float>
@@ -108,11 +111,12 @@ public:
 
     template <SimOpt SIM>
     void simulate_launch(const Body& body, const RocketConfig& rocket,
-                         float gtClimbAlt = 0.0f, 
+                         float gtClimbAlt = 0.1f, 
                          float gtTurnSpread = 1.0f, 
                          float gtFinalPitch = 85.0f);
 
     float dt = 0.1;
+    float targetOrbit_km = 80;
     const double Cd = 0.2; // Drag Coefficient
 
     FlightData<float> flight_data;
