@@ -860,6 +860,7 @@ void WindowSimulator::renderOrbitalSuccessWindow() {
     ImGui::Text("Launch outcome");
     ImGui::Text("Apoapsis:  %f km", lsuccess.finalApoapsis);
     ImGui::Text("Periapsis: %f km", lsuccess.finalPeriapsis);
+    ImGui::Text("Metric x = %f", flight_sim.metric());
 
     ImGui::Unindent();
 }

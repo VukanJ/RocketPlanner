@@ -124,11 +124,17 @@ void FlightSimulator::simulate_launch(const Body& body, const RocketConfig& rock
                 float r_peri_new = 2.0f * a_new - r_apo;
                 launchSuccess.finalPeriapsis = std::min(r_peri_new - body.radius_km, targetOrbit_km);
             }
-            launchSuccess.deltaVLeft = avail_dV;
+            launchSuccess.deltaVLeft = avail_dV - circ_dV;
 
             if (APO >= targetOrbit_km) {
                 break;
             }
+        }
+        else {
+            float PER = getOrbitExtent<Periapsis>(pos, vel, R, GM) - body.radius_km;
+            launchSuccess.finalApoapsis = APO;
+            launchSuccess.finalPeriapsis = PER;
+            launchSuccess.deltaVLeft = 0;
         }
 
         if constexpr (SIM == SimOpt::RECORD) {
