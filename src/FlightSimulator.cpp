@@ -101,11 +101,11 @@ void FlightSimulator::simulate_launch(const Body& body, const RocketConfig& rock
         pos.y += vel.y * dt / 1000.0;
 
         const float APO = getOrbitExtent<Apoapsis>(pos, vel, R, GM) - body.radius_km;
+        const float PER = getOrbitExtent<Periapsis>(pos, vel, R, GM) - body.radius_km;
 
         if (!circularizationChecked && APO > targetOrbit_km) {
             // Calculate whether it is possible to circularize the orbit
             circularizationChecked = true;
-            float PER = getOrbitExtent<Periapsis>(pos, vel, R, GM) - body.radius_km;
             float a = (APO + PER) / 2.0 + body.radius_km;
             float va = sqrt(GM * (2.0 / (APO + body.radius_km) - 1.0 / a));
             float vc = sqrt(GM / (APO + body.radius_km));
@@ -124,14 +124,12 @@ void FlightSimulator::simulate_launch(const Body& body, const RocketConfig& rock
                 float r_peri_new = 2.0f * a_new - r_apo;
                 launchSuccess.finalPeriapsis = std::min(r_peri_new - body.radius_km, targetOrbit_km);
             }
-            launchSuccess.deltaVLeft = avail_dV - circ_dV;
+            // Clamping needed for metric continuity
+            launchSuccess.deltaVLeft = std::max(0.0f, avail_dV - circ_dV);
 
-            if (APO >= targetOrbit_km) {
-                break;
-            }
+            break;
         }
         else {
-            float PER = getOrbitExtent<Periapsis>(pos, vel, R, GM) - body.radius_km;
             launchSuccess.finalApoapsis = APO;
             launchSuccess.finalPeriapsis = PER;
             launchSuccess.deltaVLeft = 0;
