@@ -80,32 +80,7 @@ void WindowSimulator::onWindowResized(int width, int height) {
     windowHeight = height;
 }
 
-void WindowSimulator::drawMenuBar() {
-    if (ImGui::BeginMainMenuBar()) {
-        if (ImGui::BeginMenu("Windows")) {
-            ImGui::MenuItem("ImGui Demo Window", nullptr, &showDemo);
-            ImGui::EndMenu();
-        }
-        bool dummy;
-        if (ImGui::BeginMenu("Appearance")) {
-            if (ImGui::MenuItem("Dark", nullptr, &dummy)) {
-                ImGui::StyleColorsDark();
-            }
-            if (ImGui::MenuItem("Light", nullptr, &dummy)) {
-                ImGui::StyleColorsLight();
-            }
-            if (ImGui::MenuItem("Classic", nullptr, &dummy)) {
-                ImGui::StyleColorsClassic();
-            }
-            ImGui::EndMenu();
-        }
-        ImGui::EndMainMenuBar();
-    }
-}
-
 void WindowSimulator::render() {
-    drawMenuBar();
-
     float mbh = ImGui::GetFrameHeight();
     ImGui::SetNextWindowSize(ImVec2(windowWidth, windowHeight - mbh));
     ImGui::SetNextWindowPos(ImVec2(0, mbh));
@@ -222,9 +197,6 @@ void WindowSimulator::render() {
 
     ImGui::End();
 
-    if (showDemo) {
-        ImGui::ShowDemoWindow(&showDemo);
-    }
 }
 
 void WindowSimulator::StagingConfigMenu() {

@@ -17,6 +17,8 @@ set(ROCKET_SOURCES
   src/WindowSimulator.cpp
   src/RocketConfig.cpp
   src/FlightSimulator.cpp
+  src/gui.cpp
+  src/WindowMission.cpp
 )
 
 # ---- Agave Font ----

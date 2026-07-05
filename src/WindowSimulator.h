@@ -52,10 +52,8 @@ public:
 private:
     bool configDirty = false;
     bool fuelUnitIsTons = true;
-    bool showDemo = false;
     std::vector<bool> showPlot;
 
-    void drawMenuBar();
     void recomputeMasses();
     void updateKinematics();
     void simulateCurrentFlight();

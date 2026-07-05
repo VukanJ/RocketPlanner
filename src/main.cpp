@@ -2,6 +2,7 @@
 #include <filesystem>
 
 #include "WindowSimulator.h"
+#include "gui.h"
 #include "kspConstants.h"
 #include "rocket.h"
 #include "cmdargs.h"
@@ -55,9 +56,10 @@ static void run_interactive() {
     
     const auto kspPath = findKSP();
     Rocket rocket(kspPath, "Rocket Optimizer");
-    WindowSimulator ws(rocket.allEngines());
+    //WindowSimulator ws(rocket.allEngines());
+    GUI gui(rocket.allEngines());
 
-    glfwSetWindowUserPointer(window, &ws);
+    glfwSetWindowUserPointer(window, &gui);
     glfwSetWindowSizeCallback(window, [](GLFWwindow* win, int w, int h) {
         auto* sim = static_cast<WindowSimulator*>(glfwGetWindowUserPointer(win));
         if (sim) sim->onWindowResized(w, h);
@@ -65,7 +67,7 @@ static void run_interactive() {
     {
         int w, h;
         glfwGetWindowSize(window, &w, &h);
-        ws.onWindowResized(w, h);
+        gui.onWindowResized(w, h);
     }
 
     while (!glfwWindowShouldClose(window)) {
@@ -75,13 +77,7 @@ static void run_interactive() {
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        ws.render();
-        //ws.renderKinematics();
-        //ws.renderBodySelector();
-        //ws.renderPictogram();
-        //ws.renderFlight();
-        //ws.renderRawData();
-
+        gui.render();
 
         ImGui::Render();
         int display_w, display_h;
