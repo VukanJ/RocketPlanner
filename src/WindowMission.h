@@ -4,8 +4,8 @@
 #include "kspConstants.h"
 
 struct Mission {
-    Body originBody = KspSystem::Kerbin;
-    Body destinationBody = KspSystem::Mun;
+    const Body* originBody = &KspSystem::Kerbin;
+    const Body* destinationBody = &KspSystem::Mun;
     bool oneWayTrip = false;
     bool apolloStyle = true;
 
@@ -15,13 +15,9 @@ struct Mission {
 
 class WindowMission {
 public:
+    Mission mission;
 
-    void render();
-
-    void onWindowResized(int width, int height);
-
-    int windowWidth = 1280;
-    int windowHeight = 720;
+    bool render();
 };
 
 #endif // WINDOW_MISSION

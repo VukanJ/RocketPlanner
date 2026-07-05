@@ -60,10 +60,6 @@ static void run_interactive() {
     GUI gui(rocket.allEngines());
 
     glfwSetWindowUserPointer(window, &gui);
-    glfwSetWindowSizeCallback(window, [](GLFWwindow* win, int w, int h) {
-        auto* sim = static_cast<WindowSimulator*>(glfwGetWindowUserPointer(win));
-        if (sim) sim->onWindowResized(w, h);
-    });
     {
         int w, h;
         glfwGetWindowSize(window, &w, &h);
@@ -83,7 +79,7 @@ static void run_interactive() {
         int display_w, display_h;
         glfwGetFramebufferSize(window, &display_w, &display_h);
         glViewport(0, 0, display_w, display_h);
-        glClearColor(0.9f, 0.9f, 0.9f, 1.0f);
+        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 

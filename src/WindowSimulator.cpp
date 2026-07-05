@@ -1,28 +1,11 @@
 #include "WindowSimulator.h"
+#include "utils.h"
 #include "imgui.h"
 #include "implot.h"
 #include <print>
 #include <stdexcept>
 #include <iostream>
 #include <fstream>
-
-static const struct { const char* name; const Body* body; } bodyTable[] = {
-    { "Kerbin", &KspSystem::Kerbin },
-    { "Eve",    &KspSystem::Eve },
-    { "Duna",   &KspSystem::Duna },
-    { "Laythe", &KspSystem::Laythe },
-    { "Mun",    &KspSystem::Mun },
-    { "Minmus", &KspSystem::Minmus },
-    { "Moho",   &KspSystem::Moho },
-    { "Gilly",  &KspSystem::Gilly },
-    { "Dres",   &KspSystem::Dres },
-    { "Ike",    &KspSystem::Ike },
-    { "Vall",   &KspSystem::Vall },
-    { "Tylo",   &KspSystem::Tylo },
-    { "Bop",    &KspSystem::Bop },
-    { "Pol",    &KspSystem::Pol },
-    { "Eeloo",  &KspSystem::Eeloo },
-};
 
 static const WindowSimulator::PlotDesc s_plots[] = {
     {"Altitude",          "t [s]",     "Altitude (km)",   &FlightData<float>::t,           &FlightData<float>::altitude_km},

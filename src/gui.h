@@ -17,7 +17,7 @@ public:
 
     void render();
 
-    enum Phase {MISSION_SELECT, ROCKET} phase = MISSION_SELECT;
+    enum class Phase {MISSION_SELECT, ROCKET} phase = Phase::MISSION_SELECT;
     bool showDemo = false;
 };
 

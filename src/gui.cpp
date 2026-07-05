@@ -12,10 +12,12 @@ void GUI::render() {
     drawMenuBar();
     switch (phase) {
         case Phase::MISSION_SELECT:
-            winM->render();
+            if (winM->render()) {
+                phase = Phase::ROCKET;
+            }
             break;
         case Phase::ROCKET:
-            winM->render();
+            winSim->render();
             break;
     }
     if (showDemo) {
@@ -25,7 +27,6 @@ void GUI::render() {
 
 void GUI::onWindowResized(int width, int height) {
     winSim->onWindowResized(width, height);
-    winM->onWindowResized(width, height);
 }
 
 void GUI::drawMenuBar() {

@@ -57,4 +57,29 @@ inline PartType partTypeFromStr(std::string_view str) {
     return PartType::UNKNOWN;
 }
 
+struct BodyEntry {
+    const char* name;
+    const Body* body;
+};
+
+inline constexpr BodyEntry bodyTable[] = {
+    { "Kerbin", &KspSystem::Kerbin },
+    { "Eve",    &KspSystem::Eve },
+    { "Duna",   &KspSystem::Duna },
+    { "Laythe", &KspSystem::Laythe },
+    { "Mun",    &KspSystem::Mun },
+    { "Minmus", &KspSystem::Minmus },
+    { "Moho",   &KspSystem::Moho },
+    { "Gilly",  &KspSystem::Gilly },
+    { "Dres",   &KspSystem::Dres },
+    { "Ike",    &KspSystem::Ike },
+    { "Vall",   &KspSystem::Vall },
+    { "Tylo",   &KspSystem::Tylo },
+    { "Bop",    &KspSystem::Bop },
+    { "Pol",    &KspSystem::Pol },
+    { "Eeloo",  &KspSystem::Eeloo },
+};
+
+inline constexpr int nBodies = sizeof(bodyTable) / sizeof(bodyTable[0]);
+
 #endif
