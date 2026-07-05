@@ -816,7 +816,7 @@ void WindowSimulator::renderOrbitalSuccessWindow() {
     if (ImGui::SliderFloat("##targetOrbit", &flight_sim.targetOrbit_km, 5, 300, "Target Orbit: %f km")) {
         configDirty = true;
     }
-    if (ImGui::SliderFloat("##deltaVextra", &extraDeltaV, 0, 30000, "Extra delta v: %f km")) {
+    if (ImGui::SliderFloat("##deltaVextra", &flight_sim.targetExtraDeltaV, 0, 30000, "Extra delta v: %f km")) {
         configDirty = true;
     }
     auto colorText = [](bool cond){
@@ -851,7 +851,7 @@ void WindowSimulator::renderOrbitalSuccessWindow() {
         ImGui::BulletText("Δv needed %f m/s", lsuccess.circularization_dv);
         ImGui::PopStyleColor();
 
-        bool enoughDVLeft = lsuccess.availableDeltaV >= extraDeltaV;
+        bool enoughDVLeft = lsuccess.availableDeltaV >= flight_sim.targetExtraDeltaV;
         colorText(enoughDVLeft);
         ImGui::BulletText("Δv left %f m/s", lsuccess.availableDeltaV - lsuccess.circularization_dv);
         ImGui::PopStyleColor();

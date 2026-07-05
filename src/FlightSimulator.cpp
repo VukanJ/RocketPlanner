@@ -156,3 +156,9 @@ void FlightSimulator::simulate_launch(const Body& body, const RocketConfig& rock
 
 template void FlightSimulator::simulate_launch<FlightSimulator::SimOpt::RECORD>(const Body&, const RocketConfig&, float, float, float);
 template void FlightSimulator::simulate_launch<FlightSimulator::SimOpt::FAST>(const Body&, const RocketConfig&, float, float, float);
+
+float FlightSimulator::metric() const {
+    float x = launchSuccess.finalApoapsis + launchSuccess.finalPeriapsis;
+    x -= dvPenaltyScale * std::abs(targetExtraDeltaV - launchSuccess.deltaVLeft);
+    return x;
+}

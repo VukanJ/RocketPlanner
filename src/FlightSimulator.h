@@ -107,8 +107,8 @@ FLT getOrbitExtent(const vec2<FLT>& pos, const vec2<FLT>& vel, FLT r_km, FLT GM)
 class FlightSimulator {
 public:
     FlightSimulator();
-    enum class SimOpt { FAST, RECORD };
 
+    enum class SimOpt { FAST, RECORD };
     template <SimOpt SIM>
     void simulate_launch(const Body& body, const RocketConfig& rocket,
                          float gtClimbAlt = 0.1f, 
@@ -117,10 +117,14 @@ public:
 
     float dt = 0.1;
     float targetOrbit_km = 80;
+    float targetExtraDeltaV = 0;
     const double Cd = 0.2; // Drag Coefficient
 
     FlightData<float> flight_data;
     LaunchSuccess launchSuccess;
+    float dvPenaltyScale = 5;
+
+    float metric() const;
 };
 
 #endif // FLIGHT_SIMULATOR_H
