@@ -41,71 +41,118 @@ namespace {
     }
 }
 
-WindowMission::WindowMission() {
-    updateMissionSequence();
-}
+WindowMission::WindowMission() { }
 
 bool WindowMission::render() {
-    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+    if (input_phase == InputPhase::FromTo) {
+        ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
 
-    ImGui::Begin("Configure Mission", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoMove);
+        ImGui::Begin("Configure Mission", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoMove);
 
-    bool changed = false;
+        ImGui::Text("Origin");
+        renderBodyCombo("##origin", mission.originBody);
 
-    ImGui::Text("Origin");
-    changed |= renderBodyCombo("##origin", mission.originBody);
+        ImGui::Separator();
 
-    ImGui::Separator();
+        ImGui::Text("Destination");
+        renderBodyCombo("##dest", mission.destinationBody);
 
-    ImGui::Text("Destination");
-    changed |= renderBodyCombo("##dest", mission.destinationBody);
+        ImGui::Separator();
 
-    ImGui::Separator();
+        ImGui::Checkbox("One-way trip", &mission.oneWayTrip);
+        ImGui::SameLine();
+        ImGui::BeginDisabled(mission.oneWayTrip);
+        ImGui::Checkbox("Apollo-style", &mission.apolloStyle);
+        ImGui::EndDisabled();
 
-    changed |= ImGui::Checkbox("One-way trip", &mission.oneWayTrip);
-    ImGui::SameLine();
-    ImGui::BeginDisabled(mission.oneWayTrip);
-    changed |= ImGui::Checkbox("Apollo-style", &mission.apolloStyle);
-    ImGui::EndDisabled();
+        if (ImGui::Button("Next: Edit Mission Sequence")) {
+            updateMissionSequence();
+            input_phase = InputPhase::Sequence;
+        }
 
-    bool next = false;
-    if (ImGui::Button("Design Rocket")) {
-        next = true;
+        ImGui::End();
+        return false;
+    }
+    else if (input_phase == InputPhase::Sequence) {
+        ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+        ImGui::Begin("Mission Sequence Preview", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoMove);
+
+        int i = 1;
+        for (auto& step : msequence) {
+            ImGui::PushID(i);
+            switch (step.type) {
+                case MissionPhaseType::TAKEOFF:
+                    ImGui::BulletText("%i. Takeoff from %s", i, step.refBody->name);
+                    ImGui::Indent();
+                    break;
+                case MissionPhaseType::CIRCULARIZE: 
+                    ImGui::BulletText("%i. Circularize orbit at %s", i, step.refBody->name);
+                    ImGui::Indent();
+                    break;
+                case MissionPhaseType::HOHMANN_TRANSFER: 
+                    ImGui::BulletText("%i Transfer %s --> %s", i, step.refBody->name, step.refBody2->name);
+                    ImGui::Indent();
+                    break;
+                case MissionPhaseType::ATMOSPHERIC_BREAKING: 
+                    ImGui::BulletText("%i. Atmospheric breaking at %s", i, step.refBody->name);
+                    ImGui::Indent();
+                    break;
+                case MissionPhaseType::LANDING_PARACHUTES: 
+                    ImGui::BulletText("%i. Landing at %s with parachutes", i, step.refBody->name);
+                    ImGui::Indent();
+                    break;
+                case MissionPhaseType::LANDING: 
+                    ImGui::BulletText("%i. Landing at %s", i, step.refBody->name);
+                    ImGui::Indent();
+                    break;
+                case MissionPhaseType::MINING: 
+                    ImGui::BulletText("%i. Mining fuel at %s", i, step.refBody->name);
+                    ImGui::Indent();
+                    break;
+                case MissionPhaseType::ORBITAL_REFUELING: 
+                    ImGui::BulletText("%i. Orbital refuelling %s", i, step.refBody->name);
+                    ImGui::Indent();
+                    break;
+            }
+            ImGui::PopID();
+            ++i;
+            ImGui::Separator();
+            ImGui::Unindent();
+        }
+
+        ImGui::End();
     }
 
-    if (changed) {
-        updateMissionSequence();
-    }
-
-    ImGui::End();
-
-    return next;
+    return false;
 }
 
 void WindowMission::updateMissionSequence() {
     msequence.clear();
 
     auto fromTo = [this](const Body* from, const Body* to) {
+        float startOrbit = from->atmHeight_km > 0 ? from->atmHeight_km + 10.0 : 30;
+        float destOrbit  = to->atmHeight_km > 0 ? to->atmHeight_km + 10.0 : 30;
+
         msequence.push_back(MissionPhase { MissionPhaseType::TAKEOFF, from, nullptr, 0 });
-        msequence.push_back(MissionPhase { MissionPhaseType::CIRCULARIZE, from, nullptr, from->atmHeight_km + 10 });
+        msequence.push_back(MissionPhase { MissionPhaseType::CIRCULARIZE, from, nullptr, startOrbit });
         if (from == to) {
             if (to->atmHeight_km > 0) {
-                msequence.push_back(MissionPhase { MissionPhaseType::LANDING_PARACHUTES, from, nullptr, from->atmHeight_km + 10 });
+                msequence.push_back(MissionPhase { MissionPhaseType::LANDING_PARACHUTES, from, nullptr, startOrbit });
             }
             else {
-                msequence.push_back(MissionPhase { MissionPhaseType::LANDING, from, nullptr, to->atmHeight_km + 10 });
+                msequence.push_back(MissionPhase { MissionPhaseType::LANDING, from, nullptr, destOrbit });
             }
         }
         else {
             msequence.push_back(MissionPhase { MissionPhaseType::HOHMANN_TRANSFER, from, to, 0 });
         }
         if (to->atmHeight_km > 0) {
-            msequence.push_back(MissionPhase { MissionPhaseType::ATMOSPHERIC_BREAKING, to, nullptr, to->atmHeight_km + 10 });
-            msequence.push_back(MissionPhase { MissionPhaseType::LANDING_PARACHUTES, to, nullptr, to->atmHeight_km + 10 });
+            msequence.push_back(MissionPhase { MissionPhaseType::ATMOSPHERIC_BREAKING, to, nullptr, destOrbit });
+            msequence.push_back(MissionPhase { MissionPhaseType::LANDING_PARACHUTES, to, nullptr, destOrbit });
         }
         else {
-            msequence.push_back(MissionPhase { MissionPhaseType::CIRCULARIZE, to, nullptr, to->atmHeight_km + 10 });
-            msequence.push_back(MissionPhase { MissionPhaseType::LANDING, to, nullptr, to->atmHeight_km + 10 });
+            msequence.push_back(MissionPhase { MissionPhaseType::CIRCULARIZE, to, nullptr, destOrbit });
+            msequence.push_back(MissionPhase { MissionPhaseType::LANDING, to, nullptr, destOrbit });
         }
     };
     fromTo(mission.originBody, mission.destinationBody);

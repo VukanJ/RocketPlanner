@@ -63,6 +63,7 @@ struct BodyEntry {
 };
 
 inline constexpr BodyEntry bodyTable[] = {
+    { "Kerbol", &KspSystem::Kerbol },
     { "Kerbin", &KspSystem::Kerbin },
     { "Eve",    &KspSystem::Eve },
     { "Duna",   &KspSystem::Duna },
@@ -72,6 +73,7 @@ inline constexpr BodyEntry bodyTable[] = {
     { "Moho",   &KspSystem::Moho },
     { "Gilly",  &KspSystem::Gilly },
     { "Dres",   &KspSystem::Dres },
+    { "Jool",   &KspSystem::Jool },
     { "Ike",    &KspSystem::Ike },
     { "Vall",   &KspSystem::Vall },
     { "Tylo",   &KspSystem::Tylo },

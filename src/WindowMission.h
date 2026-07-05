@@ -42,6 +42,8 @@ public:
     bool render();
     void updateMissionSequence();
 
+    enum class InputPhase { FromTo, Sequence } input_phase = WindowMission::InputPhase::FromTo;
+
     std::vector<MissionPhase> msequence;
 };
 

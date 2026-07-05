@@ -1,8 +1,10 @@
 #include <gtest/gtest.h>
+#include <cmath>
 
 #include "RocketSolver.h"
 #include "parts.h"
 #include "kspConstants.h"
+#include "utils.h"
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -348,4 +350,28 @@ TEST_F(KinematicsTest, MassComputation) {
     EXPECT_NEAR(rocket1_mass - fuelMass1, RC.stages[1].emptyMass, 1e-5);
     // Check total rocket mass
     EXPECT_NEAR(rocket0_mass + rocket1_mass, RC.totalMass, 1e-5);
+}
+
+// ---------------------------------------------------------------------------
+// Orbital data consistency
+// ---------------------------------------------------------------------------
+
+TEST(OrbitalDataTest, LANandLDN180Apart) {
+    for (int i = 0; i < nBodies; ++i) {
+        const Orbit& o = bodyTable[i].body->orbit;
+        if (!o.refBody) continue; // Kerbol has no orbit
+        double diff = std::fmod(std::abs(o.LDN - o.LAN), 360.0f);
+        EXPECT_NEAR(diff, 180.0f, 0.01f) << bodyTable[i].name;
+    }
+}
+
+TEST(OrbitalDataTest, ApsidesConsistentWithSemiMajorAndEccentricity) {
+    for (int i = 0; i < nBodies; ++i) {
+        const Orbit& o = bodyTable[i].body->orbit;
+        if (!o.refBody) continue;
+        EXPECT_NEAR(o.AP, o.a_semi * (1.0 + o.eccentricity), 1.0)
+            << bodyTable[i].name;
+        EXPECT_NEAR(o.PE, o.a_semi * (1.0 - o.eccentricity), 1.0)
+            << bodyTable[i].name;
+    }
 }
