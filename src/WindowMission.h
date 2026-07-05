@@ -2,6 +2,7 @@
 #define WINDOW_MISSION
 
 #include "kspConstants.h"
+#include <vector>
 
 struct Mission {
     const Body* originBody = &KspSystem::Kerbin;
@@ -13,11 +14,35 @@ struct Mission {
     float destinationApoapsis = 10;
 };
 
+enum class MissionPhaseType {
+    TAKEOFF,
+    CIRCULARIZE,
+    HOHMANN_TRANSFER, // includes inclination correction
+    ATMOSPHERIC_BREAKING,
+    LANDING_PARACHUTES,
+    LANDING,
+    MINING,
+    ORBITAL_REFUELING,
+    //GRAVITY_ASSIST
+};
+
+struct MissionPhase {
+    MissionPhaseType type = MissionPhaseType::TAKEOFF;
+    const Body* refBody = nullptr;
+    const Body* refBody2 = nullptr;
+    float orbitAltitude = 0;
+    bool optional = true;
+};
+
 class WindowMission {
 public:
+    WindowMission();
     Mission mission;
 
     bool render();
+    void updateMissionSequence();
+
+    std::vector<MissionPhase> msequence;
 };
 
 #endif // WINDOW_MISSION
