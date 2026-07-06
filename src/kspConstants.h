@@ -37,7 +37,9 @@ struct Body {
     }
 
     float getPressureAtAltitude_km(float altitude) const {
-        if (altitude >= atmHeight_km || seaLevel_atm <= 0.0f) return 0.0f;
+        if (altitude >= atmHeight_km || seaLevel_atm <= 0.0f) { 
+            return 0.0f; 
+        }
         return seaLevel_atm * std::expf(-altitude / atm_falloff_km);
     }
 };

@@ -20,19 +20,19 @@ std::tuple<int, float> parseNodeSize(const std::string& line) {
 
     // value 0: x — skip
     size_t end = vals.find(',', pos);
-    if (end == std::string::npos) return {0, 0.0f};
+    if (end == std::string::npos) { return {0, 0.0f}; }
     pos = end + 1;
 
     // value 1: y — read
     end = vals.find(',', pos);
-    if (end == std::string::npos) return {0, 0.0f};
+    if (end == std::string::npos) { return {0, 0.0f}; }
     float yPos = std::stof(trimString(vals.substr(pos, end - pos)));
     pos = end + 1;
 
     // values 2-4: z, dir_x, dir_y — skip
     for (int i = 0; i < 3; ++i) {
         end = vals.find(',', pos);
-        if (end == std::string::npos) return {0, 0.0f};
+        if (end == std::string::npos) { return {0, 0.0f}; }
         pos = end + 1;
     }
     // value 5: dir_z — skip (may be last if size omitted)
@@ -55,17 +55,17 @@ int bulkheadProfileToDefaultSize(const std::string& profiles) {
     std::string profile;
     while (std::getline(ss, profile, ',')) {
         profile = trimString(profile);
-        if (profile == "size0") return 0;
-        if (profile == "size1") return 1;
-        if (profile == "size2" || profile == "mk2") return 2;
-        if (profile == "size3" || profile == "mk3") return 3;
+        if (profile == "size0") { return 0; }
+        if (profile == "size1") { return 1; }
+        if (profile == "size2" || profile == "mk2") { return 2; }
+        if (profile == "size3" || profile == "mk3") { return 3; }
     }
     return 0;
 }
 
 std::tuple<float, float> parseISP(const std::string& line) {
     auto pos = line.find("key = ");
-    if (pos == std::string::npos) return {0.0f, 0.0f};
+    if (pos == std::string::npos) { return {0.0f, 0.0f}; }
     std::istringstream iss(trimString(line.substr(pos + 6)));
     float atm, isp;
     iss >> atm >> isp;
@@ -103,7 +103,7 @@ std::string getStringValue(const std::string& line) {
 
 std::string getTitleValue(const std::string& line) {
     std::string raw = getStringValue(line);
-    if (raw.empty()) return raw;
+    if (raw.empty()) { return raw; }
 
     auto commentPos = raw.find("//");
     if (commentPos != std::string::npos) {

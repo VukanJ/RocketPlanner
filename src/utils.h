@@ -42,18 +42,18 @@ inline std::string_view partTypeToStr(PartType type) {
 }
 
 inline PartType partTypeFromStr(std::string_view str) {
-    if (str == "CrewedCommandPod") return PartType::CrewedCommandPod;
-    if (str == "DronePod")         return PartType::DronePod;
-    if (str == "LFTank")           return PartType::LFTank;
-    if (str == "LFOXTank")         return PartType::LFOXTank;
-    if (str == "MPTank")           return PartType::MPTank;
-    if (str == "XenonTank")        return PartType::XenonTank;
-    if (str == "JetEngine")        return PartType::JetEngine;
-    if (str == "LFEngine")         return PartType::LFEngine;
-    if (str == "LOXEngine")        return PartType::LOXEngine;
-    if (str == "MPEngine")         return PartType::MPEngine;
-    if (str == "XenonEngine")      return PartType::XenonEngine;
-    if (str == "SolidBooster")     return PartType::SolidBooster;
+    if (str == "CrewedCommandPod") { return PartType::CrewedCommandPod; }
+    if (str == "DronePod")         { return PartType::DronePod; }
+    if (str == "LFTank")           { return PartType::LFTank; }
+    if (str == "LFOXTank")         { return PartType::LFOXTank; }
+    if (str == "MPTank")           { return PartType::MPTank; }
+    if (str == "XenonTank")        { return PartType::XenonTank; }
+    if (str == "JetEngine")        { return PartType::JetEngine; }
+    if (str == "LFEngine")         { return PartType::LFEngine; }
+    if (str == "LOXEngine")        { return PartType::LOXEngine; }
+    if (str == "MPEngine")         { return PartType::MPEngine; }
+    if (str == "XenonEngine")      { return PartType::XenonEngine; }
+    if (str == "SolidBooster")     { return PartType::SolidBooster; }
     return PartType::UNKNOWN;
 }
 

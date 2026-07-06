@@ -63,7 +63,7 @@ static StageInfo makeAsparagusStage(
     StageInfo s;
     double engineMass  = engine.getMass();
     double fuelMass    = 0;
-    for (double f : fuelFractions) fuelMass += f;
+    for (double f : fuelFractions) { fuelMass += f; }
     double tankMass    = fuelMass / 9.0;
     double boosterMass = std::popcount((unsigned)hasEngine) * baseSymmetry * engineMass;
     double coreMass    = engineMultiplicity * engineMass;

@@ -74,7 +74,7 @@ bool CmdArgs::is_flag_set(const std::string& name) const {
 void CmdArgs::print_args() const {
     std::println("Command-line arguments:");
     for (const auto& [name, arg] : options) {
-        if (arg.is_help()) continue; // Skip help itself
+        if (arg.is_help()) { continue; } // Skip help itself
         if (arg.is_flag()) {
             std::println("  \"{}\": \t Flag, set: {}", name, arg.is_flag_set() ? "true" : "false");
         } else {
@@ -86,7 +86,7 @@ void CmdArgs::print_args() const {
 void CmdArgs::print_help() const {
     std::println("Available command-line options for executable {}:", program_name);
     for (const auto& [name, arg] : options) {
-        if (arg.is_help()) continue; // Skip help itself
+        if (arg.is_help()) { continue; } // Skip help itself
         if (arg.is_flag()) {
             std::println("  \"{}\": \t Flag ({})", name, arg.description);
         } else {

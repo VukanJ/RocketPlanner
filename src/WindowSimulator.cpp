@@ -21,8 +21,9 @@ static const WindowSimulator::PlotDesc s_plots[] = {
     {"Drag/Thrust ratio", "t [s]",     "Drag / Thrust",   &FlightData<float>::t,           nullptr,
         [](const FlightData<float>& d, std::vector<float>& out) {
             out.resize(d.t.size());
-            for (size_t i = 0; i < d.t.size(); ++i)
+            for (size_t i = 0; i < d.t.size(); ++i) {
                 out[i] = d.thrust_kN[i] > 0 ? d.drag_N[i] / (d.thrust_kN[i] * 1000) : 0;
+            }
         }, false, true},
     {"Pitch vs Altitude", "Altitude (km)", "Angle (deg)", &FlightData<float>::altitude_km, &FlightData<float>::dir_angle_deg}
 };
@@ -84,8 +85,9 @@ void WindowSimulator::render() {
         float infoMin = 40.0f;
         float splitterH = 4.0f;
 
-        if (rocketConfigHeight_ < 0.0f)
+        if (rocketConfigHeight_ < 0.0f) {
             rocketConfigHeight_ = std::clamp(cellH * 0.75f, 100.0f, 300.0f);
+        }
 
         float maxConfig = std::max(cellH - infoMin - splitterH, 0.0f);
         float minConfig = std::min(80.0f, maxConfig);
@@ -120,8 +122,9 @@ void WindowSimulator::render() {
                 ImGui::GetColorU32(ImGuiCol_Separator), 1.0f);
 
             ImGui::InvisibleButton("##splitter", ImVec2(-1, splitterH));
-            if (ImGui::IsItemHovered())
+            if (ImGui::IsItemHovered()) {
                 ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
+            }
             if (ImGui::IsItemActive()) {
                 rocketConfigHeight_ += ImGui::GetIO().MouseDelta.y;
                 rocketConfigHeight_ = std::clamp(rocketConfigHeight_, minConfig, maxConfig);
@@ -202,7 +205,7 @@ void WindowSimulator::StagingConfigMenu() {
         insertDefaultStage();
     }
 
-    for (int s = 0; s < rocket.stages.size(); ++s) {
+    for (std::size_t s = 0; s < rocket.stages.size(); ++s) {
         auto& stage = rocket.stages[s];
         ImGui::PushID(s);
         ImGui::Separator();
@@ -225,7 +228,7 @@ void WindowSimulator::StagingConfigMenu() {
             }
             ImGui::BeginChild("##Stage", ImVec2(-1, 0), ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AutoResizeY);
             int currentEngineIdx = 0;
-            for (int i = 0; i < allEngines.size(); ++i) {
+            for (std::size_t i = 0; i < allEngines.size(); ++i) {
                 if (allEngines[i] == stage.engine) {
                     currentEngineIdx = i;
                     break;
@@ -234,7 +237,7 @@ void WindowSimulator::StagingConfigMenu() {
 
             if (ImGui::BeginCombo("##Engine",
                     stage.engine ? stage.engine->title.c_str() : "None")) {
-                for (int i = 0; i < allEngines.size(); ++i) {
+                for (std::size_t i = 0; i < allEngines.size(); ++i) {
                     bool selected = (currentEngineIdx == i);
                     if (ImGui::Selectable(allEngines[i]->title.c_str(), selected)) {
                         stage.engine = allEngines[i];
@@ -267,13 +270,17 @@ void WindowSimulator::StagingConfigMenu() {
 
                 if (fuelUnitIsTons) {
                     if (ImGui::InputDouble("##fuel", &stageFuelMass[s], 0.1, 1.0, "Fuel = %.3f t")) {
-                        if (stageFuelMass[s] < 0.0) { stageFuelMass[s] = 0.0; }
+                        if (stageFuelMass[s] < 0.0) { 
+                            stageFuelMass[s] = 0.0; 
+                        }
                         configDirty = true;
                     }
                 } else {
                     double fuelUnits = stageFuelMass[s] / density;
                     if (ImGui::InputDouble("##fuel", &fuelUnits, 0.1 / density, 1.0 / density, "Fuel = %.0f u")) {
-                        if (fuelUnits < 0.0) { fuelUnits = 0.0; }
+                        if (fuelUnits < 0.0) { 
+                            fuelUnits = 0.0; 
+                        }
                         stageFuelMass[s] = fuelUnits * density;
                         configDirty = true;
                     }
@@ -446,12 +453,17 @@ void WindowSimulator::renderGravityTurnConfig() {
         changed = true;
     }
 
-    if (changed) { configDirty = true; }
+    if (changed) { 
+        configDirty = true; 
+    }
 }
 
 void WindowSimulator::renderPictogram() {
     ImGui::Begin("Rocket Pictogram");
-    if (rocket.stages.empty()) { ImGui::End(); return; }
+    if (rocket.stages.empty()) { 
+        ImGui::End(); 
+        return; 
+    }
 
     float maxFuel = 0.0f;
     for (auto& f : stageFuelMass) {
@@ -469,7 +481,7 @@ void WindowSimulator::renderPictogram() {
                        IM_COL32(160,200,80,255), IM_COL32(200,160,80,255),
                        IM_COL32(160,80,200,255), IM_COL32(80,200,160,255) };
 
-    for (int i = 0; i < rocket.stages.size(); ++i) {
+    for (std::size_t i = 0; i < rocket.stages.size(); ++i) {
         const auto& st = rocket.stages[i];
         const auto& frac = st.asparagus_config.fuelFractions;
         float totalFuel = (float)stageFuelMass[i];
@@ -489,19 +501,27 @@ void WindowSimulator::renderPictogram() {
         float maxExtent = coreR;
         float prevR = coreR;
         for (int r = 0; r < rings; ++r) {
-            if (sym < 2) { break; }
+            if (sym < 2) { 
+                break; 
+            }
             float boosterFuel = frac.size() > r + 1 ? (float)frac[r + 1] * totalFuel / sym : 0.0f;
             float boosterR = std::sqrt(boosterFuel / 3.14159f) * coreScale;
-            if (boosterR < 4.0f) { boosterR = 4.0f; }
+            if (boosterR < 4.0f) { 
+                boosterR = 4.0f; 
+            }
             float minRing = prevR + boosterR + 2.0f;
             if (sym > 1) {
                 float minByAngle = boosterR / std::sin(3.14159f / sym);
-                if (minByAngle > minRing) { minRing = minByAngle; }
+                if (minByAngle > minRing) { 
+                    minRing = minByAngle; 
+                }
             }
             float ringRad = minRing;
             prevR = ringRad + boosterR;
             float extent = ringRad + boosterR;
-            if (extent > maxExtent) { maxExtent = extent; }
+            if (extent > maxExtent) { 
+                maxExtent = extent; 
+            }
         }
 
         float dim = (maxExtent + 10.0f) * 2.0f;
@@ -519,18 +539,24 @@ void WindowSimulator::renderPictogram() {
 
             prevR = coreR;
             for (int r = 0; r < rings; ++r) {
-                if (sym < 2) { break; }
+                if (sym < 2) { 
+                    break; 
+                }
                 bool hasEngine = (st.asparagus_config.hasEngine >> (rings - 1 - r)) & 1;
                 ImU32 bCol = hasEngine ? IM_COL32(200,200,80,255) : IM_COL32(120,120,120,255);
 
                 float boosterFuel = frac.size() > r + 1 ? (float)frac[r + 1] * totalFuel / sym : 0.0f;
                 float boosterR = std::sqrt(boosterFuel / 3.14159f) * coreScale;
-                if (boosterR < 4.0f) { boosterR = 4.0f; }
+                if (boosterR < 4.0f) { 
+                    boosterR = 4.0f; 
+                }
 
                 float minRing = prevR + boosterR + 2.0f;
                 if (sym > 1) {
                     float minByAngle = boosterR / std::sin(3.14159f / sym);
-                    if (minByAngle > minRing) { minRing = minByAngle; }
+                    if (minByAngle > minRing) { 
+                        minRing = minByAngle; 
+                    }
                 }
                 float ringRad = minRing;
                 prevR = ringRad + boosterR;
@@ -548,8 +574,14 @@ void WindowSimulator::renderPictogram() {
 
             const char* orderLabel = nullptr;
             ImU32 orderColor;
-            if (i == 0) { orderLabel = "FIRST"; orderColor = IM_COL32(80,255,80,220); }
-            else if (i == rocket.stages.size() - 1) { orderLabel = "LAST"; orderColor = IM_COL32(255,160,80,220); }
+            if (i == 0) { 
+                orderLabel = "FIRST"; 
+                orderColor = IM_COL32(80,255,80,220); 
+            }
+            else if (i == rocket.stages.size() - 1) { 
+                orderLabel = "LAST"; 
+                orderColor = IM_COL32(255,160,80,220); 
+            }
             if (orderLabel) {
                 ImVec2 ts = ImGui::CalcTextSize(orderLabel);
                 draw->AddText(ImVec2(cx - ts.x * 0.5f, origin.y + 2.0f), orderColor, orderLabel);
@@ -609,7 +641,7 @@ void WindowSimulator::renderKinematics() {
 
         double totalDV = 0;
         double totalBurn = 0;
-        for (int i = 0; i < kinematics.size(); ++i) {
+        for (std::size_t i = 0; i < kinematics.size(); ++i) {
             const auto& k = kinematics[i];
             double dV = k.engine ? k.engine->enginePerf.vacuumISP * 9.81f * std::log(k.m0 / k.mf) : 0.0f;
             double g0 = selectedBody ? selectedBody->surfaceGravity : 9.81f;
@@ -617,7 +649,7 @@ void WindowSimulator::renderKinematics() {
             totalDV += dV;
             totalBurn += k.burnTime;
             ImGui::TableNextRow();
-            ImGui::TableSetColumnIndex(0); ImGui::Text("%d", i + 1);
+            ImGui::TableSetColumnIndex(0); ImGui::Text("%ld", i + 1);
             ImGui::TableSetColumnIndex(1); ImGui::Text("%.1f", k.m0);
             ImGui::TableSetColumnIndex(2); ImGui::Text("%.1f", k.mf);
             ImGui::TableSetColumnIndex(3); ImGui::Text("%.1f", k.burnTime);
@@ -639,7 +671,9 @@ void WindowSimulator::recomputeMasses() {
 void WindowSimulator::updateKinematics() {
     kinematics.clear();
     for (const auto& stage : rocket.stages) {
-        if (!stage.engine) { return; }
+        if (!stage.engine) { 
+            return; 
+        }
     }
     rocket.calcStageKinematics(kinematics);
 }
@@ -689,14 +723,14 @@ void WindowSimulator::renderFlight() {
 
     auto& data = flight_sim.flight_data;
 
-    for (int i = 0; i < data.t.size(); ++i) {
+    for (std::size_t i = 0; i < data.t.size(); ++i) {
         if (std::isinf(data.apoapsis_km[i])) {
             data.apoapsis_km[i] = 1e6f;
         }
     }
 
     std::vector<float> stageTimes;
-    for (int i = 1; i < data.stage.size(); ++i) {
+    for (std::size_t i = 1; i < data.stage.size(); ++i) {
         if (data.stage[i] != data.stage[i - 1]) {
             stageTimes.push_back(data.t[i - 1]);
         }
@@ -704,12 +738,16 @@ void WindowSimulator::renderFlight() {
 
     float maxThrust = 0;
     for (auto v : data.thrust_kN) {
-        if (v > maxThrust) { maxThrust = v; }
+        if (v > maxThrust) { 
+            maxThrust = v; 
+        }
     }
 
     if (ImGui::BeginTable("##plotToggles", 5)) {
         for (int i = 0; i < nPlots; ++i) {
-            if (i % 5 == 0) ImGui::TableNextRow();
+            if (i % 5 == 0) { 
+                ImGui::TableNextRow(); 
+            }
             ImGui::TableNextColumn();
             bool v = showPlot[i];
             ImGui::Checkbox(s_plots[i].label, &v);
@@ -723,7 +761,9 @@ void WindowSimulator::renderFlight() {
     ImGui::BeginChild("##plots", ImVec2(-1, -1), false, ImGuiWindowFlags_HorizontalScrollbar);
 
     for (int p = 0; p < nPlots; ++p) {
-        if (!showPlot[p]) { continue; }
+        if (!showPlot[p]) { 
+            continue; 
+        }
 
         const auto& desc = s_plots[p];
 
@@ -756,7 +796,9 @@ void WindowSimulator::renderFlight() {
 
             ImPlot::PlotLine(desc.label, x_data, y_data, data.t.size());
 
-            if (!stageTimes.empty()) { ImPlot::PlotInfLines("Stage", stageTimes.data(), (int)stageTimes.size()); }
+            if (!stageTimes.empty()) { 
+                ImPlot::PlotInfLines("Stage", stageTimes.data(), (int)stageTimes.size()); 
+            }
             ImPlot::EndPlot();
         }
     }
@@ -822,7 +864,7 @@ void WindowSimulator::renderOrbitalSuccessWindow() {
 
 void WindowSimulator::renderRawData() {
     const std::size_t size = flight_sim.flight_data.t.size();
-    if (size == 0) return;
+    if (size == 0) { return; }
 
     if (ImGui::BeginTable("flight_table", 10, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
         ImGui::TableSetupColumn("t");
@@ -838,7 +880,7 @@ void WindowSimulator::renderRawData() {
         ImGui::TableHeadersRow();
 
         int step = std::max(1, static_cast<int>(size) / 100);
-        for (int i = 0; i < size; i += step) {
+        for (std::size_t i = 0; i < size; i += step) {
             ImGui::TableNextRow();
             ImGui::TableSetColumnIndex(0); ImGui::Text("%.2f", flight_sim.flight_data.t[i]);
             ImGui::TableSetColumnIndex(1); ImGui::Text("%.3f", flight_sim.flight_data.altitude_km[i]);
