@@ -7,8 +7,8 @@ static double computeCentroid(const std::vector<std::vector<double>>& simplex,
                               std::vector<double>& centroid, int exclude) {
     int n = centroid.size();
     std::fill(centroid.begin(), centroid.end(), 0.0);
-    for (int i = 0; i < (int)simplex.size(); ++i) {
-        if (i == exclude) continue;
+    for (int i = 0; i < simplex.size(); ++i) {
+        if (i == exclude) { continue; }
         for (int j = 0; j < n; ++j) {
             centroid[j] += simplex[i][j];
         }
@@ -26,7 +26,7 @@ std::vector<double> minimize(
     const NelderMeadParams& params)
 {
     int n = x0.size();
-    if (n == 0) return {};
+    if (n == 0) { return {}; }
     if (n == 1) {
         // Golden-section search with bracket expansion
         const double phi = 0.6180339887498949;
@@ -39,7 +39,7 @@ std::vector<double> minimize(
         for (int i = 0; i < 20; ++i) {
             double fa = f({a});
             double fb = f({b});
-            if (fm <= fa && fm <= fb) break;
+            if (fm <= fa && fm <= fb) { break; }
             double span = b - a;
             a -= 0.5 * span;
             b += 0.5 * span;
@@ -52,7 +52,7 @@ std::vector<double> minimize(
 
         for (int iter = 0; iter < params.maxIter; ++iter) {
             double fScale = std::max(1.0, std::min(std::abs(fc), std::abs(fd)));
-            if (std::abs(b - a) < params.tol * fScale) break;
+            if (std::abs(b - a) < params.tol * fScale) { break; }
 
             if (fc < fd) {
                 b = d; d = c;
@@ -88,7 +88,7 @@ std::vector<double> minimize(
     for (int i = 0; i <= n; ++i) {
         if (std::isfinite(fx[i])) { allNonFinite = false; break; }
     }
-    if (allNonFinite) return simplex[0];
+    if (allNonFinite) { return simplex[0]; }
 
     std::vector<double> centroid(n);
     std::vector<double> reflected(n);
@@ -117,7 +117,7 @@ std::vector<double> minimize(
         // Early termination: relative change in best value below threshold
         if (params.bestValueTol > 0.0 && iter > 0) {
             double reldiff = std::abs(fx[0] - prevBest) / std::max(1.0, std::abs(fx[0]));
-            if (!std::isfinite(reldiff) || reldiff < params.bestValueTol) break;
+            if (!std::isfinite(reldiff) || reldiff < params.bestValueTol) { break; }
         }
         prevBest = fx[0];
 
@@ -143,11 +143,13 @@ std::vector<double> minimize(
                 simplex[n] = reflected;
                 fx[n] = fReflected;
             }
-        } else if (fReflected < fx[n - 1]) {
+        }
+        else if (fReflected < fx[n - 1]) {
             // Better than second-worst — accept reflection
             simplex[n] = reflected;
             fx[n] = fReflected;
-        } else {
+        }
+        else {
             // Contraction
             if (fReflected < fx[n]) {
                 // Outside contraction
@@ -167,7 +169,8 @@ std::vector<double> minimize(
                         fx[i] = f(simplex[i]);
                     }
                 }
-            } else {
+            }
+            else {
                 // Inside contraction
                 for (int j = 0; j < n; ++j) {
                     contracted[j] = centroid[j] - params.rho * (centroid[j] - simplex[n][j]);

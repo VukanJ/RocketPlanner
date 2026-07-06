@@ -1,8 +1,10 @@
 #include <gtest/gtest.h>
+#include <cmath>
 
 #include "RocketSolver.h"
 #include "parts.h"
 #include "kspConstants.h"
+#include "utils.h"
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -28,11 +30,11 @@ static PartProperty makeTestEngine(double engineMass, double thrustkN, double va
 // emptyMass = payload + nEngine*engineMass + fuelMass/9  (tanks included)
 // fullMass  = emptyMass + fuelMass
 // fuelFractions = {1.0}
-static RocketSolver::StageInfo makeNonAsparagusStage(
+static StageInfo makeNonAsparagusStage(
     double payloadMass, const PartProperty& engine,
     int engineMultiplicity, double fuelMass)
 {
-    RocketSolver::StageInfo s;
+    StageInfo s;
     double engineMass  = engine.getMass();
     double tankMass    = fuelMass / 9.0;
     s.emptyMass        = payloadMass + engineMultiplicity * engineMass + tankMass;
@@ -52,13 +54,13 @@ static RocketSolver::StageInfo makeNonAsparagusStage(
 // massNoFuelNoTanks = payload + coreEngineMass + boosterEngineMass
 // emptyMass = massNoFuelNoTanks + tankMass
 // fullMass  = massNoFuelNoTanks + tankMass + fuelMass
-static RocketSolver::StageInfo makeAsparagusStage(
+static StageInfo makeAsparagusStage(
     double payloadMass, const PartProperty& engine,
     int engineMultiplicity, int baseSymmetry,
     int numAsparagusStages, std::uint16_t hasEngine,
     const std::vector<double>& fuelFractions)
 {
-    RocketSolver::StageInfo s;
+    StageInfo s;
     double engineMass  = engine.getMass();
     double fuelMass    = 0;
     for (double f : fuelFractions) fuelMass += f;
@@ -86,26 +88,26 @@ static RocketSolver::StageInfo makeAsparagusStage(
 // ---------------------------------------------------------------------------
 
 TEST(TotalStagesTest, EmptyConfig) {
-    RocketSolver::RocketConfig cfg;
+    RocketConfig cfg;
     EXPECT_EQ(cfg.totalStages(), 0);
 }
 
 TEST(TotalStagesTest, SingleNoAsparagus) {
-    RocketSolver::RocketConfig cfg;
+    RocketConfig cfg;
     cfg.stages.resize(1);
     cfg.stages[0].asparagus_config.numAsparagusStages = 0;
     EXPECT_EQ(cfg.totalStages(), 1);
 }
 
 TEST(TotalStagesTest, SingleWithAsparagus) {
-    RocketSolver::RocketConfig cfg;
+    RocketConfig cfg;
     cfg.stages.resize(1);
     cfg.stages[0].asparagus_config.numAsparagusStages = 2;
     EXPECT_EQ(cfg.totalStages(), 3);
 }
 
 TEST(TotalStagesTest, MixedStages) {
-    RocketSolver::RocketConfig cfg;
+    RocketConfig cfg;
     cfg.stages.resize(3);
     cfg.stages[0].asparagus_config.numAsparagusStages = 1; // 2 substages
     cfg.stages[1].asparagus_config.numAsparagusStages = 0; // 1 substage
@@ -136,7 +138,7 @@ TEST_F(KinematicsTest, TwoStageNonAsparagusMassChain) {
     auto s1 = makeNonAsparagusStage(payloadMass, engine_, 1, fuelMass1); // top
     auto s0 = makeNonAsparagusStage(s1.fullMass, engine_, 2, fuelMass0); // bottom
 
-    RocketSolver::RocketConfig cfg;
+    RocketConfig cfg;
     cfg.stages = {s0, s1};
 
     std::vector<StageKinematics> kin;
@@ -197,7 +199,7 @@ TEST_F(KinematicsTest, AsparagusThenNonAsparagusMassChain) {
                                  hasEngine,
                                  fuelFractions);
 
-    RocketSolver::RocketConfig cfg;
+    RocketConfig cfg;
     cfg.stages = {s0, s1};
 
     std::vector<StageKinematics> kin;
@@ -256,7 +258,7 @@ TEST_F(KinematicsTest, DropTankAsparagus) {
                                  1, baseSymmetry, numSub, hasEngine,
                                  fuelFractions);
 
-    RocketSolver::RocketConfig cfg;
+    RocketConfig cfg;
     cfg.stages = {s0};
 
     std::vector<StageKinematics> kin;
@@ -287,7 +289,7 @@ TEST_F(KinematicsTest, DropTankAsparagus) {
 TEST_F(KinematicsTest, SingleStageNonAsparagus) {
     auto s0 = makeNonAsparagusStage(10.0, engine_, 3, 8.0);
 
-    RocketSolver::RocketConfig cfg;
+    RocketConfig cfg;
     cfg.stages = {s0};
 
     std::vector<StageKinematics> kin;
@@ -301,8 +303,75 @@ TEST_F(KinematicsTest, SingleStageNonAsparagus) {
 
 // Edge: empty config produces empty kinematics, no crash.
 TEST(KinematicsDeathTest, EmptyConfigNoCrash) {
-    RocketSolver::RocketConfig cfg;
+    RocketConfig cfg;
     std::vector<StageKinematics> kin;
     EXPECT_NO_FATAL_FAILURE(cfg.calcStageKinematics(kin));
     EXPECT_TRUE(kin.empty());
+}
+
+TEST_F(KinematicsTest, MassComputation) {
+    RocketConfig RC;
+    PartProperty engine0{makeTestEngine(0.4, 100, 100)};
+    PartProperty engine1{makeTestEngine(0.1, 100, 100)};
+    std::vector<StageKinematics> kin;
+
+    RC.stages.emplace_back();
+    RC.stages.emplace_back();
+    RC.stages[0].engine = &engine0;
+    RC.stages[1].engine = &engine1;
+
+    RC.stages[0].payloadMass = 0.1;
+    RC.stages[1].payloadMass = 2.1;
+
+    double fuelMass0 = 5;
+    double fuelMass1 = 6;
+
+    RC.stages[0].engineMultiplicity = 2;
+    RC.stages[1].engineMultiplicity = 1;
+
+    RC.recomputeMasses({fuelMass0, fuelMass1});
+
+    double stage0_full_mass = RC.stages[0].engineMultiplicity * RC.stages[0].engine->mass;
+    stage0_full_mass += fuelMass0 + fuelMass0 / 9.0;
+    stage0_full_mass += RC.stages[0].payloadMass;
+
+    double stage1_full_mass = RC.stages[1].engineMultiplicity * RC.stages[1].engine->mass;
+    stage1_full_mass += fuelMass1 + fuelMass1 / 9.0;
+    stage1_full_mass += RC.stages[1].payloadMass;
+
+    double rocket0_mass = stage0_full_mass + stage1_full_mass;
+    double rocket1_mass = stage1_full_mass;
+
+    // Check fullMass
+    EXPECT_NEAR(rocket0_mass, RC.stages[0].fullMass, 1e-5);
+    EXPECT_NEAR(rocket1_mass, RC.stages[1].fullMass, 1e-5);
+    // Check emptyMass
+    EXPECT_NEAR(rocket0_mass - fuelMass0, RC.stages[0].emptyMass, 1e-5);
+    EXPECT_NEAR(rocket1_mass - fuelMass1, RC.stages[1].emptyMass, 1e-5);
+    // Check total rocket mass
+    EXPECT_NEAR(rocket0_mass + rocket1_mass, RC.totalMass, 1e-5);
+}
+
+// ---------------------------------------------------------------------------
+// Orbital data consistency
+// ---------------------------------------------------------------------------
+
+TEST(OrbitalDataTest, LANandLDN180Apart) {
+    for (int i = 0; i < nBodies; ++i) {
+        const Orbit& o = bodyTable[i].body->orbit;
+        if (!o.refBody) continue; // Kerbol has no orbit
+        double diff = std::fmod(std::abs(o.LDN - o.LAN), 360.0f);
+        EXPECT_NEAR(diff, 180.0f, 0.01f) << bodyTable[i].name;
+    }
+}
+
+TEST(OrbitalDataTest, ApsidesConsistentWithSemiMajorAndEccentricity) {
+    for (int i = 0; i < nBodies; ++i) {
+        const Orbit& o = bodyTable[i].body->orbit;
+        if (!o.refBody) continue;
+        EXPECT_NEAR(o.AP, o.a_semi * (1.0 + o.eccentricity), 1.0)
+            << bodyTable[i].name;
+        EXPECT_NEAR(o.PE, o.a_semi * (1.0 - o.eccentricity), 1.0)
+            << bodyTable[i].name;
+    }
 }

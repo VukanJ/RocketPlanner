@@ -8,6 +8,7 @@
 
 #include "parts.h"
 #include "stage.h"
+#include "RocketSolver.h"
 
 class Rocket {
 public:
@@ -21,6 +22,8 @@ public:
 
     void setRootPart(std::string_view partName);
     void construct(double targetDeltaV, double payloadMass, double minTWR=0, double g0=KspSystem::Kerbin.surfaceGravity, double seaLevelAtm=0.0);
+
+    const PartInfoList& allEngines() const { return partCatalogue.all_engines; }
 
 private:
     PartProperty* root = nullptr;

@@ -1,7 +1,10 @@
 CompileFlags:
   Add:
-    - -std=c++20
+    - -std=c++23
     - -Iext
+    - -I/home/vukan/RocketPlanner/build/_deps/imgui-src
+    - -I/home/vukan/RocketPlanner/build/_deps/imgui-src/backends
+    - -I/home/vukan/RocketPlanner/build/_deps/implot-src
     - -Wall
     - -Wunused-value
     - -Wshadow
