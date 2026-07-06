@@ -16,7 +16,8 @@ struct Mission {
 
 enum class MissionPhaseType {
     TAKEOFF,  // Implied circularization
-    CIRCULARIZE,
+    CIRCULARIZE_HYPERBOLIC,
+    ESCAPE,
     HOHMANN_TRANSFER, // includes inclination correction
     ATMOSPHERIC_BREAKING,
     LANDING_PARACHUTES,

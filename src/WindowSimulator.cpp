@@ -2,23 +2,22 @@
 #include "utils.h"
 #include "imgui.h"
 #include "implot.h"
-#include <print>
 #include <stdexcept>
 #include <iostream>
 #include <fstream>
 
 static const WindowSimulator::PlotDesc s_plots[] = {
-    {"Altitude",          "t [s]",     "Altitude (km)",   &FlightData<float>::t,           &FlightData<float>::altitude_km},
-    {"Velocity",          "t [s]",     "Velocity (m/s)",  &FlightData<float>::t,           &FlightData<float>::velocity_ms},
-    {"Apoapsis",          "t [s]",     "Apoapsis (km)",   &FlightData<float>::t,           &FlightData<float>::apoapsis_km,   nullptr, false, true},
-    {"Thrust",            "t [s]",     "Thrust (kN)",     &FlightData<float>::t,           &FlightData<float>::thrust_kN,     nullptr, false, true},
-    {"Mass",              "t [s]",     "Mass (t)",        &FlightData<float>::t,           &FlightData<float>::mass_t},
-    {"Drag",              "t [s]",     "Drag (N)",        &FlightData<float>::t,           &FlightData<float>::drag_N},
-    {"Pressure",          "t [s]",     "Pressure (atm)",  &FlightData<float>::t,           &FlightData<float>::pressure_atm},
-    {"Pitch (90=Horiz)",  "t [s]",     "Angle (deg)",     &FlightData<float>::t,           &FlightData<float>::dir_angle_deg},
-    {"Area",              "t [s]",     "Area (m\u00b2)",  &FlightData<float>::t,           &FlightData<float>::area_m2},
-    {"Trajectory",        "X (km)",    "Y (km)",          &FlightData<float>::posx_km,     &FlightData<float>::posy_km},
-    {"Drag/Thrust ratio", "t [s]",     "Drag / Thrust",   &FlightData<float>::t,           nullptr,
+    {"Altitude",          "t [s]",  "Altitude (km)",  &FlightData<float>::t,       &FlightData<float>::altitude_km},
+    {"Velocity",          "t [s]",  "Velocity (m/s)", &FlightData<float>::t,       &FlightData<float>::velocity_ms},
+    {"Apoapsis",          "t [s]",  "Apoapsis (km)",  &FlightData<float>::t,       &FlightData<float>::apoapsis_km,   nullptr, false, true},
+    {"Thrust",            "t [s]",  "Thrust (kN)",    &FlightData<float>::t,       &FlightData<float>::thrust_kN,     nullptr, false, true},
+    {"Mass",              "t [s]",  "Mass (t)",       &FlightData<float>::t,       &FlightData<float>::mass_t},
+    {"Drag",              "t [s]",  "Drag (N)",       &FlightData<float>::t,       &FlightData<float>::drag_N},
+    {"Pressure",          "t [s]",  "Pressure (atm)", &FlightData<float>::t,       &FlightData<float>::pressure_atm},
+    {"Pitch (90=Horiz)",  "t [s]",  "Angle (deg)",    &FlightData<float>::t,       &FlightData<float>::dir_angle_deg},
+    {"Area",              "t [s]",  "Area (m\u00b2)", &FlightData<float>::t,       &FlightData<float>::area_m2},
+    {"Trajectory",        "X (km)", "Y (km)",         &FlightData<float>::posx_km, &FlightData<float>::posy_km},
+    {"Drag/Thrust ratio", "t [s]",  "Drag / Thrust",  &FlightData<float>::t,       nullptr,
         [](const FlightData<float>& d, std::vector<float>& out) {
             out.resize(d.t.size());
             for (size_t i = 0; i < d.t.size(); ++i) {

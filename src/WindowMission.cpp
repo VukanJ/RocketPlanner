@@ -45,7 +45,7 @@ namespace {
 WindowMission::WindowMission() { }
 
 
-float naiveTakeoffLanding_dv(const Body* body, float targetAltitudeKm) {
+float naiveTakeoffLandingCost(const Body* body, float targetAltitudeKm) {
     float mu = body->GM();
     float R = body->radius_km;
     float Rtarget = body->radius_km + targetAltitudeKm;
@@ -106,12 +106,15 @@ std::pair<float, float> hohmannTransferCost(const Orbit& A, const Orbit& B) {
     float a_trans_min = 0.5f * (A.AP + B.AP);
     float a_trans_max = 0.5f * (A.AP + B.PE);
 
-    float dv_vmin = std::sqrt(2.0 / A.AP + 1.0 / a_trans_min) - speedA;
-    float dv_vmax = std::sqrt(2.0 / A.AP + 1.0 / a_trans_max) - speedA;
+    float dv_vmin = 1000.0f * std::sqrt(A.refBody->GM() * (2.0 / A.AP - 1.0 / a_trans_min)) - speedA;
+    float dv_vmax = 1000.0f * std::sqrt(A.refBody->GM() * (2.0 / A.AP - 1.0 / a_trans_max)) - speedA;
 
     return {dv_vmin, dv_vmax};
 }
 
+float circularizeHyperbolicCost() {
+
+}
 
 bool WindowMission::render() {
     if (input_phase == InputPhase::FromTo) {
@@ -153,16 +156,25 @@ bool WindowMission::render() {
             switch (step.type) {
                 case MissionPhaseType::TAKEOFF:
                     ImGui::BulletText("%i. Takeoff from %s", i, step.refBody->name);
-                    ImGui::Text("Δv: %f", naiveTakeoffLanding_dv(step.refBody, step.orbitAltitude));
+                    ImGui::Text("Δv: %.0f", naiveTakeoffLandingCost(step.refBody, step.orbitAltitude));
                     ImGui::Indent();
                     break;
-                case MissionPhaseType::CIRCULARIZE: 
-                    ImGui::BulletText("%i. Circularize orbit at %s", i, step.refBody->name);
+                case MissionPhaseType::CIRCULARIZE_HYPERBOLIC:
+                    ImGui::BulletText("%i. Circularize hyperbolic orbit at %s", i, step.refBody->name);
                     ImGui::Indent();
                     break;
                 case MissionPhaseType::HOHMANN_TRANSFER: 
-                    ImGui::BulletText("%i Transfer %s --> %s", i, step.refBody->name, step.refBody2->name);
-                    ImGui::Indent();
+                    {
+                        ImGui::BulletText("%i Transfer %s --> %s", i, step.refBody->name, step.refBody2->name);
+                        auto dv_hoh = hohmannTransferCost(Orbit::circular(step.refBody, step.orbitAltitude + step.refBody->radius_km), step.refBody2->orbit);
+                        if (std::abs(dv_hoh.second - dv_hoh.first) > 10) {
+                            ImGui::Text("Δv: %.0f - %.0f", dv_hoh.first, dv_hoh.second);
+                        }
+                        else {
+                            ImGui::Text("Δv: %.0f", dv_hoh.first);
+                        }
+                        ImGui::Indent();
+                    }
                     break;
                 case MissionPhaseType::ATMOSPHERIC_BREAKING: 
                     ImGui::BulletText("%i. Atmospheric breaking at %s", i, step.refBody->name);
@@ -174,7 +186,7 @@ bool WindowMission::render() {
                     break;
                 case MissionPhaseType::LANDING: 
                     ImGui::BulletText("%i. Landing on %s", i, step.refBody->name);
-                    ImGui::Text("Δv: %f", naiveTakeoffLanding_dv(step.refBody, step.orbitAltitude));
+                    ImGui::Text("Δv: %.0f", naiveTakeoffLandingCost(step.refBody, step.orbitAltitude));
                     ImGui::Indent();
                     break;
                 case MissionPhaseType::MINING: 
@@ -215,13 +227,14 @@ void WindowMission::updateMissionSequence() {
             }
         }
         else {
-            msequence.push_back(MissionPhase { MissionPhaseType::HOHMANN_TRANSFER, from, to, 0 });
+            msequence.push_back(MissionPhase { MissionPhaseType::HOHMANN_TRANSFER, from, to, startOrbit });
         }
         if (to->atmHeight_km > 0) {
             msequence.push_back(MissionPhase { MissionPhaseType::ATMOSPHERIC_BREAKING, to, nullptr, destOrbit });
             msequence.push_back(MissionPhase { MissionPhaseType::LANDING_PARACHUTES, to, nullptr, destOrbit });
         }
         else {
+            msequence.push_back(MissionPhase { MissionPhaseType::CIRCULARIZE_HYPERBOLIC, to, nullptr, destOrbit });
             msequence.push_back(MissionPhase { MissionPhaseType::LANDING, to, nullptr, destOrbit });
         }
     };
