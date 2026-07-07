@@ -47,7 +47,7 @@ static void run_interactive() {
     ImGuiIO& io = ImGui::GetIO(); (void)io;
 #ifdef AGAVE_FONT_PATH
     if (std::filesystem::exists(AGAVE_FONT_PATH)) {
-        ImFont* font = io.Fonts->AddFontFromFileTTF(AGAVE_FONT_PATH, 16.0f, nullptr, io.Fonts->GetGlyphRangesGreek());
+        ImFont* font = io.Fonts->AddFontFromFileTTF(AGAVE_FONT_PATH, 19.0f, nullptr, io.Fonts->GetGlyphRangesGreek());
         if (font) io.FontDefault = font;
     }
 #endif

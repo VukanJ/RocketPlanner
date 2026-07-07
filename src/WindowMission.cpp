@@ -192,7 +192,6 @@ bool WindowMission::render() {
                         step.updateDeltaV();
                         updateCostFrom = i;
                     }
-                    ImGui::Text("Δv: %.0f m/s", step.dv);
                     break;
                 case MissionPhaseType::CIRCULARIZE_HYPERBOLIC:
                     ImGui::BulletText("%i. Circularize hyperbolic orbit at %s", i, step.refBody2->name);
@@ -201,13 +200,11 @@ bool WindowMission::render() {
                         step.updateDeltaV();
                         updateCostFrom = i;
                     }
-                    ImGui::Text("Δv: %.0f m/s", step.dv);
                     break;
                 case MissionPhaseType::HOHMANN_TRANSFER: 
                     {
                         ImGui::BulletText("%i Transfer %s --> %s", i, step.refBody->name, step.refBody2->name);
                         ImGui::Indent();
-                        ImGui::Text("Δv: %.0f m/s", step.dv);
                     }
                     break;
                 case MissionPhaseType::ATMOSPHERIC_BREAKING: 
@@ -221,12 +218,10 @@ bool WindowMission::render() {
                 case MissionPhaseType::LANDING: 
                     ImGui::BulletText("%i. Landing on %s", i, step.refBody->name);
                     ImGui::Indent();
-                    ImGui::Text("Δv: %.0f m/s", step.dv);
                     break;
                 case MissionPhaseType::ESCAPE: 
                     ImGui::BulletText("%i. Escape from %s", i, step.refBody->name);
                     ImGui::Indent();
-                    ImGui::Text("Δv: %.0f m/s", step.dv);
                     break;
                 case MissionPhaseType::MINING: 
                     ImGui::BulletText("%i. Mining fuel at %s", i, step.refBody->name);
@@ -237,11 +232,12 @@ bool WindowMission::render() {
                     ImGui::Indent();
                     break;
             }
+            ImGui::Text("Δv: %.0f m/s", step.dv);
             ImGui::PopID();
             ImGui::Separator();
             ImGui::Unindent();
         }
-        ImGui::TextColored({0.5, 0.5, 1, 1}, "Total Δv: %f m/s", dvTotal);
+        ImGui::TextColored({0.5, 0.5, 1, 1}, "Total Δv: %.2f m/s", dvTotal);
         ImGui::SameLine();
         if (ImGui::Button("Accept")) { 
             endWin = true;

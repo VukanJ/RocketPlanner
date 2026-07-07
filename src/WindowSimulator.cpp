@@ -694,32 +694,6 @@ void WindowSimulator::renderFlight() {
         ImGui::TextWrapped("Adjust the rocket configuration to see flight simulation results.");
         return;
     }
-    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0.5, 0, 1.0));
-    if (ImGui::Button("Save CSV")) {
-        std::ofstream csv("flight_data.csv");
-        csv << "t,alt_km,vel_m_s,mass_t,thrust_kN,drag_N,apo_km,pressure_atm,dir_deg,area_m2,stage\n";
-        for (size_t i = 0; i < flight_sim.flight_data.t.size(); ++i) {
-            csv << flight_sim.flight_data.t[i] << ','
-                << flight_sim.flight_data.altitude_km[i] << ','
-                << flight_sim.flight_data.velocity_ms[i] << ','
-                << flight_sim.flight_data.mass_t[i] << ','
-                << flight_sim.flight_data.thrust_kN[i] << ','
-                << flight_sim.flight_data.drag_N[i] << ','
-                << flight_sim.flight_data.apoapsis_km[i] << ','
-                << flight_sim.flight_data.pressure_atm[i] << ','
-                << flight_sim.flight_data.dir_angle_deg[i] << ','
-                << flight_sim.flight_data.area_m2[i] << ','
-                << flight_sim.flight_data.stage[i] << '\n';
-        }
-        std::clog << "CSV saved\n";
-    }
-    ImGui::PopStyleColor();
-    ImGui::SameLine();
-    ImGui::TextDisabled("(?)");
-    if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Saves flight_data.csv to working directory");
-    }
-
     auto& data = flight_sim.flight_data;
 
     for (std::size_t i = 0; i < data.t.size(); ++i) {
@@ -856,7 +830,7 @@ void WindowSimulator::renderOrbitalSuccessWindow() {
     ImGui::Text("Launch outcome");
     ImGui::Text("Apoapsis:  %f km", lsuccess.finalApoapsis);
     ImGui::Text("Periapsis: %f km", lsuccess.finalPeriapsis);
-    ImGui::Text("Metric x = %f", flight_sim.metric());
+    ImGui::TextColored({0.3, 0.3, 0.3, 1}, "Metric x = %f", flight_sim.metric());
 
     ImGui::Unindent();
 }
@@ -864,6 +838,31 @@ void WindowSimulator::renderOrbitalSuccessWindow() {
 void WindowSimulator::renderRawData() {
     const std::size_t size = flight_sim.flight_data.t.size();
     if (size == 0) { return; }
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.5, 0.5, 0, 1.0));
+    if (ImGui::Button("Save CSV")) {
+        std::ofstream csv("flight_data.csv");
+        csv << "t,alt_km,vel_m_s,mass_t,thrust_kN,drag_N,apo_km,pressure_atm,dir_deg,area_m2,stage\n";
+        for (size_t i = 0; i < flight_sim.flight_data.t.size(); ++i) {
+            csv << flight_sim.flight_data.t[i] << ','
+                << flight_sim.flight_data.altitude_km[i] << ','
+                << flight_sim.flight_data.velocity_ms[i] << ','
+                << flight_sim.flight_data.mass_t[i] << ','
+                << flight_sim.flight_data.thrust_kN[i] << ','
+                << flight_sim.flight_data.drag_N[i] << ','
+                << flight_sim.flight_data.apoapsis_km[i] << ','
+                << flight_sim.flight_data.pressure_atm[i] << ','
+                << flight_sim.flight_data.dir_angle_deg[i] << ','
+                << flight_sim.flight_data.area_m2[i] << ','
+                << flight_sim.flight_data.stage[i] << '\n';
+        }
+        std::clog << "CSV saved\n";
+    }
+    ImGui::PopStyleColor();
+    ImGui::SameLine();
+    ImGui::TextDisabled("(?)");
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Saves flight_data.csv to working directory");
+    }
 
     if (ImGui::BeginTable("flight_table", 10, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
         ImGui::TableSetupColumn("t");
