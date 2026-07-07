@@ -173,7 +173,7 @@ bool WindowMission::render() {
     }
     else if (input_phase == InputPhase::Sequence) {
         ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
-        ImGui::Begin("Mission Sequence Preview", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoMove);
+        ImGui::Begin("Mission Sequence", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoMove);
 
         ImGui::TextColored({1, 1, 0, 1}, "Ctrl+LMB to enter value");
 
@@ -211,7 +211,7 @@ bool WindowMission::render() {
                     }
                     break;
                 case MissionPhaseType::ATMOSPHERIC_BREAKING: 
-                    ImGui::BulletText("%i. Atmospheric breaking at %s", i, step.refBody->name);
+                    ImGui::BulletText("%i. Atmospheric reentry at %s", i, step.refBody->name);
                     ImGui::Indent();
                     break;
                 case MissionPhaseType::LANDING_PARACHUTES: 
@@ -220,6 +220,11 @@ bool WindowMission::render() {
                     break;
                 case MissionPhaseType::LANDING: 
                     ImGui::BulletText("%i. Landing on %s", i, step.refBody->name);
+                    ImGui::Indent();
+                    ImGui::Text("Δv: %.0f m/s", step.dv);
+                    break;
+                case MissionPhaseType::ESCAPE: 
+                    ImGui::BulletText("%i. Escape from %s", i, step.refBody->name);
                     ImGui::Indent();
                     ImGui::Text("Δv: %.0f m/s", step.dv);
                     break;
@@ -247,10 +252,19 @@ bool WindowMission::render() {
                 auto& step = msequence[j];
                 auto& prev = msequence[j - 1];
 
-                if (step.alt1 != prev.alt1) {
+                if (step.refBody == prev.refBody) {
+                    step.alt1 = prev.alt1;
                 }
 
-                
+                if (step.refBody == prev.refBody2) {
+                    step.alt1 = prev.alt2;
+                }
+
+                step.updateDeltaV();
+                if (step.type == MissionPhaseType::LANDING || step.type == MissionPhaseType::LANDING_PARACHUTES) {
+                    // No more propagation
+                    break;
+                }
             }
         }
 
@@ -278,6 +292,14 @@ void WindowMission::updateMissionSequence() {
             }
         }
         else {
+            if (to->orbit.parent == from->orbit.parent) {
+                // Planet to planet
+                msequence.push_back(MissionPhase { MissionPhaseType::ESCAPE, from, nullptr, (float)from->orbit.AP });
+            }
+            if (to == from->orbit.parent) {
+                // Return from natural satellite. Need to escape first
+                msequence.push_back(MissionPhase { MissionPhaseType::ESCAPE, from, nullptr, (float)from->orbit.AP });
+            }
             msequence.push_back(MissionPhase::hohmann(from, to, startOrbit, destOrbit));
         }
         if (to->atmHeight_km > 0) {
