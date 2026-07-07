@@ -21,6 +21,7 @@ enum class MissionPhaseType {
     HOHMANN_TRANSFER, // includes inclination correction
     ATMOSPHERIC_BREAKING,
     LANDING_PARACHUTES,
+    INCLINATION_CORRECTION,
     LANDING,
     MINING,
     ORBITAL_REFUELING,
@@ -36,6 +37,8 @@ struct MissionPhase {
 
     bool optional = true;
     bool prograde = true;
+
+    bool active = true;
     
     static MissionPhase takeoff(const Body* body, float alt) {
         return { MissionPhaseType::TAKEOFF, body, nullptr, alt, 0, false};
