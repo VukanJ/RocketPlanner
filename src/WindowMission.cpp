@@ -2,7 +2,10 @@
 #include "gui.h"
 #include "utils.h"
 #include "imgui.h"
+#include <cassert>
 #include <cmath>
+#include <compare>
+#include <stdexcept>
 
 namespace {
     bool renderBodyCombo(const char* label, const Body*& selected) {
@@ -46,16 +49,16 @@ WindowMission::WindowMission() { }
 
 
 float naiveTakeoffLandingCost(const Body* body, float targetAltitudeKm) {
-    float mu = body->GM();
+    float alpha = body->GM();
     float R = body->radius_km;
     float Rtarget = body->radius_km + targetAltitudeKm;
     float a = 0.5f * (R + Rtarget);
 
-    float dv = 1000.0f * (std::sqrt(mu * (2.0f / R - 1.0f / a))
-                        - std::sqrt(mu * (2.0f / Rtarget - 1.0f / a))
-                        + std::sqrt(mu / Rtarget));
+    float dv = 1000.0f * (std::sqrt(alpha * (2.0f / R - 1.0f / a))
+                        - std::sqrt(alpha * (2.0f / Rtarget - 1.0f / a))
+                        + std::sqrt(alpha / Rtarget));
 
-    if (body->seaLevel_atm > 0.0f) {
+    if (body->hasAtmosphere()) {
         // Assume rocket gains altitude at terminal velocity while ascending by the atmospheric scaling height.
         // The time spent in the atmosphere can be translated into a gravity loss expression that scales
         // well to all bodies in the KSP system with an atmosphere.
@@ -75,48 +78,70 @@ float naiveTakeoffLandingCost(const Body* body, float targetAltitudeKm) {
     return dv;
 }
 
-std::pair<float, float> hohmannTransferCost(const Orbit& A, const Orbit& B) {
+Orbit getHohmannOrbit(const Body* origin, const Body* target, float startAltitude) {
+    // Assume orbits are coplanar and orbit A is circular
+    if (origin != target->orbit.parent) {
+        throw std::runtime_error("Hohmann transfer must  different reference bodies!");
+    }
+
+    Orbit he;
+    he.PE = startAltitude + origin->radius_km;
+    he.AP =  target->orbit.AP;
+
+    float a = 0.5f * (he.PE + he.AP);
+    float b = std::sqrt(he.PE * he.AP);
+    he.eccentricity = std::sqrt(1.0 - b*b / (a*a));
+    he.a_semi = a;
+    he.parent = origin;
+    return he;
+}
+
+float hohmannTransferCost(const Body* origin, const Body* target, float startAltitude) {
     // Calculate dV range for hohmann transfer
-    if (A.refBody != B.refBody) {
+    Orbit o_target = target->orbit;
+    if (origin != target->orbit.parent) {
         // This is not a Hohmann transfer
-        return {-1, -1};
+        return -1;
     }
 
-    if (A.eccentricity > 1e-2) {
-        return {-2, -2}; // Cant handle this yet
-    }
+    Orbit o_origin = Orbit::circular(origin, startAltitude + origin->radius_km);
 
-    if (A.inclination != B.inclination) {
-        return {-3, -3}; // Cant handle this yet
-    }
-
-    if ((A.PE > B.AP && A.AP < B.PE) || (B.PE > A.AP && B.AP < A.PE)) {
+    if ((o_origin.PE > o_target.AP && o_origin.AP < o_target.PE) || (o_target.PE > o_origin.AP && o_target.AP < o_origin.PE)) {
         // Orbits intersect
-        return {-4, -4}; // Cant handle this yet
+        return -4;
     }
 
     // Coplanar orbits, one contains the other. Starting orbit is circular
+    Orbit hohmann = getHohmannOrbit(origin, target, startAltitude);
 
-    // Use vis-viva 
-    float speedA = 1000.0 * std::sqrt(A.refBody->GM() / A.AP);
-    //float speedB_AP = 1000.0 * std::sqrt(A.refBody->GM() * (2.0 / B.AP - 1.0 / B.a_semi));
-    //float speedB_PE = 1000.0 * std::sqrt(A.refBody->GM() * (2.0 / B.PE - 1.0 / B.a_semi));
-
-    // Construct transfer orbits 
-    float a_trans_min = 0.5f * (A.AP + B.AP);
-    float a_trans_max = 0.5f * (A.AP + B.PE);
-
-    float dv_vmin = 1000.0f * std::sqrt(A.refBody->GM() * (2.0 / A.AP - 1.0 / a_trans_min)) - speedA;
-    float dv_vmax = 1000.0f * std::sqrt(A.refBody->GM() * (2.0 / A.AP - 1.0 / a_trans_max)) - speedA;
-
-    return {dv_vmin, dv_vmax};
+    float dV = hohmann.v_periapsis(unit_mps) - o_origin.v_apoapsis(unit_mps);
+    return dV;
 }
 
-float circularizeHyperbolicCost() {
+float circularizeHyperbolicCost(const Body* origin, const Body* target, float startAltitude, float rmin, bool prograde = true) {
+    // Compute speed of target body on its orbit
+    float vTarget = target->orbit.v_apoapsis(unit_kmps);
+    rmin += target->radius_km;
 
+    Orbit hohmann = getHohmannOrbit(origin, target, startAltitude);
+
+    float v0 = 0;
+    if (prograde) {
+        v0 = vTarget - hohmann.v_apoapsis(unit_kmps);
+    }
+    else {
+        v0 = vTarget + hohmann.v_apoapsis(unit_kmps);
+    }
+    float alpha = target->GM();
+    float eps = 0.5f * v0 * v0 - alpha / target->R_SOI_km;
+    float vmax = std::sqrt(2.0f * (eps + alpha / rmin));  // Vis-viva
+
+    float dV = unit_mps * std::abs(vmax - std::sqrt(alpha / rmin));
+    return dV;
 }
 
 bool WindowMission::render() {
+    bool endWin = false;
     if (input_phase == InputPhase::FromTo) {
         ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
 
@@ -144,36 +169,45 @@ bool WindowMission::render() {
         }
 
         ImGui::End();
-        return false;
+        return endWin;
     }
     else if (input_phase == InputPhase::Sequence) {
         ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
         ImGui::Begin("Mission Sequence Preview", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoMove);
 
-        int i = 1;
-        for (auto& step : msequence) {
-            ImGui::PushID(i);
+        ImGui::TextColored({1, 1, 0, 1}, "Ctrl+LMB to enter value");
+
+        float dvTotal = 0;
+        int updateCostFrom = -1;
+
+        for (int i = 0; i < msequence.size(); ++i) {
+            ImGui::PushID(i + 1);
+            auto& step = msequence.at(i);
+            dvTotal += step.dv;
             switch (step.type) {
                 case MissionPhaseType::TAKEOFF:
                     ImGui::BulletText("%i. Takeoff from %s", i, step.refBody->name);
-                    ImGui::Text("Δv: %.0f", naiveTakeoffLandingCost(step.refBody, step.orbitAltitude));
                     ImGui::Indent();
+                    if (ImGui::SliderFloat("##orbit", &step.alt1, step.refBody->atmHeight_km, 300, "Orbit: %.2f km", ImGuiSliderFlags_Logarithmic)) {
+                        step.updateDeltaV();
+                        updateCostFrom = i;
+                    }
+                    ImGui::Text("Δv: %.0f m/s", step.dv);
                     break;
                 case MissionPhaseType::CIRCULARIZE_HYPERBOLIC:
-                    ImGui::BulletText("%i. Circularize hyperbolic orbit at %s", i, step.refBody->name);
+                    ImGui::BulletText("%i. Circularize hyperbolic orbit at %s", i, step.refBody2->name);
                     ImGui::Indent();
+                    if (ImGui::SliderFloat("##orbit2", &step.alt2, step.refBody2->atmHeight_km, 300, "Target Orbit: %.2f km", ImGuiSliderFlags_Logarithmic)) {
+                        step.updateDeltaV();
+                        updateCostFrom = i;
+                    }
+                    ImGui::Text("Δv: %.0f m/s", step.dv);
                     break;
                 case MissionPhaseType::HOHMANN_TRANSFER: 
                     {
                         ImGui::BulletText("%i Transfer %s --> %s", i, step.refBody->name, step.refBody2->name);
-                        auto dv_hoh = hohmannTransferCost(Orbit::circular(step.refBody, step.orbitAltitude + step.refBody->radius_km), step.refBody2->orbit);
-                        if (std::abs(dv_hoh.second - dv_hoh.first) > 10) {
-                            ImGui::Text("Δv: %.0f - %.0f", dv_hoh.first, dv_hoh.second);
-                        }
-                        else {
-                            ImGui::Text("Δv: %.0f", dv_hoh.first);
-                        }
                         ImGui::Indent();
+                        ImGui::Text("Δv: %.0f m/s", step.dv);
                     }
                     break;
                 case MissionPhaseType::ATMOSPHERIC_BREAKING: 
@@ -186,8 +220,8 @@ bool WindowMission::render() {
                     break;
                 case MissionPhaseType::LANDING: 
                     ImGui::BulletText("%i. Landing on %s", i, step.refBody->name);
-                    ImGui::Text("Δv: %.0f", naiveTakeoffLandingCost(step.refBody, step.orbitAltitude));
                     ImGui::Indent();
+                    ImGui::Text("Δv: %.0f m/s", step.dv);
                     break;
                 case MissionPhaseType::MINING: 
                     ImGui::BulletText("%i. Mining fuel at %s", i, step.refBody->name);
@@ -199,15 +233,31 @@ bool WindowMission::render() {
                     break;
             }
             ImGui::PopID();
-            ++i;
             ImGui::Separator();
             ImGui::Unindent();
+        }
+        ImGui::TextColored({0.5, 0.5, 1, 1}, "Total Δv: %f m/s", dvTotal);
+        ImGui::SameLine();
+        if (ImGui::Button("Accept")) { 
+            endWin = true;
+        }
+
+        if (updateCostFrom > -1) {
+            for (int j = updateCostFrom + 1; j < msequence.size(); ++j) {
+                auto& step = msequence[j];
+                auto& prev = msequence[j - 1];
+
+                if (step.alt1 != prev.alt1) {
+                }
+
+                
+            }
         }
 
         ImGui::End();
     }
 
-    return false;
+    return endWin;
 }
 
 void WindowMission::updateMissionSequence() {
@@ -217,7 +267,8 @@ void WindowMission::updateMissionSequence() {
         float startOrbit = from->atmHeight_km > 0 ? from->atmHeight_km + 10.0 : 30;
         float destOrbit  = to->atmHeight_km > 0 ? to->atmHeight_km + 10.0 : 30;
 
-        msequence.push_back(MissionPhase { MissionPhaseType::TAKEOFF, from, nullptr, startOrbit });
+        msequence.push_back(MissionPhase::takeoff(from, startOrbit));
+
         if (from == to) {
             if (to->atmHeight_km > 0) {
                 msequence.push_back(MissionPhase { MissionPhaseType::LANDING_PARACHUTES, from, nullptr, startOrbit });
@@ -227,14 +278,14 @@ void WindowMission::updateMissionSequence() {
             }
         }
         else {
-            msequence.push_back(MissionPhase { MissionPhaseType::HOHMANN_TRANSFER, from, to, startOrbit });
+            msequence.push_back(MissionPhase::hohmann(from, to, startOrbit, destOrbit));
         }
         if (to->atmHeight_km > 0) {
             msequence.push_back(MissionPhase { MissionPhaseType::ATMOSPHERIC_BREAKING, to, nullptr, destOrbit });
             msequence.push_back(MissionPhase { MissionPhaseType::LANDING_PARACHUTES, to, nullptr, destOrbit });
         }
         else {
-            msequence.push_back(MissionPhase { MissionPhaseType::CIRCULARIZE_HYPERBOLIC, to, nullptr, destOrbit });
+            msequence.push_back(MissionPhase::circularize_hyperbolic(from, to, startOrbit, destOrbit));
             msequence.push_back(MissionPhase { MissionPhaseType::LANDING, to, nullptr, destOrbit });
         }
     };
@@ -242,6 +293,18 @@ void WindowMission::updateMissionSequence() {
     if (!mission.oneWayTrip) {
         fromTo(mission.destinationBody, mission.originBody);
     }
+
+    for (auto& step : msequence) {
+        step.updateDeltaV();
+    }
 }
 
-
+void MissionPhase::updateDeltaV() {
+    switch (type) {
+        case MissionPhaseType::LANDING: dv = naiveTakeoffLandingCost(refBody, alt1); break;
+        case MissionPhaseType::TAKEOFF: dv = naiveTakeoffLandingCost(refBody, alt1); break;
+        case MissionPhaseType::CIRCULARIZE_HYPERBOLIC: dv = circularizeHyperbolicCost(refBody, refBody2, alt1, alt2, true); break;
+        case MissionPhaseType::HOHMANN_TRANSFER: dv = hohmannTransferCost(refBody, refBody2, alt1); break;
+        default: dv = 0;
+    }
+}

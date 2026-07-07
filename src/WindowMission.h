@@ -24,15 +24,30 @@ enum class MissionPhaseType {
     LANDING,
     MINING,
     ORBITAL_REFUELING,
-    //GRAVITY_ASSIST
 };
 
 struct MissionPhase {
     MissionPhaseType type = MissionPhaseType::TAKEOFF;
     const Body* refBody = nullptr;
     const Body* refBody2 = nullptr;
-    float orbitAltitude = 0;
+    float alt1 = 0;
+    float alt2 = 0;
+    float dv = INFINITY;
+
     bool optional = true;
+    bool prograde = true;
+    
+    static MissionPhase takeoff(const Body* body, float alt) {
+        return { MissionPhaseType::TAKEOFF, body, nullptr, alt, 0, false};
+    }
+    static MissionPhase hohmann(const Body* from, const Body* to, float fromAlt, float toAlt) {
+        return { MissionPhaseType::HOHMANN_TRANSFER, from, to, fromAlt, toAlt, false};
+    }
+    static MissionPhase circularize_hyperbolic(const Body* from, const Body* to, float fromAlt, float toAlt) {
+        return { MissionPhaseType::CIRCULARIZE_HYPERBOLIC, from, to, fromAlt, toAlt, false};
+    }
+
+    void updateDeltaV();
 };
 
 class WindowMission {

@@ -6,7 +6,7 @@ struct Body;
 struct Orbit {
     static constexpr Orbit circular(const Body* ref, float R) {
         Orbit o;
-        o.refBody = ref;
+        o.parent = ref;
         o.AP = R;
         o.PE = R;
         o.a_semi = R;
@@ -14,7 +14,7 @@ struct Orbit {
     }
     static constexpr Orbit hyperbolic(const Body* ref, float R) {
         Orbit o;
-        o.refBody = ref;
+        o.parent = ref;
         o.AP = R;
         o.PE = R;
         o.a_semi = R;
@@ -22,7 +22,7 @@ struct Orbit {
         return o;
     }
 
-    const Body* refBody = nullptr;
+    const Body* parent = nullptr;
     float LAN = 0;  // Longitude of ascending node
     float LDN = 180;  // Longitude of descending node
     float argumentOfPeriapsis = 0;
@@ -33,6 +33,9 @@ struct Orbit {
     float eccentricity = 0;
     float inclination = 0;
     float epoch = 0; // Seconds elapsed at t = 0
+
+    float v_apoapsis(float unit) const;
+    float v_periapsis(float unit) const;
 };
 
 #endif // ORBIT_H

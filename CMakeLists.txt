@@ -9,6 +9,7 @@ set(ROCKET_SOURCES
   src/rocket.cpp
   src/LoadKspParts.cpp
   src/parts.cpp
+  src/Orbit.cpp
   src/PartSerializer.cpp
   src/stage.cpp
   src/RocketSolver.cpp

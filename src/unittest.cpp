@@ -359,7 +359,7 @@ TEST_F(KinematicsTest, MassComputation) {
 TEST(OrbitalDataTest, LANandLDN180Apart) {
     for (int i = 0; i < nBodies; ++i) {
         const Orbit& o = bodyTable[i].body->orbit;
-        if (!o.refBody) continue; // Kerbol has no orbit
+        if (!o.parent) continue; // Kerbol has no orbit
         double diff = std::fmod(std::abs(o.LDN - o.LAN), 360.0f);
         EXPECT_NEAR(diff, 180.0f, 0.01f) << bodyTable[i].name;
     }
@@ -368,7 +368,7 @@ TEST(OrbitalDataTest, LANandLDN180Apart) {
 TEST(OrbitalDataTest, ApsidesConsistentWithSemiMajorAndEccentricity) {
     for (int i = 0; i < nBodies; ++i) {
         const Orbit& o = bodyTable[i].body->orbit;
-        if (!o.refBody) continue;
+        if (!o.parent) continue;
         EXPECT_NEAR(o.AP, o.a_semi * (1.0 + o.eccentricity), 1.0)
             << bodyTable[i].name;
         EXPECT_NEAR(o.PE, o.a_semi * (1.0 - o.eccentricity), 1.0)
