@@ -11,7 +11,8 @@ float escapeBurnCost(const Body* body, float targetAltitudeKm);
 
 Orbit getHohmannOrbit(const Body* origin, const Body* target, float startAltitude);
 
-float hohmannTransferCost(const Body* origin, const Body* target, float startAltitude);
+float hohmannTransferCost_Planet2Planet(const Body* origin, const Body* target);
+float hohmannTransferCost_Planet2Moon(const Body* origin, const Body* target, float startAltitude);
 
 float circularizeHyperbolicCost(const Body* origin, const Body* target, float startAltitude, float rmin, bool prograde = true);
 

@@ -454,7 +454,7 @@ TEST(DeltaV, escapeVelocity) {
 
 TEST(DeltaV, hohmannTransferCost) {
     for (const Body* sat : {&KspSystem::Mun, &KspSystem::Minmus}) {
-        float dvtrans = hohmannTransferCost(&KspSystem::Kerbin, sat, 30);
+        float dvtrans = hohmannTransferCost_Planet2Moon(&KspSystem::Kerbin, sat, 30);
         
         // Compute expectation
         float dvExpected = 0;
@@ -467,7 +467,7 @@ TEST(DeltaV, hohmannTransferCost) {
     }
 
     for (const Body* sat : {&KspSystem::Laythe, &KspSystem::Vall, &KspSystem::Bop, &KspSystem::Pol, &KspSystem::Tylo}) {
-        float dvtrans = hohmannTransferCost(&KspSystem::Jool, sat, 100);
+        float dvtrans = hohmannTransferCost_Planet2Moon(&KspSystem::Jool, sat, 100);
         
         // Compute expectation
         float dvExpected = 0;

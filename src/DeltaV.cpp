@@ -41,30 +41,42 @@ float escapeBurnCost(const Body* origin, float startAltitude) {
 
 Orbit getHohmannOrbit(const Body* origin, const Body* target, float startAltitude) {
     // Assume orbits are coplanar and orbit A is circular
-    if (origin != target->orbit.parent) {
-        throw std::runtime_error("Hohmann transfer must different reference bodies!");
-    }
-
     Orbit he;
-    he.PE = startAltitude + origin->radius_km;
-    he.AP =  target->orbit.AP;
+    if (origin->orbit.parent == target->orbit.parent) {
+        he.PE = origin->orbit.PE; // TODO compute intervals
+        he.AP = target->orbit.AP;
 
-    float a = 0.5f * (he.PE + he.AP);
-    float b = std::sqrt(he.PE * he.AP);
-    he.eccentricity = std::sqrt(1.0 - b*b / (a*a));
-    he.a_semi = a;
-    he.parent = origin;
-    return he;
+        float a = 0.5f * (he.PE + he.AP);
+        float b = std::sqrt(he.PE * he.AP);
+        he.eccentricity = std::sqrt(1.0 - b*b / (a*a));
+        he.a_semi = a;
+        he.parent = origin->orbit.parent;
+        return he;
+    }
+    else if (origin == target->orbit.parent) {
+        he.PE = startAltitude + origin->radius_km;
+        he.AP =  target->orbit.AP;
+
+        float a = 0.5f * (he.PE + he.AP);
+        float b = std::sqrt(he.PE * he.AP);
+        he.eccentricity = std::sqrt(1.0 - b*b / (a*a));
+        he.a_semi = a;
+        he.parent = origin;
+        return he;
+    }
+    else {
+        throw std::runtime_error("Invalid Hohmann cost call");
+    }
 }
 
-float hohmannTransferCost(const Body* origin, const Body* target, float startAltitude) {
+float hohmannTransferCost_Planet2Moon(const Body* origin, const Body* target, float startAltitude) {
     // Calculate dV range for hohmann transfer
-    Orbit o_target = target->orbit;
     if (origin != target->orbit.parent) {
         // This is not a Hohmann transfer
         return -1;
     }
 
+    Orbit o_target = target->orbit;
     Orbit o_origin = Orbit::circular(origin, startAltitude + origin->radius_km);
 
     if ((o_origin.PE > o_target.AP && o_origin.AP < o_target.PE) || (o_target.PE > o_origin.AP && o_target.AP < o_origin.PE)) {
@@ -74,6 +86,27 @@ float hohmannTransferCost(const Body* origin, const Body* target, float startAlt
 
     // Coplanar orbits, one contains the other. Starting orbit is circular
     Orbit hohmann = getHohmannOrbit(origin, target, startAltitude);
+
+    float dV = hohmann.v_periapsis(unit_mps) - o_origin.v_apoapsis(unit_mps);
+    return dV;
+}
+
+float hohmannTransferCost_Planet2Planet(const Body* origin, const Body* target) {
+    if (origin->orbit.parent != target->orbit.parent) {
+        // This is not a Planet to planet Hohmann transfer
+        return -1;
+    }
+
+    Orbit o_target = target->orbit;
+    Orbit o_origin = Orbit::circular(origin->orbit.parent, origin->orbit.PE);
+
+    if ((o_origin.PE > o_target.AP && o_origin.AP < o_target.PE) || (o_target.PE > o_origin.AP && o_target.AP < o_origin.PE)) {
+        // Orbits intersect
+        return -4;
+    }
+
+    // Coplanar orbits, one contains the other.
+    Orbit hohmann = getHohmannOrbit(origin, target, 0);
 
     float dV = hohmann.v_periapsis(unit_mps) - o_origin.v_apoapsis(unit_mps);
     return dV;

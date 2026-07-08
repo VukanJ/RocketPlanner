@@ -6,7 +6,7 @@
 
 struct Mission {
     const Body* originBody = &KspSystem::Kerbin;
-    const Body* destinationBody = &KspSystem::Mun;
+    const Body* destinationBody = &KspSystem::Dres;
     bool oneWayTrip = false;
     bool apolloStyle = true;
 

@@ -234,18 +234,20 @@ void WindowMission::updateMissionSequence() {
         else {
             if (to->orbit.parent == from->orbit.parent) {
                 // Planet to planet — both orbit the same parent body
-                msequence.push_back(MissionPhase { MissionPhaseType::ESCAPE, from, nullptr, startOrbit, destOrbit });
+                msequence.push_back(MissionPhase { MissionPhaseType::ESCAPE, from, to, startOrbit, destOrbit });
                 if (to->orbit.inclination != from->orbit.inclination) {
                     msequence.push_back(MissionPhase { MissionPhaseType::INCLINATION_CORRECTION, from, to, startOrbit });
                 }
             }
             if (to == from->orbit.parent) {
                 // Return from natural satellite. Need to escape first
-                msequence.push_back(MissionPhase { MissionPhaseType::ESCAPE, from, nullptr, startOrbit, reentryPE });
+                msequence.push_back(MissionPhase { MissionPhaseType::ESCAPE, from, to, startOrbit, reentryPE });
             }
             if (to->orbit.parent == from) {
                 // Parent to moon — inclination correction w.r.t. parent's equator
-                msequence.push_back(MissionPhase { MissionPhaseType::INCLINATION_CORRECTION, from, to, startOrbit });
+                if (to->orbit.inclination != 0) { // origin orbit is in parents ecliptic
+                    msequence.push_back(MissionPhase { MissionPhaseType::INCLINATION_CORRECTION, from, to, startOrbit });
+                }
             }
             msequence.push_back(MissionPhase::hohmann(from, to, startOrbit, destOrbit));
         }
@@ -270,26 +272,41 @@ void WindowMission::updateMissionSequence() {
 
 void MissionPhase::updateDeltaV() {
     switch (type) {
-        case MissionPhaseType::LANDING: dv = naiveTakeoffLandingCost(refBody, alt1); break;
-        case MissionPhaseType::TAKEOFF: dv = naiveTakeoffLandingCost(refBody, alt1); break;
+        case MissionPhaseType::LANDING: 
+            dv = naiveTakeoffLandingCost(refBody, alt1); 
+            break;
+        case MissionPhaseType::TAKEOFF: 
+            dv = naiveTakeoffLandingCost(refBody, alt1); 
+            break;
         case MissionPhaseType::ESCAPE:
-            dv = circularizeHyperbolicCost(refBody->orbit.parent, refBody, alt2, alt1, true);
+            if (refBody->orbit.parent == refBody2->orbit.parent) {
+                // Planet to planet, or Moon to Moon
+                // No direct maneuver, since inclination correction might be needed.
+                dv = escapeBurnCost(refBody, alt1);
+            }
+            else {
+                // Combine Escape and Hohmann return into a single maneuver
+                // Cost should be the same as for circularizing hyperbolic orbit 
+                // after a Hohmann transfer, just in reverse. (Time-reversal symmetry)
+                dv = circularizeHyperbolicCost(refBody->orbit.parent, refBody, alt2, alt1, true);
+            }
             break;
         case MissionPhaseType::CIRCULARIZE_HYPERBOLIC:
             if (refBody2 && refBody2 == refBody->orbit.parent) {
                 dv = circularizeHyperbolicCost(refBody2, refBody, alt2, alt1, true);
             } else if (refBody2 && refBody2->orbit.parent == refBody->orbit.parent) {
-                // Planet→planet
+                // Planet -> planet
                 dv = 0;
             } else {
                 dv = circularizeHyperbolicCost(refBody, refBody2, alt1, alt2, true);
             }
             break;
         case MissionPhaseType::HOHMANN_TRANSFER:
-            if (refBody2 && refBody2 == refBody->orbit.parent) {
-                dv = 0;  // ESCAPE already set up the transfer
-            } else {
-                dv = hohmannTransferCost(refBody, refBody2, alt1);
+            if (refBody2->orbit.parent == refBody) {
+                dv = hohmannTransferCost_Planet2Moon(refBody, refBody2, alt1);
+            }
+            else if (refBody->orbit.parent == refBody2->orbit.parent) {
+                dv = hohmannTransferCost_Planet2Planet(refBody, refBody2);
             }
             break;
         case MissionPhaseType::INCLINATION_CORRECTION:
