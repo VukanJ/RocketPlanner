@@ -13,15 +13,20 @@ struct Orbit {
         o.a_semi = R;
         return o;
     }
-    static constexpr Orbit hyperbolic(const Body* ref, float R) {
+
+    static constexpr Orbit elliptic(const Body* ref, float ap, float pe) {
         Orbit o;
         o.parent = ref;
-        o.AP = R;
-        o.PE = R;
-        o.a_semi = R;
-        o.eccentricity = 1.5;
+        o.AP = ap;
+        o.PE = pe;
+        o.a_semi = 0.5 * (ap + pe);
+
+        float b = std::sqrt(ap * pe);
+
+        o.eccentricity = std::sqrt(1 - b*b / (o.a_semi * o.a_semi));
         return o;
     }
+
 
     const Body* parent = nullptr;
     float LAN = 0;  // Longitude of ascending node

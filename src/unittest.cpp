@@ -1,10 +1,14 @@
 #include <gtest/gtest.h>
 #include <cmath>
+#include <numbers>
 
+#include "DeltaV.h"
 #include "RocketSolver.h"
+#include "imgui.h"
 #include "parts.h"
 #include "kspConstants.h"
 #include "utils.h"
+#include "Orbit.h"
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -375,3 +379,105 @@ TEST(OrbitalDataTest, ApsidesConsistentWithSemiMajorAndEccentricity) {
             << bodyTable[i].name;
     }
 }
+
+// ---------------------------------------------------------------------------
+// DeltaV calculators
+// ---------------------------------------------------------------------------
+//
+
+const Body* allBodies[] = {
+    &KspSystem::Mun,
+    &KspSystem::Minmus,
+    &KspSystem::Kerbin,
+    &KspSystem::Dres,
+    &KspSystem::Kerbol,
+    &KspSystem::Duna,
+    &KspSystem::Ike,
+    &KspSystem::Jool,
+    &KspSystem::Bop,
+    &KspSystem::Tylo,
+    &KspSystem::Pol,
+    &KspSystem::Laythe,
+    &KspSystem::Vall,
+    &KspSystem::Moho,
+    &KspSystem::Eeloo,
+    &KspSystem::Gilly,
+    &KspSystem::Eve
+};
+
+TEST(DeltaV, naiveTakeoffLanding) {
+    float orbit = 100;
+
+    for (const auto* body : allBodies) {
+        if (body->hasAtmosphere()) continue;
+        float dv = naiveTakeoffLandingCost(body, orbit);
+        
+        // Compute expectation (double Hohmann)
+        float dvExpected = 0;
+        Orbit o1 = Orbit::elliptic(body, body->radius_km + orbit, body->radius_km);
+        dvExpected += o1.v_periapsis(unit_mps);
+        Orbit o2 = Orbit::circular(body, body->radius_km + orbit);
+        dvExpected += o2.v_apoapsis(unit_mps) - o1.v_apoapsis(unit_mps);
+
+        EXPECT_NEAR(dv, dvExpected, 1e-3);
+    }
+}
+
+TEST(DeltaV, getHohmannOrbit) {
+    // Kerbin -> Mun, Minmus
+    for (const Body* sat : {&KspSystem::Mun, &KspSystem::Minmus}) {
+        auto H = getHohmannOrbit(&KspSystem::Kerbin, sat, 30);
+        EXPECT_NEAR(H.PE, KspSystem::Kerbin.radius_km + 30, 1e-3);
+        EXPECT_NEAR(H.AP, sat->orbit.AP, 1e-3);
+        EXPECT_NEAR(H.a_semi, 0.5f * (H.AP + H.PE), 1e-3);
+        EXPECT_NEAR(H.v_periapsis(unit_kmps), std::sqrt(KspSystem::Kerbin.GM() * (2.0 / H.PE - 1.0 / H.a_semi)), 1e-3);
+        EXPECT_NEAR(H.v_apoapsis(unit_kmps), std::sqrt(KspSystem::Kerbin.GM() * (2.0 / H.AP - 1.0 / H.a_semi)), 1e-3);
+    }
+
+    // Jool -> Moons
+    for (const Body* sat : {&KspSystem::Laythe, &KspSystem::Vall, &KspSystem::Bop, &KspSystem::Pol, &KspSystem::Tylo}) {
+        auto H = getHohmannOrbit(&KspSystem::Jool, sat, 100);
+        EXPECT_NEAR(H.PE, KspSystem::Jool.radius_km + 100, 1e-3);
+        EXPECT_NEAR(H.AP, sat->orbit.AP, 1e-3);
+        EXPECT_NEAR(H.a_semi, 0.5f * (H.AP + H.PE), 1e-2);
+        EXPECT_NEAR(H.v_periapsis(unit_kmps), std::sqrt(KspSystem::Jool.GM() * (2.0 / H.PE - 1.0 / H.a_semi)), 1e-3);
+        EXPECT_NEAR(H.v_apoapsis(unit_kmps), std::sqrt(KspSystem::Jool.GM() * (2.0 / H.AP - 1.0 / H.a_semi)), 1e-3);
+    }
+}
+
+TEST(DeltaV, escapeVelocity) {
+    Orbit circ = Orbit::circular(&KspSystem::Kerbin, 30 + KspSystem::Kerbin.radius_km);
+    float dv = escapeBurnCost(&KspSystem::Kerbin, 30);
+    EXPECT_NEAR(dv, circ.v_apoapsis(unit_mps) * (std::numbers::sqrt2 - 1.0), 1e-3);
+}
+
+
+TEST(DeltaV, hohmannTransferCost) {
+    for (const Body* sat : {&KspSystem::Mun, &KspSystem::Minmus}) {
+        float dvtrans = hohmannTransferCost(&KspSystem::Kerbin, sat, 30);
+        
+        // Compute expectation
+        float dvExpected = 0;
+        auto H = getHohmannOrbit(&KspSystem::Kerbin, sat, 30);
+        Orbit circ = Orbit::circular(&KspSystem::Kerbin, KspSystem::Kerbin.radius_km + 30);
+
+        dvExpected += H.v_periapsis(unit_mps) - circ.v_periapsis(unit_mps);
+        
+        EXPECT_NEAR(dvtrans, dvExpected, 1e-3);
+    }
+
+    for (const Body* sat : {&KspSystem::Laythe, &KspSystem::Vall, &KspSystem::Bop, &KspSystem::Pol, &KspSystem::Tylo}) {
+        float dvtrans = hohmannTransferCost(&KspSystem::Jool, sat, 100);
+        
+        // Compute expectation
+        float dvExpected = 0;
+        auto H = getHohmannOrbit(&KspSystem::Jool, sat, 100);
+        Orbit circ = Orbit::circular(&KspSystem::Jool, KspSystem::Jool.radius_km + 100);
+
+        dvExpected += H.v_periapsis(unit_mps) - circ.v_periapsis(unit_mps);
+        
+        EXPECT_NEAR(dvtrans, dvExpected, 1e-3);
+    }
+}
+
+
