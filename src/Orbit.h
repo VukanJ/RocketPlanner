@@ -1,6 +1,7 @@
 #ifndef ORBIT_H
 #define ORBIT_H
 
+#include "Eigen/Core"
 struct Body;
 
 struct Orbit {
@@ -34,6 +35,7 @@ struct Orbit {
     float inclination = 0;
     float epoch = 0; // Seconds elapsed at t = 0
 
+    Eigen::Vector3f normal() const;
     float v_apoapsis(float unit) const;
     float v_periapsis(float unit) const;
 };

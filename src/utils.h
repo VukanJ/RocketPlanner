@@ -8,6 +8,10 @@
 constexpr inline float unit_mps = 1000.0;
 constexpr inline float unit_kmps = 1.0;
 
+auto inline constexpr deg2rad(auto f) {
+    return f * M_PI / 180.0;
+}
+
 inline std::string partTypeToDisplayName(PartType type) {
     switch (type) {
         case PartType::CrewedCommandPod: return "Crewed Command Pod";

@@ -4,8 +4,9 @@
 #include "imgui.h"
 #include <cassert>
 #include <cmath>
-#include <compare>
 #include <stdexcept>
+
+#include "eigen3/Eigen/Geometry"
 
 namespace {
     bool renderBodyCombo(const char* label, const Body*& selected) {
@@ -138,6 +139,83 @@ float circularizeHyperbolicCost(const Body* origin, const Body* target, float st
 
     float dV = unit_mps * std::abs(vmax - std::sqrt(alpha / rmin));
     return dV;
+}
+
+float directionToAnomaly(const Eigen::Vector3f& dir, const Orbit& orbit) {
+    // Given a direction, return the anomaly of the point this vector is pointing at on the orbit
+    Eigen::Vector3f up(0, 1, 0);
+    Eigen::Vector3f solarprimevector(1, 0, 0);
+    
+    auto ANdir = Eigen::AngleAxisf(deg2rad(-orbit.LAN), up) * solarprimevector;
+    auto N = orbit.normal();
+
+    auto dirPER = Eigen::AngleAxisf(deg2rad(-orbit.argumentOfPeriapsis), N) * ANdir;
+
+    // Project direction onto orbital plane
+    Eigen::Vector3f dirProj = dir - N * dir.dot(N);
+    dirProj.normalize();
+
+    float anomaly = std::acos(std::clamp(dirProj.dot(dirPER), -1.0f, 1.0f));
+
+    // If direction is past apoapsis (approaching periapsis), anomaly > 180
+    if (N.cross(dirPER).dot(dirProj) > 0) {
+        anomaly = 2.0f * M_PI - anomaly;
+    }
+
+    return anomaly;
+}
+
+float inclinationCorrectionCost(const Orbit& origin, const Orbit& target) {
+    Eigen::Vector3f up(0, 1, 0);
+    Eigen::Vector3f solarprimevector(1, 0, 0);  // reference vector
+
+    auto ANdir_target = Eigen::AngleAxisf(deg2rad(-target.LAN), up) * solarprimevector;
+    auto ANdir_origin = Eigen::AngleAxisf(deg2rad(-origin.LAN), up) * solarprimevector;
+
+    // Get normals of orbital planes
+    // By rotating up vector by inclination around the AN directions
+    auto N_target = Eigen::AngleAxisf(deg2rad(-target.inclination), ANdir_target) * up;
+    auto N_origin = Eigen::AngleAxisf(deg2rad(-origin.inclination), ANdir_origin) * up;
+
+    if (N_target.y() < 0) {
+        N_target = -N_target;
+    }
+    if (N_origin.y() < 0) {
+        N_origin = -N_origin;
+    }
+
+    // Relative inclination angle between the two orbital planes
+    float relInclination = std::acos(std::clamp(N_origin.dot(N_target), -1.0f, 1.0f));
+
+    // If planes are already aligned, no cost
+    if (relInclination < 1e-6f) { return 0; }
+
+    // Line of nodes (intersection of the two planes) — both directions
+    auto nodeDir = N_origin.cross(N_target).normalized();
+
+    // True anomaly of each node on the origin orbit
+    float theta_a = directionToAnomaly(nodeDir, origin);
+    float theta_b = directionToAnomaly(-nodeDir, origin);
+
+    float mu = origin.parent->GM();
+    float a = origin.a_semi;
+    float e = origin.eccentricity;
+
+    auto speedAt = [&](float theta) {
+        float cosT = std::cos(theta);
+        float r = a * (1.0f - e * e) / (1.0f + e * cosT);
+        return std::sqrt(mu * (2.0f / r - 1.0f / a));
+    };
+
+    float v_a = speedAt(theta_a);
+    float v_b = speedAt(theta_b);
+
+    // dV = 2 * v * sin(Δi/2) for a pure plane-change burn at the node
+    float dV_a = 2.0f * v_a * std::sin(relInclination / 2.0f);
+    float dV_b = 2.0f * v_b * std::sin(relInclination / 2.0f);
+
+    // Return the cheaper of the two nodes (convert km/s → m/s)
+    return unit_mps * std::min(dV_a, dV_b);
 }
 
 bool WindowMission::render() {
@@ -323,14 +401,18 @@ void WindowMission::updateMissionSequence() {
         }
         else {
             if (to->orbit.parent == from->orbit.parent) {
-                // Planet to planet
+                // Planet to planet — both orbit the same parent body
                 msequence.push_back(MissionPhase { MissionPhaseType::ESCAPE, from, nullptr, startOrbit, destOrbit });
+                if (to->orbit.inclination != from->orbit.inclination) {
+                    msequence.push_back(MissionPhase { MissionPhaseType::INCLINATION_CORRECTION, from, to, startOrbit });
+                }
             }
             if (to == from->orbit.parent) {
                 // Return from natural satellite. Need to escape first
                 msequence.push_back(MissionPhase { MissionPhaseType::ESCAPE, from, nullptr, startOrbit, reentryPE });
             }
-            if (to->orbit.inclination > 0) {
+            if (to->orbit.parent == from) {
+                // Parent to moon — inclination correction w.r.t. parent's equator
                 msequence.push_back(MissionPhase { MissionPhaseType::INCLINATION_CORRECTION, from, to, startOrbit });
             }
             msequence.push_back(MissionPhase::hohmann(from, to, startOrbit, destOrbit));
@@ -364,6 +446,9 @@ void MissionPhase::updateDeltaV() {
         case MissionPhaseType::CIRCULARIZE_HYPERBOLIC:
             if (refBody2 && refBody2 == refBody->orbit.parent) {
                 dv = circularizeHyperbolicCost(refBody2, refBody, alt2, alt1, true);
+            } else if (refBody2 && refBody2->orbit.parent == refBody->orbit.parent) {
+                // Planet→planet: use landing cost as capture estimate
+                dv = naiveTakeoffLandingCost(refBody2, alt2);
             } else {
                 dv = circularizeHyperbolicCost(refBody, refBody2, alt1, alt2, true);
             }
@@ -373,6 +458,16 @@ void MissionPhase::updateDeltaV() {
                 dv = 0;  // ESCAPE already set up the transfer
             } else {
                 dv = hohmannTransferCost(refBody, refBody2, alt1);
+            }
+            break;
+        case MissionPhaseType::INCLINATION_CORRECTION:
+            if (refBody2 && refBody2->orbit.parent == refBody) {
+                // Planet → moon: ship's parking orbit vs moon's orbit around planet
+                Orbit shipOrbit = Orbit::circular(refBody, alt1 + refBody->radius_km);
+                dv = inclinationCorrectionCost(shipOrbit, refBody2->orbit);
+            } else {
+                // Planet → planet: orbits around shared parent
+                dv = inclinationCorrectionCost(refBody->orbit, refBody2->orbit);
             }
             break;
         default: dv = 0;
