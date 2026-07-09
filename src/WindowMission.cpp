@@ -296,7 +296,7 @@ void MissionPhase::updateDeltaV() {
                 dv = circularizeHyperbolicCost(refBody2, refBody, alt2, alt1, true);
             } else if (refBody2 && refBody2->orbit.parent == refBody->orbit.parent) {
                 // Planet -> planet
-                dv = 0;
+                dv = circularizeHyperbolicCost(refBody, refBody2, alt1, alt2, true);
             } else {
                 dv = circularizeHyperbolicCost(refBody, refBody2, alt1, alt2, true);
             }
