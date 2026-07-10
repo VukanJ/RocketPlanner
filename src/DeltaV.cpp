@@ -147,26 +147,46 @@ DeltaVRange hohmannTransferCost_Planet2Planet(const Body* origin, const Body* ta
     return dv_range;
 }
 
-float circularizeHyperbolicCost(const Body* origin, const Body* target, float startAltitude, float rmin, bool prograde) {
-    // Compute speed of target body on its orbit
-    float vTarget = target->orbit.v_apoapsis(unit_kmps);
+DeltaVRange circularizeHyperbolicCost(const Body* origin, const Body* target, float startAltitude, float rmin, bool prograde) {
     rmin += target->radius_km;
-
-    Orbit hohmann = getHohmannOrbit(origin, target, startAltitude);
-
-    float v0 = 0;
-    if (prograde) {
-        v0 = vTarget - hohmann.v_apoapsis(unit_kmps);
-    }
-    else {
-        v0 = vTarget + hohmann.v_apoapsis(unit_kmps);
-    }
     float alpha = target->GM();
-    float eps = 0.5f * v0 * v0 - alpha / target->R_SOI_km;
-    float vmax = std::sqrt(2.0f * (eps + alpha / rmin));  // Vis-viva
+    float vCircular = std::sqrt(alpha / rmin);
 
-    float dV = unit_mps * std::abs(vmax - std::sqrt(alpha / rmin));
-    return dV;
+    auto computeCost = [&](float v_transfer, float vTarget) -> float {
+        float v0 = prograde ? (vTarget - v_transfer) : (vTarget + v_transfer);
+        float eps = 0.5f * v0 * v0 - alpha / target->R_SOI_km;
+        float vmax = std::sqrt(2.0f * (eps + alpha / rmin));
+        return unit_mps * std::abs(vmax - vCircular);
+    };
+
+    DeltaVRange dv_range;
+
+    if (origin->orbit.parent == target->orbit.parent) {
+        // Planet -> planet: sweep all four (R1, R2) combinations
+        const Body* center = origin->orbit.parent;
+        float GM = center->GM();
+        for (float R1 : {origin->orbit.PE, origin->orbit.AP}) {
+            for (float R2 : {target->orbit.PE, target->orbit.AP}) {
+                Orbit hohmann = getHohmannOrbit(center, R1, R2);
+                float v_transfer = std::sqrt(GM * (2.0f / R2 - 1.0f / hohmann.a_semi));
+                float vTarget    = std::sqrt(GM * (2.0f / R2 - 1.0f / target->orbit.a_semi));
+                dv_range.add(computeCost(v_transfer, vTarget));
+            }
+        }
+    }
+    else if (origin == target->orbit.parent) {
+        // Planet -> moon: fixed departure, sweep target PE/AP
+        float R1 = startAltitude + origin->radius_km;
+        float GM = origin->GM();
+        for (float R2 : {target->orbit.PE, target->orbit.AP}) {
+            Orbit hohmann = getHohmannOrbit(origin, R1, R2);
+            float v_transfer = std::sqrt(GM * (2.0f / R2 - 1.0f / hohmann.a_semi));
+            float vTarget    = std::sqrt(GM * (2.0f / R2 - 1.0f / target->orbit.a_semi));
+            dv_range.add(computeCost(v_transfer, vTarget));
+        }
+    }
+
+    return dv_range;
 }
 
 float directionToAnomaly(const Eigen::Vector3f& dir, const Orbit& orbit) {
@@ -193,7 +213,7 @@ float directionToAnomaly(const Eigen::Vector3f& dir, const Orbit& orbit) {
     return anomaly;
 }
 
-float inclinationCorrectionCost(const Orbit& origin, const Orbit& target) {
+DeltaVRange inclinationCorrectionCost(const Orbit& origin, const Orbit& target) {
     Eigen::Vector3f up(0, 1, 0);
     Eigen::Vector3f solarprimevector(1, 0, 0);  // reference vector
 
@@ -216,7 +236,7 @@ float inclinationCorrectionCost(const Orbit& origin, const Orbit& target) {
     float relInclination = std::acos(std::clamp(N_origin.dot(N_target), -1.0f, 1.0f));
 
     // If planes are already aligned, no cost
-    if (relInclination < 1e-6f) { return 0; }
+    if (relInclination < 0.001) { return 0; }
 
     // Line of nodes (intersection of the two planes) — both directions
     auto nodeDir = N_origin.cross(N_target).normalized();
@@ -225,14 +245,14 @@ float inclinationCorrectionCost(const Orbit& origin, const Orbit& target) {
     float theta_a = directionToAnomaly(nodeDir, origin);
     float theta_b = directionToAnomaly(-nodeDir, origin);
 
-    float mu = origin.parent->GM();
+    float alpha = origin.parent->GM();
     float a = origin.a_semi;
     float e = origin.eccentricity;
 
     auto speedAt = [&](float theta) {
         float cosT = std::cos(theta);
         float r = a * (1.0f - e * e) / (1.0f + e * cosT);
-        return std::sqrt(mu * (2.0f / r - 1.0f / a));
+        return std::sqrt(alpha * (2.0f / r - 1.0f / a));
     };
 
     float v_a = speedAt(theta_a);
@@ -243,6 +263,9 @@ float inclinationCorrectionCost(const Orbit& origin, const Orbit& target) {
     float dV_b = 2.0f * v_b * std::sin(relInclination / 2.0f);
 
     // Return the cheaper of the two nodes (convert km/s → m/s)
-    return unit_mps * std::min(dV_a, dV_b);
+    DeltaVRange dv_range;
+    dv_range.add(unit_mps * dV_a);
+    dv_range.add(unit_mps * dV_b);
+    return dv_range;
 }
 

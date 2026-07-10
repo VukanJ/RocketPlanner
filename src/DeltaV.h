@@ -37,11 +37,11 @@ Orbit getHohmannOrbit(const Body* origin, const Body* target, float startAltitud
 DeltaVRange hohmannTransferCost_Planet2Planet(const Body* origin, const Body* target);
 DeltaVRange hohmannTransferCost_Planet2Moon(const Body* origin, const Body* target, float startAltitude);
 
-float circularizeHyperbolicCost(const Body* origin, const Body* target, float startAltitude, float rmin, bool prograde = true);
+DeltaVRange circularizeHyperbolicCost(const Body* origin, const Body* target, float startAltitude, float rmin, bool prograde = true);
 
 float directionToAnomaly(const Eigen::Vector3f& dir, const Orbit& orbit);
 
-float inclinationCorrectionCost(const Orbit& origin, const Orbit& target);
+DeltaVRange inclinationCorrectionCost(const Orbit& origin, const Orbit& target);
 
 
 
