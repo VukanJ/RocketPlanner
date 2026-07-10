@@ -15,6 +15,9 @@ struct Orbit {
     }
 
     static constexpr Orbit elliptic(const Body* ref, float ap, float pe) {
+        if (pe > ap) {
+            throw std::runtime_error("PE <= AP is required");
+        }
         Orbit o;
         o.parent = ref;
         o.AP = ap;

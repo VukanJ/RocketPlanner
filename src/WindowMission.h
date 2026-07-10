@@ -1,12 +1,13 @@
 #ifndef WINDOW_MISSION
 #define WINDOW_MISSION
 
+#include "DeltaV.h"
 #include "kspConstants.h"
 #include <vector>
 
 struct Mission {
     const Body* originBody = &KspSystem::Kerbin;
-    const Body* destinationBody = &KspSystem::Dres;
+    const Body* destinationBody = &KspSystem::Mun;
     bool oneWayTrip = false;
     bool apolloStyle = true;
 
@@ -33,7 +34,7 @@ struct MissionPhase {
     const Body* refBody2 = nullptr;
     float alt1 = 0;
     float alt2 = 0;
-    float dv = INFINITY;
+    DeltaVRange dv_range;
 
     bool optional = true;
     bool prograde = true;

@@ -83,11 +83,12 @@ bool WindowMission::render() {
     }
     else if (input_phase == InputPhase::Sequence) {
         ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
-        ImGui::Begin("Mission Sequence", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoMove);
+        ImGui::Begin("Mission Sequence", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysVerticalScrollbar);
 
         ImGui::TextColored({1, 1, 0, 1}, "Ctrl+LMB to enter value");
 
-        float dvTotal = 0;
+        float dvTotal_min = 0;
+        float dvTotal_max = 0;
         int updateCostFrom = -1;
 
         for (int i = 0; i < msequence.size(); ++i) {
@@ -95,8 +96,9 @@ bool WindowMission::render() {
             auto& step = msequence.at(i);
             ImGui::Checkbox("##TEST", &step.active); ImGui::SameLine();
             ImGui::BeginDisabled(!step.active);
-            if (step.active) {
-                dvTotal += step.dv;
+            if (step.active && step.dv_range.has_value()) {
+                dvTotal_min += step.dv_range.min;
+                dvTotal_max += step.dv_range.max;
             }
             switch (step.type) {
                 case MissionPhaseType::TAKEOFF:
@@ -108,7 +110,7 @@ bool WindowMission::render() {
                     }
                     break;
                 case MissionPhaseType::CIRCULARIZE_HYPERBOLIC:
-                    ImGui::Text("%i. Circularize hyperbolic orbit at %s", i, step.refBody2->name);
+                    ImGui::Text("%i. Circularize hyperbolic orbit around %s", i, step.refBody2->name);
                     ImGui::Indent();
                     if (ImGui::SliderFloat("##orbit2", &step.alt2, step.refBody2->atmHeight_km, 300, "Target Orbit: %.2f km", ImGuiSliderFlags_Logarithmic)) {
                         step.updateDeltaV();
@@ -119,6 +121,9 @@ bool WindowMission::render() {
                     {
                         ImGui::Text("%i Transfer %s --> %s", i, step.refBody->name, step.refBody2->name);
                         ImGui::Indent();
+                        if (step.dv_range.has_value() && step.dv_range.min == 0) {
+                            ImGui::TextColored({0.5, 0.5, 0.5, 1}, "Δv: Set up by escape burn");
+                        }
                     }
                     break;
                 case MissionPhaseType::INCLINATION_CORRECTION: 
@@ -163,15 +168,25 @@ bool WindowMission::render() {
                     ImGui::Indent();
                     break;
             }
-            if (step.dv > 0) {
-                ImGui::Text("Δv: %.0f m/s", step.dv);
+            if (step.dv_range.min > 0) {
+                if (step.dv_range.single()) {
+                    ImGui::Text("Δv: %.0f m/s", step.dv_range.min);
+                }
+                else {
+                    ImGui::Text("Δv: %.0f - %.0f m/s", step.dv_range.min, step.dv_range.max);
+                }
             }
             ImGui::EndDisabled();
             ImGui::PopID();
             ImGui::Separator();
             ImGui::Unindent();
         }
-        ImGui::TextColored({0.5, 0.5, 1, 1}, "Total Δv: %.2f m/s", dvTotal);
+        if (std::abs(dvTotal_min - dvTotal_max) > 10) {
+            ImGui::TextColored({0.5, 0.5, 1, 1}, "Total Δv: %.2f - %.2f m/s", dvTotal_min, dvTotal_max);
+        }
+        else {
+            ImGui::TextColored({0.5, 0.5, 1, 1}, "Total Δv: %.2f m/s", 0.5f * (dvTotal_min + dvTotal_max));
+        }
         if (ImGui::Button("Go Back")) { 
             endWin = false;
             input_phase = InputPhase::FromTo;
@@ -273,52 +288,52 @@ void WindowMission::updateMissionSequence() {
 void MissionPhase::updateDeltaV() {
     switch (type) {
         case MissionPhaseType::LANDING: 
-            dv = naiveTakeoffLandingCost(refBody, alt1); 
+            dv_range = naiveTakeoffLandingCost(refBody, alt1); 
             break;
         case MissionPhaseType::TAKEOFF: 
-            dv = naiveTakeoffLandingCost(refBody, alt1); 
+            dv_range = naiveTakeoffLandingCost(refBody, alt1); 
             break;
         case MissionPhaseType::ESCAPE:
             if (refBody->orbit.parent == refBody2->orbit.parent) {
                 // Planet to planet, or Moon to Moon
                 // No direct maneuver, since inclination correction might be needed.
-                dv = escapeBurnCost(refBody, alt1);
+                dv_range = escapeBurnCost(refBody, alt1);
             }
             else {
                 // Combine Escape and Hohmann return into a single maneuver
                 // Cost should be the same as for circularizing hyperbolic orbit 
                 // after a Hohmann transfer, just in reverse. (Time-reversal symmetry)
-                dv = circularizeHyperbolicCost(refBody->orbit.parent, refBody, alt2, alt1, true);
+                dv_range = circularizeHyperbolicCost(refBody->orbit.parent, refBody, alt2, alt1, true);
             }
             break;
         case MissionPhaseType::CIRCULARIZE_HYPERBOLIC:
             if (refBody2 && refBody2 == refBody->orbit.parent) {
-                dv = circularizeHyperbolicCost(refBody2, refBody, alt2, alt1, true);
+                dv_range = circularizeHyperbolicCost(refBody2, refBody, alt2, alt1, true);
             } else if (refBody2 && refBody2->orbit.parent == refBody->orbit.parent) {
                 // Planet -> planet
-                dv = circularizeHyperbolicCost(refBody, refBody2, alt1, alt2, true);
+                dv_range = circularizeHyperbolicCost(refBody, refBody2, alt1, alt2, true);
             } else {
-                dv = circularizeHyperbolicCost(refBody, refBody2, alt1, alt2, true);
+                dv_range = circularizeHyperbolicCost(refBody, refBody2, alt1, alt2, true);
             }
             break;
         case MissionPhaseType::HOHMANN_TRANSFER:
             if (refBody2->orbit.parent == refBody) {
-                dv = hohmannTransferCost_Planet2Moon(refBody, refBody2, alt1);
+                dv_range = hohmannTransferCost_Planet2Moon(refBody, refBody2, alt1);
             }
             else if (refBody->orbit.parent == refBody2->orbit.parent) {
-                dv = hohmannTransferCost_Planet2Planet(refBody, refBody2);
+                dv_range = hohmannTransferCost_Planet2Planet(refBody, refBody2);
             }
             break;
         case MissionPhaseType::INCLINATION_CORRECTION:
             if (refBody2 && refBody2->orbit.parent == refBody) {
                 // Planet → moon: ship's parking orbit vs moon's orbit around planet
                 Orbit shipOrbit = Orbit::circular(refBody, alt1 + refBody->radius_km);
-                dv = inclinationCorrectionCost(shipOrbit, refBody2->orbit);
+                dv_range = inclinationCorrectionCost(shipOrbit, refBody2->orbit);
             } else {
                 // Planet → planet: orbits around shared parent
-                dv = inclinationCorrectionCost(refBody->orbit, refBody2->orbit);
+                dv_range = inclinationCorrectionCost(refBody->orbit, refBody2->orbit);
             }
             break;
-        default: dv = 0;
+        default: dv_range = 0;
     }
 }

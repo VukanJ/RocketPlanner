@@ -69,11 +69,27 @@ Orbit getHohmannOrbit(const Body* origin, const Body* target, float startAltitud
     }
 }
 
-float hohmannTransferCost_Planet2Moon(const Body* origin, const Body* target, float startAltitude) {
+Orbit getHohmannOrbit(const Body* center, float R1, float R2) {
+    Orbit he;
+    if (R1 > R2) {
+        std::swap(R1, R2);
+    }
+    he.PE = R1;
+    he.AP = R2;
+
+    float a = 0.5f * (he.PE + he.AP);
+    float b = std::sqrt(he.PE * he.AP);
+    he.eccentricity = std::sqrt(1.0 - b*b / (a*a));
+    he.a_semi = a;
+    he.parent = center;
+    return he;
+}
+
+DeltaVRange hohmannTransferCost_Planet2Moon(const Body* origin, const Body* target, float startAltitude) {
     // Calculate dV range for hohmann transfer
     if (origin != target->orbit.parent) {
         // This is not a Hohmann transfer
-        return -1;
+        return { };
     }
 
     Orbit o_target = target->orbit;
@@ -81,17 +97,23 @@ float hohmannTransferCost_Planet2Moon(const Body* origin, const Body* target, fl
 
     if ((o_origin.PE > o_target.AP && o_origin.AP < o_target.PE) || (o_target.PE > o_origin.AP && o_target.AP < o_origin.PE)) {
         // Orbits intersect
-        return -4;
+        return { };
     }
 
     // Coplanar orbits, one contains the other. Starting orbit is circular
-    Orbit hohmann = getHohmannOrbit(origin, target, startAltitude);
 
-    float dV = hohmann.v_periapsis(unit_mps) - o_origin.v_apoapsis(unit_mps);
-    return dV;
+    auto deltav = [&](float R1, float R2) {
+        Orbit hohmann = getHohmannOrbit(origin, R1, R2);
+        return std::abs(hohmann.v_periapsis(unit_mps) - 1000.0 * std::sqrt(origin->GM() / R1));
+    };
+
+    DeltaVRange dv_range;
+    dv_range.add(deltav(origin->radius_km + startAltitude, target->orbit.PE));
+    dv_range.add(deltav(origin->radius_km + startAltitude, target->orbit.AP));
+    return dv_range;
 }
 
-float hohmannTransferCost_Planet2Planet(const Body* origin, const Body* target) {
+DeltaVRange hohmannTransferCost_Planet2Planet(const Body* origin, const Body* target) {
     if (origin->orbit.parent != target->orbit.parent) {
         // This is not a Planet to planet Hohmann transfer
         return -1;
@@ -105,11 +127,24 @@ float hohmannTransferCost_Planet2Planet(const Body* origin, const Body* target) 
         return -4;
     }
 
-    // Coplanar orbits, one contains the other.
-    Orbit hohmann = getHohmannOrbit(origin, target, 0);
+    auto deltav = [&](float R1, float R2) {
+        Orbit hohmann = getHohmannOrbit(origin->orbit.parent, R1, R2);
+        float dv = 0;
+        if (R1 < R2) {
+            dv = hohmann.v_periapsis(unit_mps) - 1000.0f * std::sqrt(origin->orbit.parent->GM() / R1);
+        }
+        else {
+            dv = hohmann.v_apoapsis(unit_mps) - 1000.0f * std::sqrt(origin->orbit.parent->GM() / R1);
+        }
+        return std::abs(dv);
+    };
 
-    float dV = hohmann.v_periapsis(unit_mps) - o_origin.v_apoapsis(unit_mps);
-    return dV;
+    DeltaVRange dv_range;
+    dv_range.add(deltav(origin->orbit.AP, target->orbit.AP));
+    dv_range.add(deltav(origin->orbit.AP, target->orbit.PE));
+    dv_range.add(deltav(origin->orbit.PE, target->orbit.AP));
+    dv_range.add(deltav(origin->orbit.PE, target->orbit.PE));
+    return dv_range;
 }
 
 float circularizeHyperbolicCost(const Body* origin, const Body* target, float startAltitude, float rmin, bool prograde) {

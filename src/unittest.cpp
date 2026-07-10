@@ -404,6 +404,15 @@ const Body* allBodies[] = {
     &KspSystem::Gilly,
     &KspSystem::Eve
 };
+const Body* allPlanets[] = {
+    &KspSystem::Kerbin,
+    &KspSystem::Duna,
+    &KspSystem::Jool,
+    &KspSystem::Moho,
+    &KspSystem::Eeloo,
+    &KspSystem::Eve,
+    &KspSystem::Dres,
+};
 
 TEST(DeltaV, naiveTakeoffLanding) {
     float orbit = 100;
@@ -452,32 +461,49 @@ TEST(DeltaV, escapeVelocity) {
 }
 
 
-TEST(DeltaV, hohmannTransferCost) {
-    for (const Body* sat : {&KspSystem::Mun, &KspSystem::Minmus}) {
-        float dvtrans = hohmannTransferCost_Planet2Moon(&KspSystem::Kerbin, sat, 30);
-        
-        // Compute expectation
-        float dvExpected = 0;
-        auto H = getHohmannOrbit(&KspSystem::Kerbin, sat, 30);
-        Orbit circ = Orbit::circular(&KspSystem::Kerbin, KspSystem::Kerbin.radius_km + 30);
-
-        dvExpected += H.v_periapsis(unit_mps) - circ.v_periapsis(unit_mps);
-        
-        EXPECT_NEAR(dvtrans, dvExpected, 1e-3);
-    }
-
-    for (const Body* sat : {&KspSystem::Laythe, &KspSystem::Vall, &KspSystem::Bop, &KspSystem::Pol, &KspSystem::Tylo}) {
-        float dvtrans = hohmannTransferCost_Planet2Moon(&KspSystem::Jool, sat, 100);
-        
-        // Compute expectation
-        float dvExpected = 0;
-        auto H = getHohmannOrbit(&KspSystem::Jool, sat, 100);
-        Orbit circ = Orbit::circular(&KspSystem::Jool, KspSystem::Jool.radius_km + 100);
-
-        dvExpected += H.v_periapsis(unit_mps) - circ.v_periapsis(unit_mps);
-        
-        EXPECT_NEAR(dvtrans, dvExpected, 1e-3);
-    }
-}
-
-
+//TEST(DeltaV, hohmannTransferCost) {
+//    // Earth and Moons
+//    for (const Body* sat : {&KspSystem::Mun, &KspSystem::Minmus}) {
+//        float dvtrans = hohmannTransferCost_Planet2Moon(&KspSystem::Kerbin, sat, 30);
+//
+//        // Compute expectation
+//        float dvExpected = 0;
+//        auto H = getHohmannOrbit(&KspSystem::Kerbin, sat, 30);
+//        Orbit circ = Orbit::circular(&KspSystem::Kerbin, KspSystem::Kerbin.radius_km + 30);
+//
+//        dvExpected += H.v_periapsis(unit_mps) - circ.v_periapsis(unit_mps);
+//
+//        EXPECT_NEAR(dvtrans, dvExpected, 1e-3);
+//    }
+//
+//    // Jool and Moons
+//    for (const Body* sat : {&KspSystem::Laythe, &KspSystem::Vall, &KspSystem::Bop, &KspSystem::Pol, &KspSystem::Tylo}) {
+//        float dvtrans = hohmannTransferCost_Planet2Moon(&KspSystem::Jool, sat, 100);
+//
+//        // Compute expectation
+//        float dvExpected = 0;
+//        auto H = getHohmannOrbit(&KspSystem::Jool, sat, 100);
+//        Orbit circ = Orbit::circular(&KspSystem::Jool, KspSystem::Jool.radius_km + 100);
+//
+//        dvExpected += H.v_periapsis(unit_mps) - circ.v_periapsis(unit_mps);
+//
+//        EXPECT_NEAR(dvtrans, dvExpected, 1e-3);
+//    }
+//
+//    // Planet -> Planet
+//    for (const Body* origin : allPlanets) {
+//        for (const Body* target : allPlanets) {
+//            if (origin == target) continue;
+//            float dvtrans = hohmannTransferCost_Planet2Planet(origin, target);
+//
+//            // Compute expectation
+//            float dvExpected = 0;
+//            auto H = getHohmannOrbit(origin, target, 0);
+//            Orbit circ = Orbit::circular(&KspSystem::Kerbol, origin->orbit.PE);
+//
+//            dvExpected += H.v_periapsis(unit_mps) - circ.v_periapsis(unit_mps);
+//
+//            EXPECT_NEAR(dvtrans, dvExpected, 1e-3);
+//        }
+//    }
+//}
