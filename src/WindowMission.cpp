@@ -317,12 +317,7 @@ void MissionPhase::updateDeltaV() {
             }
             break;
         case MissionPhaseType::HOHMANN_TRANSFER:
-            if (refBody2->orbit.parent == refBody) {
-                dv_range = hohmannTransferCost_Planet2Moon(refBody, refBody2, alt1);
-            }
-            else if (refBody->orbit.parent == refBody2->orbit.parent) {
-                dv_range = hohmannTransferCost_Planet2Planet(refBody, refBody2);
-            }
+            dv_range = hohmannTransferCost(refBody, refBody2, alt1);
             break;
         case MissionPhaseType::INCLINATION_CORRECTION:
             if (refBody2 && refBody2->orbit.parent == refBody) {

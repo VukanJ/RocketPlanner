@@ -28,20 +28,17 @@ struct DeltaVRange {
 };
 
 
-float naiveTakeoffLandingCost(const Body* body, float targetAltitudeKm);
-
-float escapeBurnCost(const Body* body, float targetAltitudeKm);
-
-Orbit getHohmannOrbit(const Body* origin, const Body* target, float startAltitude);
-
-DeltaVRange hohmannTransferCost_Planet2Planet(const Body* origin, const Body* target);
-DeltaVRange hohmannTransferCost_Planet2Moon(const Body* origin, const Body* target, float startAltitude);
-
-DeltaVRange circularizeHyperbolicCost(const Body* origin, const Body* target, float startAltitude, float rmin, bool prograde = true);
 
 float directionToAnomaly(const Eigen::Vector3f& dir, const Orbit& orbit);
+Orbit getHohmannOrbit(const Body* origin, const Body* target, float startAltitude);
 
+float naiveTakeoffLandingCost(const Body* body, float targetAltitudeKm);
+float escapeBurnCost(const Body* body, float targetAltitudeKm);
+DeltaVRange hohmannTransferCost(const Body* origin, const Body* target, float startAltitude = 0);
+DeltaVRange circularizeHyperbolicCost(const Body* origin, const Body* target, float startAltitude, float rmin, bool prograde = true);
 DeltaVRange inclinationCorrectionCost(const Orbit& origin, const Orbit& target);
+
+
 
 
 
