@@ -87,6 +87,20 @@ bool WindowMission::render() {
 
         ImGui::TextColored({1, 1, 0, 1}, "Ctrl+LMB to enter value");
 
+        ImGui::PushStyleColor(ImGuiCol_CheckMark, ImVec4(1.0f, 0.6f, 0.0f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.3f, 0.15f, 0.0f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(0.4f, 0.2f, 0.0f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0.4f, 0.2f, 0.0f, 1.0f));
+        if (ImGui::Checkbox("Oberth effect", &oberth)) {
+            updateMissionSequence();
+        }
+        ImGui::SameLine();
+        ImGui::TextDisabled("(?)");
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Assume interplanetary burns performed in low orbit. Saves Δv via Oberth effect.");
+        }
+        ImGui::PopStyleColor(4);
+
         float dvTotal_min = 0;
         float dvTotal_max = 0;
         int updateCostFrom = -1;
@@ -157,6 +171,10 @@ bool WindowMission::render() {
                     break;
                 case MissionPhaseType::ESCAPE: 
                     ImGui::Text("%i. Escape from %s", i, step.refBody->name);
+                    ImGui::Indent();
+                    break;
+                case MissionPhaseType::ORBITAL_INSERTION: 
+                    ImGui::Text("%i. Direct orbital transfer to %s", i, step.refBody2->name);
                     ImGui::Indent();
                     break;
                 case MissionPhaseType::MINING: 
@@ -249,9 +267,14 @@ void WindowMission::updateMissionSequence() {
         else {
             if (to->orbit.parent == from->orbit.parent) {
                 // Planet to planet — both orbit the same parent body
-                msequence.push_back(MissionPhase { MissionPhaseType::ESCAPE, from, to, startOrbit, destOrbit });
-                if (to->orbit.inclination != from->orbit.inclination) {
-                    msequence.push_back(MissionPhase { MissionPhaseType::INCLINATION_CORRECTION, from, to, startOrbit });
+                if (oberth) {
+                    msequence.push_back(MissionPhase { MissionPhaseType::ORBITAL_INSERTION, from, to, startOrbit, destOrbit });
+                }
+                else {
+                    msequence.push_back(MissionPhase { MissionPhaseType::ESCAPE, from, to, startOrbit, destOrbit });
+                    if (to->orbit.inclination != from->orbit.inclination) {
+                        msequence.push_back(MissionPhase { MissionPhaseType::INCLINATION_CORRECTION, from, to, startOrbit });
+                    }
                 }
             }
             if (to == from->orbit.parent) {
@@ -264,7 +287,9 @@ void WindowMission::updateMissionSequence() {
                     msequence.push_back(MissionPhase { MissionPhaseType::INCLINATION_CORRECTION, from, to, startOrbit });
                 }
             }
-            msequence.push_back(MissionPhase::hohmann(from, to, startOrbit, destOrbit));
+            if (!oberth) {
+                msequence.push_back(MissionPhase::hohmann(from, to, startOrbit, destOrbit));
+            }
         }
         if (to->atmHeight_km > 0) {
             msequence.push_back(MissionPhase { MissionPhaseType::ATMOSPHERIC_BREAKING, to, nullptr, reentryPE });
@@ -318,6 +343,9 @@ void MissionPhase::updateDeltaV() {
             break;
         case MissionPhaseType::HOHMANN_TRANSFER:
             dv_range = hohmannTransferCost(refBody, refBody2, alt1);
+            break;
+        case MissionPhaseType::ORBITAL_INSERTION:
+            dv_range = orbitalInsertion(refBody, refBody2, alt1);
             break;
         case MissionPhaseType::INCLINATION_CORRECTION:
             if (refBody2 && refBody2->orbit.parent == refBody) {

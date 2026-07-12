@@ -7,7 +7,7 @@
 
 struct Mission {
     const Body* originBody = &KspSystem::Kerbin;
-    const Body* destinationBody = &KspSystem::Mun;
+    const Body* destinationBody = &KspSystem::Moho;
     bool oneWayTrip = false;
     bool apolloStyle = true;
 
@@ -23,6 +23,7 @@ enum class MissionPhaseType {
     ATMOSPHERIC_BREAKING,
     LANDING_PARACHUTES,
     INCLINATION_CORRECTION,
+    ORBITAL_INSERTION, // Combines ESCAPE, INCLINATION_CORRECTION and HOHMANN_TRANSFER using Oberth effect
     LANDING,
     MINING,
     ORBITAL_REFUELING,
@@ -65,6 +66,7 @@ public:
     enum class InputPhase { FromTo, Sequence } input_phase = WindowMission::InputPhase::FromTo;
 
     std::vector<MissionPhase> msequence;
+    bool oberth = false;
 };
 
 #endif // WINDOW_MISSION

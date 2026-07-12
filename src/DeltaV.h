@@ -37,9 +37,6 @@ float escapeBurnCost(const Body* body, float targetAltitudeKm);
 DeltaVRange hohmannTransferCost(const Body* origin, const Body* target, float startAltitude = 0);
 DeltaVRange circularizeHyperbolicCost(const Body* origin, const Body* target, float startAltitude, float rmin, bool prograde = true);
 DeltaVRange inclinationCorrectionCost(const Orbit& origin, const Orbit& target);
-
-
-
-
+DeltaVRange orbitalInsertion(const Body* origin, const Body* target, float startAltitude);
 
 #endif // DELTAV_H

@@ -1,6 +1,7 @@
 #include "DeltaV.h"
 
 #include <cmath>
+#include <numbers>
 #include "utils.h"
 #include "eigen3/Eigen/Geometry"
 
@@ -212,6 +213,17 @@ DeltaVRange inclinationCorrectionCost(const Orbit& origin, const Orbit& target) 
     DeltaVRange dv_range;
     dv_range.add(unit_mps * dV_a);
     dv_range.add(unit_mps * dV_b);
+    return dv_range;
+}
+
+DeltaVRange orbitalInsertion(const Body* origin, const Body* target, float startAltitude) {
+    DeltaVRange v_infinity = hohmannTransferCost(origin, target, 0);
+    float v_circ = unit_mps * std::sqrt(origin->GM() / (startAltitude + origin->radius_km));
+    float v_escape = std::numbers::sqrt2 * v_circ;
+
+    DeltaVRange dv_range;
+    dv_range.add(std::abs(std::sqrt(v_infinity.max * v_infinity.max + v_escape * v_escape) - v_circ));
+    dv_range.add(std::abs(std::sqrt(v_infinity.min * v_infinity.min + v_escape * v_escape) - v_circ));
     return dv_range;
 }
 
