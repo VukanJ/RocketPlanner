@@ -224,6 +224,7 @@ DeltaVRange inclinationCorrectionCost(const Orbit& origin, const Orbit& target) 
 }
 
 DeltaVRange orbitalInsertion(const Body* origin, const Body* target, float startAltitude) {
+    // Rough estimate of cost to burn from origin LO to intersect target. Neglects inclination correction
     DeltaVRange v_infinity = hohmannTransferCost(origin, target, 0);
     float v_circ = unit_mps * std::sqrt(origin->GM_km3s2 / (startAltitude + origin->radius_km));
     float v_escape = std::numbers::sqrt2 * v_circ;
