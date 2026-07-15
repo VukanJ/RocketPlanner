@@ -27,8 +27,6 @@ struct DeltaVRange {
     float max = -INFINITY;
 };
 
-
-
 float directionToAnomaly(const Eigen::Vector3f& dir, const Orbit& orbit);
 Orbit getHohmannOrbit(const Body* center, float R1, float R2);
 

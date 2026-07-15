@@ -527,8 +527,14 @@ TEST(DeltaV, hohmannTransferCost) {
             // Compute expectation
             auto Hmax = getHohmannOrbit(origin->orbit.parent, origin->orbit.PE, target->orbit.AP);
             auto Hmin = getHohmannOrbit(origin->orbit.parent, origin->orbit.AP, target->orbit.PE);
-            float dv1 = std::abs(Hmax.v_periapsis(unit_mps) - origin->orbit.v_periapsis(unit_mps));
-            float dv2 = std::abs(Hmin.v_periapsis(unit_mps) - origin->orbit.v_apoapsis(unit_mps));
+            float dv1, dv2;
+            if (target->orbit.a_semi < origin->orbit.a_semi) {
+                dv1 = std::abs(Hmax.v_apoapsis(unit_mps) - origin->orbit.v_periapsis(unit_mps));
+                dv2 = std::abs(Hmin.v_apoapsis(unit_mps) - origin->orbit.v_apoapsis(unit_mps));
+            } else {
+                dv1 = std::abs(Hmax.v_periapsis(unit_mps) - origin->orbit.v_periapsis(unit_mps));
+                dv2 = std::abs(Hmin.v_periapsis(unit_mps) - origin->orbit.v_apoapsis(unit_mps));
+            }
             EXPECT_NEAR(dvtrans.max, std::max(dv1, dv2), 1e-3);
             EXPECT_NEAR(dvtrans.min, std::min(dv1, dv2), 1e-3);
         }

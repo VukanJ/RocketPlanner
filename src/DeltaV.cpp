@@ -79,8 +79,14 @@ DeltaVRange hohmannTransferCost(const Body* origin, const Body* target, float st
         const Body* center = origin->orbit.parent;
         Orbit o_p2a = getHohmannOrbit(center, origin->orbit.PE, target->orbit.AP);
         Orbit o_a2p = getHohmannOrbit(center, origin->orbit.AP, target->orbit.PE);
-        dv_range.add(std::abs(o_p2a.v_periapsis(unit_mps) - origin->orbit.v_periapsis(unit_mps)));
-        dv_range.add(std::abs(o_a2p.v_periapsis(unit_mps) - origin->orbit.v_apoapsis(unit_mps)));
+        if (target->orbit.a_semi < origin->orbit.a_semi) {
+            dv_range.add(std::abs(o_p2a.v_apoapsis(unit_mps) - origin->orbit.v_periapsis(unit_mps)));
+            dv_range.add(std::abs(o_a2p.v_apoapsis(unit_mps) - origin->orbit.v_apoapsis(unit_mps)));
+        }
+        else {
+            dv_range.add(std::abs(o_p2a.v_periapsis(unit_mps) - origin->orbit.v_periapsis(unit_mps)));
+            dv_range.add(std::abs(o_a2p.v_periapsis(unit_mps) - origin->orbit.v_apoapsis(unit_mps)));
+        }
     }
     else {
         return { };
