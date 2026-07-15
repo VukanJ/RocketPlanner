@@ -30,7 +30,7 @@ struct DeltaVRange {
 
 
 float directionToAnomaly(const Eigen::Vector3f& dir, const Orbit& orbit);
-Orbit getHohmannOrbit(const Body* origin, const Body* target, float startAltitude);
+Orbit getHohmannOrbit(const Body* center, float R1, float R2);
 
 float naiveTakeoffLandingCost(const Body* body, float targetAltitudeKm);
 float escapeBurnCost(const Body* body, float targetAltitudeKm);

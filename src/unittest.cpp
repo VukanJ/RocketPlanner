@@ -444,28 +444,30 @@ TEST(DeltaV, naiveTakeoffLanding) {
     }
 }
 
-//TEST(DeltaV, getHohmannOrbit) {
-//    // Kerbin -> Mun, Minmus
-//    for (const Body* sat : {&KspSystem::Mun, &KspSystem::Minmus}) {
-//        auto H = getHohmannOrbit(&KspSystem::Kerbin, sat, 30);
-//        EXPECT_NEAR(H.PE, KspSystem::Kerbin.radius_km + 30, 1e-3);
-//        EXPECT_NEAR(H.AP, sat->orbit.AP, 1e-3);
-//        EXPECT_NEAR(H.a_semi, 0.5f * (H.AP + H.PE), 1e-3);
-//        EXPECT_NEAR(H.v_periapsis(unit_kmps), std::sqrt(KspSystem::Kerbin.GM_km3s2 * (2.0 / H.PE - 1.0 / H.a_semi)), 1e-3);
-//        EXPECT_NEAR(H.v_apoapsis(unit_kmps), std::sqrt(KspSystem::Kerbin.GM_km3s2 * (2.0 / H.AP - 1.0 / H.a_semi)), 1e-3);
-//    }
-//
-//    // Jool -> Moons
-//    for (const Body* sat : {&KspSystem::Laythe, &KspSystem::Vall, &KspSystem::Bop, &KspSystem::Pol, &KspSystem::Tylo}) {
-//        auto H = getHohmannOrbit(&KspSystem::Jool, sat, 100);
-//        EXPECT_NEAR(H.PE, KspSystem::Jool.radius_km + 100, 1e-3);
-//        EXPECT_NEAR(H.AP, sat->orbit.AP, 1e-3);
-//        EXPECT_NEAR(H.a_semi, 0.5f * (H.AP + H.PE), 1e-2);
-//        EXPECT_NEAR(H.v_periapsis(unit_kmps), std::sqrt(KspSystem::Jool.GM_km3s2 * (2.0 / H.PE - 1.0 / H.a_semi)), 1e-3);
-//        EXPECT_NEAR(H.v_apoapsis(unit_kmps), std::sqrt(KspSystem::Jool.GM_km3s2 * (2.0 / H.AP - 1.0 / H.a_semi)), 1e-3);
-//    }
-//}
-//
+TEST(DeltaV, getHohmannOrbit) {
+    // Kerbin -> Mun, Minmus
+    for (const Body* sat : {&KspSystem::Mun, &KspSystem::Minmus}) {
+        float R1 = KspSystem::Kerbin.radius_km + 30.0f;
+        float R2 = sat->orbit.AP;
+        auto H = getHohmannOrbit(&KspSystem::Kerbin, R1, R2);
+        EXPECT_NEAR(H.PE, R1, 1e-3);
+        EXPECT_NEAR(H.AP, R2, 1e-3);
+        EXPECT_NEAR(H.a_semi, 0.5f * (H.AP + H.PE), 1e-3);
+        EXPECT_NEAR(H.v_periapsis(unit_kmps), std::sqrt(KspSystem::Kerbin.GM_km3s2 * (2.0 / H.PE - 1.0 / H.a_semi)), 1e-3);
+        EXPECT_NEAR(H.v_apoapsis(unit_kmps), std::sqrt(KspSystem::Kerbin.GM_km3s2 * (2.0 / H.AP - 1.0 / H.a_semi)), 1e-3);
+    }
+
+    //// Jool -> Moons
+    //for (const Body* sat : {&KspSystem::Laythe, &KspSystem::Vall, &KspSystem::Bop, &KspSystem::Pol, &KspSystem::Tylo}) {
+    //    auto H = getHohmannOrbit(&KspSystem::Jool, sat, 100);
+    //    EXPECT_NEAR(H.PE, KspSystem::Jool.radius_km + 100, 1e-3);
+    //    EXPECT_NEAR(H.AP, sat->orbit.AP, 1e-3);
+    //    EXPECT_NEAR(H.a_semi, 0.5f * (H.AP + H.PE), 1e-2);
+    //    EXPECT_NEAR(H.v_periapsis(unit_kmps), std::sqrt(KspSystem::Jool.GM_km3s2 * (2.0 / H.PE - 1.0 / H.a_semi)), 1e-3);
+    //    EXPECT_NEAR(H.v_apoapsis(unit_kmps), std::sqrt(KspSystem::Jool.GM_km3s2 * (2.0 / H.AP - 1.0 / H.a_semi)), 1e-3);
+    //}
+}
+
 //TEST(DeltaV, escapeVelocity) {
 //    Orbit circ = Orbit::circular(&KspSystem::Kerbin, 30 + KspSystem::Kerbin.radius_km);
 //    float dv = escapeBurnCost(&KspSystem::Kerbin, 30);
