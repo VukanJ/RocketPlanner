@@ -68,7 +68,7 @@ DeltaVRange hohmannTransferCost(const Body* origin, const Body* target, float st
         const Body* center = origin;
         float GM = center->GM_km3s2;
         float R1 = startAltitude + origin->radius_km;
-        float v_circ = 1000.0f * std::sqrt(GM / R1);
+        float v_circ = unit_mps * std::sqrt(GM / R1);
         Orbit h1 = getHohmannOrbit(center, R1, target->orbit.PE);
         Orbit h2 = getHohmannOrbit(center, R1, target->orbit.AP);
         dv_range.add(std::abs(h1.v_periapsis(unit_mps) - v_circ));
@@ -79,7 +79,6 @@ DeltaVRange hohmannTransferCost(const Body* origin, const Body* target, float st
         const Body* center = origin->orbit.parent;
         Orbit o_p2a = getHohmannOrbit(center, origin->orbit.PE, target->orbit.AP);
         Orbit o_a2p = getHohmannOrbit(center, origin->orbit.AP, target->orbit.PE);
-
         dv_range.add(std::abs(o_p2a.v_periapsis(unit_mps) - origin->orbit.v_periapsis(unit_mps)));
         dv_range.add(std::abs(o_a2p.v_periapsis(unit_mps) - origin->orbit.v_apoapsis(unit_mps)));
     }
@@ -91,44 +90,57 @@ DeltaVRange hohmannTransferCost(const Body* origin, const Body* target, float st
 
 DeltaVRange circularizeHyperbolicCost(const Body* origin, const Body* target, float startAltitude, float rmin, bool prograde) {
     rmin += target->radius_km;
-    float alpha = target->GM_km3s2;
-    float vCircular = std::sqrt(alpha / rmin);
-
-    auto computeCost = [&](float v_transfer, float vTarget) -> float {
-        float v0 = prograde ? (vTarget - v_transfer) : (vTarget + v_transfer);
-        float eps = 0.5f * v0 * v0 - alpha / target->R_SOI_km;
-        float vmax = std::sqrt(2.0f * (eps + alpha / rmin));
-        return unit_mps * std::abs(vmax - vCircular);
-    };
-
     DeltaVRange dv_range;
 
-    if (origin->orbit.parent == target->orbit.parent) {
-        // Planet -> planet: sweep all four (R1, R2) combinations
-        const Body* center = origin->orbit.parent;
-        float GM = center->GM_km3s2;
-        for (float R1 : {origin->orbit.PE, origin->orbit.AP}) {
-            for (float R2 : {target->orbit.PE, target->orbit.AP}) {
-                Orbit hohmann = getHohmannOrbit(center, R1, R2);
-                float v_transfer = std::sqrt(GM * (2.0f / R2 - 1.0f / hohmann.a_semi));
-                float vTarget    = std::sqrt(GM * (2.0f / R2 - 1.0f / target->orbit.a_semi));
-                dv_range.add(computeCost(v_transfer, vTarget));
-            }
-        }
-    }
-    else if (origin == target->orbit.parent) {
-        // Planet -> moon: fixed departure, sweep target PE/AP
-        float R1 = startAltitude + origin->radius_km;
-        float GM = origin->GM_km3s2;
-        for (float R2 : {target->orbit.PE, target->orbit.AP}) {
-            Orbit hohmann = getHohmannOrbit(origin, R1, R2);
-            float v_transfer = std::sqrt(GM * (2.0f / R2 - 1.0f / hohmann.a_semi));
-            float vTarget    = std::sqrt(GM * (2.0f / R2 - 1.0f / target->orbit.a_semi));
-            dv_range.add(computeCost(v_transfer, vTarget));
-        }
-    }
+    auto dV_cost_mps = [&](float v_rocket, float v_target) {
+        float v0 = prograde ? v_target - v_rocket : v_target + v_rocket; // Initial relative velocity to target
+        float eps = 0.5f * v0 * v0 - target->GM_km3s2 / target->R_SOI_km;  // Specific energy upon entering SOI of target
+        float v_p = std::sqrt(2.0 * (eps + target->GM_km3s2 / rmin));  // Velocity at periapsis of hyperbolic orbit
+        return unit_mps * (v_p - std::sqrt(target->GM_km3s2 / rmin));
+    };
 
-    return dv_range;
+    if (origin->orbit.parent == target->orbit.parent) { 
+        // Planet to planet transfer
+        Orbit hoh_p2a = getHohmannOrbit(origin->orbit.parent, origin->orbit.PE, target->orbit.AP);
+        Orbit hoh_a2p = getHohmannOrbit(origin->orbit.parent, origin->orbit.AP, target->orbit.PE);
+
+        float v_target_AP = target->orbit.v_apoapsis(unit_kmps);
+        float v_target_PE = target->orbit.v_periapsis(unit_kmps);
+
+        float v_rocket_p2a;
+        float v_rocket_a2p;
+        if (target->orbit.a_semi < origin->orbit.a_semi) {
+            v_rocket_p2a = hoh_p2a.v_periapsis(unit_kmps);
+            v_rocket_a2p = hoh_a2p.v_periapsis(unit_kmps);
+        }
+        else {
+            v_rocket_p2a = hoh_p2a.v_apoapsis(unit_kmps);
+            v_rocket_a2p = hoh_a2p.v_apoapsis(unit_kmps);
+        }
+
+        dv_range.add(dV_cost_mps(v_rocket_p2a, v_target_AP));
+        dv_range.add(dV_cost_mps(v_rocket_a2p, v_target_PE));
+        return dv_range;
+    }
+    else if (origin == target->orbit.parent) { 
+        // Planet to child moon transfer
+        Orbit hoh_2pe = getHohmannOrbit(origin, startAltitude + origin->radius_km, target->orbit.PE);
+        Orbit hoh_2ap = getHohmannOrbit(origin, startAltitude + origin->radius_km, target->orbit.AP);
+
+        // Get min max moon orbital speeds
+        float v_target_AP = target->orbit.v_apoapsis(unit_kmps);
+        float v_target_PE = target->orbit.v_periapsis(unit_kmps);
+
+        float v_rocket_AP = hoh_2ap.v_apoapsis(unit_kmps);
+        float v_rocket_PE = hoh_2pe.v_apoapsis(unit_kmps);
+
+        dv_range.add(dV_cost_mps(v_rocket_AP, v_target_AP));
+        dv_range.add(dV_cost_mps(v_rocket_PE, v_target_PE));
+        return dv_range;
+    }
+    else { 
+        return { };
+    }
 }
 
 float directionToAnomaly(const Eigen::Vector3f& dir, const Orbit& orbit) {
