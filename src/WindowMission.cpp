@@ -239,6 +239,8 @@ bool WindowMission::render() {
         ImGui::End();
     }
 
+    systemMap.render(mission);
+
     return endWin;
 }
 

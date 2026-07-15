@@ -25,6 +25,7 @@ set(ROCKET_SOURCES
   src/FlightSimulator.cpp
   src/gui.cpp
   src/WindowMission.cpp
+  src/SystemMap.cpp
 )
 
 # ---- Agave Font ----

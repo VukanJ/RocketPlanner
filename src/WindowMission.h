@@ -2,6 +2,7 @@
 #define WINDOW_MISSION
 
 #include "DeltaV.h"
+#include "SystemMap.h"
 #include "kspConstants.h"
 #include <vector>
 
@@ -67,6 +68,7 @@ public:
 
     std::vector<MissionPhase> msequence;
     bool oberth = false;
+    SystemMap systemMap;
 };
 
 #endif // WINDOW_MISSION
