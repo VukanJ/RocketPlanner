@@ -12,6 +12,9 @@ auto inline constexpr deg2rad(auto f) {
     return f * M_PI / 180.0;
 }
 
+using vec2f = Eigen::Vector2f;
+using vec3f = Eigen::Vector3f;
+
 inline std::string partTypeToDisplayName(PartType type) {
     switch (type) {
         case PartType::CrewedCommandPod: return "Crewed Command Pod";

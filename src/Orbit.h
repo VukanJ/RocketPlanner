@@ -2,7 +2,10 @@
 #define ORBIT_H
 
 #include "Eigen/Core"
+#include <utility>
 struct Body;
+
+using vec3f = Eigen::Vector3f;
 
 struct Orbit {
     static constexpr Orbit circular(const Body* ref, float R) {
@@ -30,7 +33,6 @@ struct Orbit {
         return o;
     }
 
-
     const Body* parent = nullptr;
     float LAN = 0;  // Longitude of ascending node
     float LDN = 180;  // Longitude of descending node
@@ -47,5 +49,7 @@ struct Orbit {
     float v_apoapsis(float unit) const;
     float v_periapsis(float unit) const;
 };
+
+std::pair<vec3f, vec3f> get_local_position(const Orbit& o);
 
 #endif // ORBIT_H

@@ -97,6 +97,7 @@ static void run_interactive() {
 int main(int argc, char** argv) {
     CmdArgs args;
     args.add_flag("-i", "Open interactive GUI window");
+    args.add_flag("-x", "Debug mode");
     args.add_flag("--interactive", "Open interactive GUI window");
 
     if (!args(argc, argv)) {
@@ -105,6 +106,13 @@ int main(int argc, char** argv) {
         return EXIT_FAILURE;
     }
     if (args.is_flag_set("-h") || args.is_flag_set("--help")) {
+        return EXIT_SUCCESS;
+    }
+
+    if (args.is_flag_set("-x")) {
+        auto init = get_local_position(KspSystem::Kerbin.orbit);
+        std::cout << "Initial position: " << init.first.transpose() << std::endl;
+        std::cout << "Initial velocity: " << init.second.transpose() << std::endl;
         return EXIT_SUCCESS;
     }
 

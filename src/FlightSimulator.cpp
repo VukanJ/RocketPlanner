@@ -49,12 +49,12 @@ void FlightSimulator::simulate_launch(const Body& body, const RocketConfig& rock
             flowRate = (currentStage.m0 - currentStage.mf) / currentStage.burnTime;
         }
 
-        float R = std::sqrt(pos.x*pos.x + pos.y*pos.y);
+        float R = std::sqrt(pos.x()*pos.x() + pos.y()*pos.y());
         float altitude = R - body.radius_km;
         float pressure = body.getPressureAtAltitude_km(altitude);
 
         float g_mag = body.surfaceGravity * std::pow(body.radius_km / R, 2);
-        vec2f grav = {-g_mag * pos.x / R, -g_mag * pos.y / R};
+        vec2f grav = {-g_mag * pos.x() / R, -g_mag * pos.y() / R};
 
         // Calculate current, pressure dependent thrust
         float isp = currentStage.engine->enginePerf.getISP(pressure);
@@ -62,8 +62,8 @@ void FlightSimulator::simulate_launch(const Body& body, const RocketConfig& rock
         float thrust = (isp / ispVac) * currentStage.engine->MaxThrustkN * currentStage.nEngines;
 
         // Calculate rocket orientation w.r.t planet center
-        vec2f up {pos.x / R, pos.y / R};
-        vec2f east {up.y, -up.x};
+        vec2f up {pos.x() / R, pos.y() / R};
+        vec2f east {up.y(), -up.x()};
 
         // Altitude-based turn schedule
         float turnEnd  = std::max(body.atmHeight_km, gtClimbAlt + 0.1f);
@@ -78,27 +78,27 @@ void FlightSimulator::simulate_launch(const Body& body, const RocketConfig& rock
         // TWR dominates later. Smoothly transitions with progress.
         float pitch_angle = schedulePitch * (1.0f - progress) + twrPitch * progress;
 
-        dir.x = cos(pitch_angle) * up.x + sin(pitch_angle) * east.x;
-        dir.y = cos(pitch_angle) * up.y + sin(pitch_angle) * east.y;
+        dir.x() = cos(pitch_angle) * up.x() + sin(pitch_angle) * east.x();
+        dir.y() = cos(pitch_angle) * up.y() + sin(pitch_angle) * east.y();
 
         mass -= flowRate * dt;
         float A = currentStage.area_m2;
         float air_density = (body.seaLevel_atm > 0) ? pressure * body.sea_level_density_kgpm3 / body.seaLevel_atm : 0.0;
-        float speed = std::sqrtf(vel.x * vel.x + vel.y * vel.y);
+        float speed = std::sqrtf(vel.x() * vel.x() + vel.y() * vel.y());
         float drag_mag = 0.5 * air_density * speed * speed * A * Cd;
         vec2f drag_accel {0, 0};
         if (speed > 1e-6) {
-            float ax = (-drag_mag / (mass * 1000.0) * vel.x / speed);
-            float ay = (-drag_mag / (mass * 1000.0) * vel.y / speed);
+            float ax = (-drag_mag / (mass * 1000.0) * vel.x() / speed);
+            float ay = (-drag_mag / (mass * 1000.0) * vel.y() / speed);
             drag_accel = {ax, ay};
         }
 
-        float accel_x = thrust * dir.x / mass + drag_accel.x + grav.x;
-        float accel_y = thrust * dir.y / mass + drag_accel.y + grav.y;
-        vel.x += accel_x * dt;
-        vel.y += accel_y * dt;
-        pos.x += vel.x * dt / 1000.0;
-        pos.y += vel.y * dt / 1000.0;
+        float accel_x = thrust * dir.x() / mass + drag_accel.x() + grav.x();
+        float accel_y = thrust * dir.y() / mass + drag_accel.y() + grav.y();
+        vel.x() += accel_x * dt;
+        vel.y() += accel_y * dt;
+        pos.x() += vel.x() * dt / 1000.0;
+        pos.y() += vel.y() * dt / 1000.0;
 
         const float APO = getOrbitExtent<Apoapsis>(pos, vel, R, GM) - body.radius_km;
         const float PER = getOrbitExtent<Periapsis>(pos, vel, R, GM) - body.radius_km;
@@ -139,10 +139,10 @@ void FlightSimulator::simulate_launch(const Body& body, const RocketConfig& rock
             flight_data.t.push_back(elapsed);
             flight_data.altitude_km.push_back(altitude);
             flight_data.velocity_ms.push_back(speed);
-            flight_data.vx_ms.push_back(vel.x);
-            flight_data.vy_ms.push_back(vel.y);
-            flight_data.posx_km.push_back(pos.x);
-            flight_data.posy_km.push_back(pos.y);
+            flight_data.vx_ms.push_back(vel.x());
+            flight_data.vy_ms.push_back(vel.y());
+            flight_data.posx_km.push_back(pos.x());
+            flight_data.posy_km.push_back(pos.y());
             flight_data.thrust_kN.push_back(thrust);
             flight_data.mass_t.push_back(mass);
             flight_data.pressure_atm.push_back(pressure);

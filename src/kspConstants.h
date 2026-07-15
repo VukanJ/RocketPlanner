@@ -25,20 +25,21 @@ struct Body {
     const char* name;
     const float radius_km;
     const float R_SOI_km; // sphere of influence in km
-    const float surfaceGravity;
+    const double surfaceGravity;
     const float seaLevel_atm; // in atm
     const float atmHeight_km;
     const float atm_falloff_km; // Approximate atm scale parameter
     const float sea_level_density_kgpm3;
     const float rotPeriod_s;
+    const double GM_km3s2;
     const Orbit orbit;
 
     inline bool hasAtmosphere() const {
         return seaLevel_atm > 0;
     }
 
-    inline float GM() const {
-        return (surfaceGravity / 1000.0) * radius_km * radius_km;
+    inline double GM() const {
+        return GM_km3s2;
     }
 
     float getPressureAtAltitude_km(float altitude) const {
@@ -61,6 +62,7 @@ namespace KspSystem {
         .atm_falloff_km          = 0.0f,
         .sea_level_density_kgpm3 = 0.0f,
         .rotPeriod_s             = 432000.0f,
+        .GM_km3s2                = 1172332800.0,
         .orbit                   = {} };
     constexpr inline Body Moho   { 
         .name                    = "Moho",
@@ -72,11 +74,12 @@ namespace KspSystem {
         .atm_falloff_km          = 0.0f,
         .sea_level_density_kgpm3 = 0.0f,
         .rotPeriod_s             = 1210000,
+        .GM_km3s2                = 168.609,
         .orbit={.parent=&KspSystem::Kerbol,
                 .LAN                 = 70.0f,
                 .LDN                 = 250.0f,
                 .argumentOfPeriapsis = 15.0f,
-                .meanAnomaly         = 3.14f,
+                .meanAnomaly         = M_PI,
                 .AP                  = 6315765.965,
                 .PE                  = 4210510.643,
                 .a_semi              = 5263138.304,
@@ -93,11 +96,12 @@ namespace KspSystem {
         .atm_falloff_km          = 8.6720f,
         .sea_level_density_kgpm3 = 6.23837138885624f,
         .rotPeriod_s             = 80500,
+        .GM_km3s2                = 8171.752772,
         .orbit={.parent=&KspSystem::Kerbol,
                 .LAN                 = 15.0f,
                 .LDN                 = 195.0f,
                 .argumentOfPeriapsis = 0.0f,
-                .meanAnomaly         = 3.14f,
+                .meanAnomaly         = M_PI,
                 .AP                  = 9931011.389,
                 .PE                  = 9734357.699,
                 .a_semi              = 9832684.544,
@@ -114,6 +118,7 @@ namespace KspSystem {
         .atm_falloff_km          = 0.0f,
         .sea_level_density_kgpm3 = 0.0f,
         .rotPeriod_s             = 28255,
+        .GM_km3s2                = 0.008289,
         .orbit={.parent=&KspSystem::Eve,   
                 .LAN                 = 80.0f,
                 .LDN                 = 260.0f,
@@ -135,11 +140,12 @@ namespace KspSystem {
         .atm_falloff_km          = 5.9235f,
         .sea_level_density_kgpm3 = 1.22497705725583f,
         .rotPeriod_s             = 21549.4251830898,
+        .GM_km3s2                = 3531.600000,
         .orbit={.parent=&KspSystem::Kerbol,
                 .LAN                 = 0.0f,
                 .LDN                 = 180.0f,
                 .argumentOfPeriapsis = 0.0f,
-                .meanAnomaly         = 3.14f,
+                .meanAnomaly         = M_PI,
                 .AP                  = 13599840.256,
                 .PE                  = 13599840.256,
                 .a_semi              = 13599840.256,
@@ -156,6 +162,7 @@ namespace KspSystem {
         .atm_falloff_km          = 0.0f,
         .sea_level_density_kgpm3 = 0.0f,
         .rotPeriod_s             = 138984.376574476,
+        .GM_km3s2                = 65.138398,
         .orbit={.parent=&KspSystem::Kerbin,
                 .LAN                 = 0.0f,
                 .LDN                 = 180.0f,
@@ -177,6 +184,7 @@ namespace KspSystem {
         .atm_falloff_km          = 0.0f,
         .sea_level_density_kgpm3 = 0.0f,
         .rotPeriod_s             = 40400,
+        .GM_km3s2                = 1.765800,
         .orbit={.parent=&KspSystem::Kerbin,
                 .LAN                 = 78.0f,
                 .LDN                 = 258.0f,
@@ -198,11 +206,12 @@ namespace KspSystem {
         .atm_falloff_km          = 6.9421f,
         .sea_level_density_kgpm3 = 0.149935108881759f,
         .rotPeriod_s             = 65517.859375,
+        .GM_km3s2                = 300.984422,
         .orbit={.parent=&KspSystem::Kerbol,
                 .LAN                 = 135.5f,
                 .LDN                 = 315.5f,
                 .argumentOfPeriapsis = 0.0f,
-                .meanAnomaly         = 3.14f,
+                .meanAnomaly         = M_PI,
                 .AP                  = 21783189.181,
                 .PE                  = 19669121.346,
                 .a_semi              = 20726155.264,
@@ -219,6 +228,7 @@ namespace KspSystem {
         .atm_falloff_km          = 0.0f,
         .sea_level_density_kgpm3 = 0.0f,
         .rotPeriod_s             = 65517.8621348081,
+        .GM_km3s2                = 18.590000,
         .orbit={.parent=&KspSystem::Duna,  
                 .LAN                 = 0.0f,
                 .LDN                 = 180.0f,
@@ -240,11 +250,12 @@ namespace KspSystem {
         .atm_falloff_km          = 0.0f,
         .sea_level_density_kgpm3 = 0.0f,
         .rotPeriod_s             = 34800,
+        .GM_km3s2                = 21.484,
         .orbit={.parent=&KspSystem::Kerbol,
                 .LAN                 = 280.0f,
                 .LDN                 = 100.0f,
                 .argumentOfPeriapsis = 90.0f,
-                .meanAnomaly         = 3.14f,
+                .meanAnomaly         = M_PI,
                 .AP                  = 46761053.692,
                 .PE                  = 34917642.714,
                 .a_semi              = 40839348.203,
@@ -261,6 +272,7 @@ namespace KspSystem {
         .atm_falloff_km          = 10.0f,
         .sea_level_density_kgpm3 = 0.0f,
         .rotPeriod_s             = 36000.0f,
+        .GM_km3s2                = 282528.0,
         .orbit={.parent=&KspSystem::Kerbol,
                 .LAN                 = 52.0f,
                 .LDN                 = 232.0f,
@@ -282,11 +294,12 @@ namespace KspSystem {
         .atm_falloff_km          = 8.2212f,
         .sea_level_density_kgpm3 = 0.764571404126208f,
         .rotPeriod_s             = 52980.8790593796,
+        .GM_km3s2                = 1962.000031,
         .orbit={.parent=&KspSystem::Jool,  
                 .LAN                 = 0.0f,
                 .LDN                 = 180.0f,
                 .argumentOfPeriapsis = 0.0f,
-                .meanAnomaly         = 3.14f,
+                .meanAnomaly         = M_PI,
                 .AP                  = 27184.0,
                 .PE                  = 27184.0,
                 .a_semi              = 27184.0,
@@ -303,6 +316,7 @@ namespace KspSystem {
         .atm_falloff_km          = 0.0f,
         .sea_level_density_kgpm3 = 0.0f,
         .rotPeriod_s             = 105962.088893924,
+        .GM_km3s2                = 207.900009,
         .orbit={.parent=&KspSystem::Jool,  
                 .LAN                 = 0.0f,
                 .LDN                 = 180.0f,
@@ -324,11 +338,12 @@ namespace KspSystem {
         .atm_falloff_km          = 0.0f,
         .sea_level_density_kgpm3 = 0.0f,
         .rotPeriod_s             = 211926.35802123,
+        .GM_km3s2                = 2826.000044,
         .orbit={.parent=&KspSystem::Jool,  
                 .LAN                 = 0.0f,
                 .LDN                 = 180.0f,
                 .argumentOfPeriapsis = 0.0f,
-                .meanAnomaly         = 3.14f,
+                .meanAnomaly         = M_PI,
                 .AP                  = 68500.0,
                 .PE                  = 68500.0,
                 .a_semi              = 68500.0,
@@ -345,6 +360,7 @@ namespace KspSystem {
         .atm_falloff_km          = 0.0f,
         .sea_level_density_kgpm3 = 0.0f,
         .rotPeriod_s             = 544507.428516654,
+        .GM_km3s2                = 2.484360,
         .orbit={.parent=&KspSystem::Jool,  
                 .LAN                 = 10.0f,
                 .LDN                 = 190.0f,
@@ -366,6 +382,7 @@ namespace KspSystem {
         .atm_falloff_km          = 0.0f,
         .sea_level_density_kgpm3 = 0.0f,
         .rotPeriod_s             = 901902.623531173,
+        .GM_km3s2                = 0.722,
         .orbit={.parent=&KspSystem::Jool,  
                 .LAN                 = 2.0f,
                 .LDN                 = 182.0f,
@@ -387,11 +404,12 @@ namespace KspSystem {
         .atm_falloff_km          = 0.0f,
         .sea_level_density_kgpm3 = 0.0f,
         .rotPeriod_s             = 19460,
+        .GM_km3s2                = 74.481000,
         .orbit={.parent=&KspSystem::Kerbol,
                 .LAN                 = 50.0f,
                 .LDN                 = 230.0f,
                 .argumentOfPeriapsis = 260.0f,
-                .meanAnomaly         = 3.14f,
+                .meanAnomaly         = M_PI,
                 .AP                  = 113549713.2,
                 .PE                  = 66687926.8,
                 .a_semi              = 90118820.0,

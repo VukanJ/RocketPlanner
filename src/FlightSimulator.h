@@ -5,6 +5,7 @@
 #include <cmath>
 #include "kspConstants.h"
 #include "RocketConfig.h"
+#include "utils.h"
 
 template <typename FLT>
 struct FlightData {
@@ -72,25 +73,20 @@ struct LaunchSuccess {
     float deltaVLeft = 0;
 };
 
-template <typename F=float>
-struct vec2 { F x = 0; F y = 0; };
-
-using vec2f = vec2<float>;
-
-float getApoapsis(const vec2<float>& pos, const vec2<float>& vel, float r_km, float GM, float body_R);
-float getPeriapsis(const vec2<float>& pos, const vec2<float>& vel, float r_km, float GM, float body_R);
+float getApoapsis(const vec2f& pos, const vec2f& vel, float r_km, float GM, float body_R);
+float getPeriapsis(const vec2f& pos, const vec2f& vel, float r_km, float GM, float body_R);
 
 enum ApoPer {Apoapsis, Periapsis};
 
 template <ApoPer AP, typename FLT=float>
-FLT getOrbitExtent(const vec2<FLT>& pos, const vec2<FLT>& vel, FLT r_km, FLT GM) {
-    FLT vx = vel.x / 1000.0;
-    FLT vy = vel.y / 1000.0;
+FLT getOrbitExtent(const vec2f& pos, const vec2f& vel, FLT r_km, FLT GM) {
+    FLT vx = vel.x() / 1000.0;
+    FLT vy = vel.y() / 1000.0;
     FLT v2 = vx*vx + vy*vy;
     FLT eps = 0.5f * v2 - GM / r_km;
     if (eps >= 0) { return INFINITY; }
     FLT a   = -GM / (2.0f * eps);
-    FLT h   = pos.x * vy - pos.y * vx;
+    FLT h   = pos.x() * vy - pos.y() * vx;
     FLT e   = std::sqrt(1.0f + 2.0f*eps*h*h / (GM * GM));
     if constexpr (AP == Apoapsis) {
         return a * (1.0f + e);

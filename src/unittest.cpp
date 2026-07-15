@@ -380,6 +380,18 @@ TEST(OrbitalDataTest, ApsidesConsistentWithSemiMajorAndEccentricity) {
     }
 }
 
+TEST(OrbitalDataTest, GMConsistentWithSurfaceGravity) {
+    for (int i = 0; i < nBodies; ++i) {
+        const Body* b = bodyTable[i].body;
+        double expected_from_sg = (b->surfaceGravity / 1000.0) * b->radius_km * b->radius_km;
+        // surfaceGravity derived from geeASL * 9.80665; GM_km3s2 from Kittopia is authoritative.
+        // Check consistency within 0.5%.
+        EXPECT_NEAR(b->GM_km3s2, expected_from_sg, 1e-3)
+            << bodyTable[i].name << ": GM_km3s2=" << b->GM_km3s2
+            << " vs surfaceGravity-derived=" << expected_from_sg;
+    }
+}
+
 // ---------------------------------------------------------------------------
 // DeltaV calculators
 // ---------------------------------------------------------------------------
