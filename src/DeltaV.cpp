@@ -1,6 +1,7 @@
 #include "DeltaV.h"
 
 #include <cmath>
+#include <iostream>
 #include <numbers>
 #include "utils.h"
 #include "eigen3/Eigen/Geometry"
@@ -57,39 +58,33 @@ Orbit getHohmannOrbit(const Body* center, float R1, float R2) {
 }
 
 DeltaVRange hohmannTransferCost(const Body* origin, const Body* target, float startAltitude) {
-    const Body* center = nullptr;
-    float R1[2];
-
-    if (origin == target->orbit.parent) {
-        // Planet -> moon
-        center = origin;
-        R1[0] = R1[1] = startAltitude + origin->radius_km;
-    }
-    else if (origin->orbit.parent == target->orbit.parent) {
-        // Planet -> planet
-        center = origin->orbit.parent;
-        R1[0] = origin->orbit.PE;
-        R1[1] = origin->orbit.AP;
-    }
-    else if (target == origin->orbit.parent) {
+    if (target == origin->orbit.parent) {
         // Moon -> planet: escape burn already sets up the transfer
         return DeltaVRange(0);
     }
+    DeltaVRange dv_range;
+    if (origin == target->orbit.parent) {
+        // Planet -> moon: from circular parking orbit
+        const Body* center = origin;
+        float GM = center->GM_km3s2;
+        float R1 = startAltitude + origin->radius_km;
+        float v_circ = 1000.0f * std::sqrt(GM / R1);
+        Orbit h1 = getHohmannOrbit(center, R1, target->orbit.PE);
+        Orbit h2 = getHohmannOrbit(center, R1, target->orbit.AP);
+        dv_range.add(std::abs(h1.v_periapsis(unit_mps) - v_circ));
+        dv_range.add(std::abs(h2.v_periapsis(unit_mps) - v_circ));
+    }
+    else if (origin->orbit.parent == target->orbit.parent) {
+        // Planet -> planet
+        const Body* center = origin->orbit.parent;
+        Orbit o_p2a = getHohmannOrbit(center, origin->orbit.PE, target->orbit.AP);
+        Orbit o_a2p = getHohmannOrbit(center, origin->orbit.AP, target->orbit.PE);
+
+        dv_range.add(std::abs(o_p2a.v_periapsis(unit_mps) - origin->orbit.v_periapsis(unit_mps)));
+        dv_range.add(std::abs(o_a2p.v_periapsis(unit_mps) - origin->orbit.v_apoapsis(unit_mps)));
+    }
     else {
         return { };
-    }
-
-    float GM = center->GM_km3s2;
-    float R2[2] = { (float)target->orbit.PE, (float)target->orbit.AP };
-
-    DeltaVRange dv_range;
-    for (int i = 0; i < 2; i++) {
-        for (int j = 0; j < 2; j++) {
-            Orbit hohmann = getHohmannOrbit(center, R1[i], R2[j]);
-            float v_depart = std::sqrt(GM * (2.0f / R1[i] - 1.0f / hohmann.a_semi));
-            float v_circular = std::sqrt(GM / R1[i]);
-            dv_range.add(unit_mps * std::abs(v_depart - v_circular));
-        }
     }
     return dv_range;
 }
