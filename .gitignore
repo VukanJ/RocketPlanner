@@ -3,3 +3,5 @@ build
 *.csv
 *.ini
 parts_cache.json
+__pycache__
+.pyc
