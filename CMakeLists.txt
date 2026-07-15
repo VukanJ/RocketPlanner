@@ -4,6 +4,10 @@ project(rocket)
 
 set(CMAKE_CXX_STANDARD 23)
 
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Debug)
+endif()
+
 set(ROCKET_SOURCES
   src/main.cpp
   src/rocket.cpp
@@ -74,27 +78,36 @@ set(IMPLOT_SOURCES
   ${implot_SOURCE_DIR}/implot_items.cpp
 )
 
-add_executable(debug ${ROCKET_SOURCES} ${IMGUI_SOURCES} ${IMPLOT_SOURCES})
-target_include_directories(debug PRIVATE ext src ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends ${implot_SOURCE_DIR} /usr/include /usr/include/eigen3)
-target_compile_definitions(debug PRIVATE AGAVE_FONT_PATH="${AGAVE_FONT_PATH}")
-target_compile_options(debug PRIVATE -no-pie -g -O0 -fno-omit-frame-pointer -march=native -Wall -Wunused-value -Wshadow -pedantic)
-target_link_options(debug PRIVATE -no-pie)
-target_link_libraries(debug glfw OpenGL::GL)
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+  set(TARGET_NAME release)
+else()
+  set(TARGET_NAME debug)
+endif()
 
-add_executable(release ${ROCKET_SOURCES} ${IMGUI_SOURCES} ${IMPLOT_SOURCES})
-target_include_directories(release PRIVATE ext src ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends ${implot_SOURCE_DIR} /usr/include /usr/include/eigen3)
-target_compile_definitions(release PRIVATE AGAVE_FONT_PATH="${AGAVE_FONT_PATH}")
-target_compile_options(release PRIVATE -march=native -Wall -Wunused-value -Wshadow -pedantic -O3 -DNDEBUG)
-target_link_libraries(release glfw OpenGL::GL)
+add_executable(${TARGET_NAME} ${ROCKET_SOURCES} ${IMGUI_SOURCES} ${IMPLOT_SOURCES})
+target_include_directories(${TARGET_NAME} PRIVATE ext src ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends ${implot_SOURCE_DIR} /usr/include /usr/include/eigen3)
+target_compile_definitions(${TARGET_NAME} PRIVATE AGAVE_FONT_PATH="${AGAVE_FONT_PATH}")
+target_compile_options(${TARGET_NAME} PRIVATE -no-pie -fno-omit-frame-pointer -march=native -Wall -Wunused-value -Wshadow -pedantic)
+target_link_options(${TARGET_NAME} PRIVATE -no-pie)
+target_link_libraries(${TARGET_NAME} glfw OpenGL::GL)
+
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+  target_compile_options(${TARGET_NAME} PRIVATE -O3 -DNDEBUG)
+else()
+  target_compile_options(${TARGET_NAME} PRIVATE -O0 -g)
+endif()
 
 # ---- GoogleTest ----
 find_package(GTest REQUIRED)
 
-add_executable(unittest src/unittest.cpp src/rocket.cpp src/parts.cpp src/PartSerializer.cpp src/stage.cpp src/LoadKspParts.cpp src/NelderMead.cpp src/RocketSolver.cpp src/RocketConfig.cpp src/DeltaV.cpp src/Orbit.cpp)
+set(UNITTEST_SOURCES
+  src/unittest.cpp src/rocket.cpp src/parts.cpp src/PartSerializer.cpp
+  src/stage.cpp src/LoadKspParts.cpp src/NelderMead.cpp
+  src/RocketSolver.cpp src/RocketConfig.cpp src/DeltaV.cpp src/Orbit.cpp
+)
 
+add_executable(unittest ${UNITTEST_SOURCES})
 target_include_directories(unittest PRIVATE ext src /usr/include /usr/include/eigen3)
-target_compile_options(unittest PRIVATE -g -O0 -march=native -Wall -Wunused-value -Wshadow -pedantic)
+target_compile_options(unittest PRIVATE -march=native -Wall -Wunused-value -Wshadow -pedantic -g -O0)
 target_link_libraries(unittest GTest::gtest_main)
 add_test(NAME unittest COMMAND unittest)
-
-

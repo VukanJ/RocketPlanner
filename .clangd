@@ -5,6 +5,7 @@ CompileFlags:
     - -I/home/vukan/RocketPlanner/build/_deps/imgui-src
     - -I/home/vukan/RocketPlanner/build/_deps/imgui-src/backends
     - -I/home/vukan/RocketPlanner/build/_deps/implot-src
+    - -I/usr/include/eigen3
     - -Wall
     - -Wunused-value
     - -Wshadow

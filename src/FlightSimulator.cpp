@@ -23,7 +23,7 @@ void FlightSimulator::simulate_launch(const Body& body, const RocketConfig& rock
     float stageTime = 0;
     float mass = currentStage.m0;
     float flowRate = (currentStage.m0 - currentStage.mf) / currentStage.burnTime;
-    const float GM = body.GM();
+    const float GM = body.GM_km3s2;
 
     float totalBurnTime = 0;
     for (auto& k : kinematics) { totalBurnTime += k.burnTime; }

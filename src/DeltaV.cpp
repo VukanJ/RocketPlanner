@@ -6,7 +6,7 @@
 #include "eigen3/Eigen/Geometry"
 
 float naiveTakeoffLandingCost(const Body* body, float targetAltitudeKm) {
-    float GM = body->GM();
+    float GM = body->GM_km3s2;
     float R = body->radius_km;
     float Rtarget = body->radius_km + targetAltitudeKm;
     float a = 0.5f * (R + Rtarget);
@@ -36,7 +36,7 @@ float naiveTakeoffLandingCost(const Body* body, float targetAltitudeKm) {
 }
 
 float escapeBurnCost(const Body* origin, float startAltitude) {
-    float v_circ = unit_mps * std::sqrt(origin->GM() / (origin->radius_km + startAltitude));
+    float v_circ = unit_mps * std::sqrt(origin->GM_km3s2 / (origin->radius_km + startAltitude));
     return v_circ * (std::numbers::sqrt2 - 1.0);
 }
 
@@ -79,7 +79,7 @@ DeltaVRange hohmannTransferCost(const Body* origin, const Body* target, float st
         return { };
     }
 
-    float GM = center->GM();
+    float GM = center->GM_km3s2;
     float R2[2] = { (float)target->orbit.PE, (float)target->orbit.AP };
 
     DeltaVRange dv_range;
@@ -96,7 +96,7 @@ DeltaVRange hohmannTransferCost(const Body* origin, const Body* target, float st
 
 DeltaVRange circularizeHyperbolicCost(const Body* origin, const Body* target, float startAltitude, float rmin, bool prograde) {
     rmin += target->radius_km;
-    float alpha = target->GM();
+    float alpha = target->GM_km3s2;
     float vCircular = std::sqrt(alpha / rmin);
 
     auto computeCost = [&](float v_transfer, float vTarget) -> float {
@@ -111,7 +111,7 @@ DeltaVRange circularizeHyperbolicCost(const Body* origin, const Body* target, fl
     if (origin->orbit.parent == target->orbit.parent) {
         // Planet -> planet: sweep all four (R1, R2) combinations
         const Body* center = origin->orbit.parent;
-        float GM = center->GM();
+        float GM = center->GM_km3s2;
         for (float R1 : {origin->orbit.PE, origin->orbit.AP}) {
             for (float R2 : {target->orbit.PE, target->orbit.AP}) {
                 Orbit hohmann = getHohmannOrbit(center, R1, R2);
@@ -124,7 +124,7 @@ DeltaVRange circularizeHyperbolicCost(const Body* origin, const Body* target, fl
     else if (origin == target->orbit.parent) {
         // Planet -> moon: fixed departure, sweep target PE/AP
         float R1 = startAltitude + origin->radius_km;
-        float GM = origin->GM();
+        float GM = origin->GM_km3s2;
         for (float R2 : {target->orbit.PE, target->orbit.AP}) {
             Orbit hohmann = getHohmannOrbit(origin, R1, R2);
             float v_transfer = std::sqrt(GM * (2.0f / R2 - 1.0f / hohmann.a_semi));
@@ -192,7 +192,7 @@ DeltaVRange inclinationCorrectionCost(const Orbit& origin, const Orbit& target) 
     float theta_a = directionToAnomaly(nodeDir, origin);
     float theta_b = directionToAnomaly(-nodeDir, origin);
 
-    float alpha = origin.parent->GM();
+    float alpha = origin.parent->GM_km3s2;
     float a = origin.a_semi;
     float e = origin.eccentricity;
 
@@ -218,7 +218,7 @@ DeltaVRange inclinationCorrectionCost(const Orbit& origin, const Orbit& target) 
 
 DeltaVRange orbitalInsertion(const Body* origin, const Body* target, float startAltitude) {
     DeltaVRange v_infinity = hohmannTransferCost(origin, target, 0);
-    float v_circ = unit_mps * std::sqrt(origin->GM() / (startAltitude + origin->radius_km));
+    float v_circ = unit_mps * std::sqrt(origin->GM_km3s2 / (startAltitude + origin->radius_km));
     float v_escape = std::numbers::sqrt2 * v_circ;
 
     DeltaVRange dv_range;

@@ -9,11 +9,11 @@ inline constexpr float deg2rad(float f) {
 }
 
 float Orbit::v_apoapsis(float unit) const {
-    return unit * std::sqrt(parent->GM() * (2.0f / AP - 1.0f / a_semi));
+    return unit * std::sqrt(parent->GM_km3s2 * (2.0f / AP - 1.0f / a_semi));
 }
 
 float Orbit::v_periapsis(float unit) const {
-    return unit * std::sqrt(parent->GM() * (2.0f / PE - 1.0f / a_semi));
+    return unit * std::sqrt(parent->GM_km3s2 * (2.0f / PE - 1.0f / a_semi));
 }
 
 Eigen::Vector3f Orbit::normal() const {
@@ -59,9 +59,9 @@ std::pair<vec3f, vec3f> get_local_position(const Orbit& o) {
     r0.y() = 0;
     r0.z() = rmag * sin(phi);
 
-    v0.x() = -sqrt(o.parent->GM() / p) * sin(phi);
+    v0.x() = -sqrt(o.parent->GM_km3s2 / p) * sin(phi);
     v0.y() = 0;
-    v0.z() = sqrt(o.parent->GM() / p) * (e + cos(phi));
+    v0.z() = sqrt(o.parent->GM_km3s2 / p) * (e + cos(phi));
 
     auto transform = Eigen::AngleAxisf(deg2rad(-o.argumentOfPeriapsis), Eigen::Vector3f::UnitY()) *
                      Eigen::AngleAxisf(deg2rad(-o.inclination), Eigen::Vector3f::UnitX()) *

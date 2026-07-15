@@ -451,8 +451,8 @@ TEST(DeltaV, naiveTakeoffLanding) {
 //        EXPECT_NEAR(H.PE, KspSystem::Kerbin.radius_km + 30, 1e-3);
 //        EXPECT_NEAR(H.AP, sat->orbit.AP, 1e-3);
 //        EXPECT_NEAR(H.a_semi, 0.5f * (H.AP + H.PE), 1e-3);
-//        EXPECT_NEAR(H.v_periapsis(unit_kmps), std::sqrt(KspSystem::Kerbin.GM() * (2.0 / H.PE - 1.0 / H.a_semi)), 1e-3);
-//        EXPECT_NEAR(H.v_apoapsis(unit_kmps), std::sqrt(KspSystem::Kerbin.GM() * (2.0 / H.AP - 1.0 / H.a_semi)), 1e-3);
+//        EXPECT_NEAR(H.v_periapsis(unit_kmps), std::sqrt(KspSystem::Kerbin.GM_km3s2 * (2.0 / H.PE - 1.0 / H.a_semi)), 1e-3);
+//        EXPECT_NEAR(H.v_apoapsis(unit_kmps), std::sqrt(KspSystem::Kerbin.GM_km3s2 * (2.0 / H.AP - 1.0 / H.a_semi)), 1e-3);
 //    }
 //
 //    // Jool -> Moons
@@ -461,8 +461,8 @@ TEST(DeltaV, naiveTakeoffLanding) {
 //        EXPECT_NEAR(H.PE, KspSystem::Jool.radius_km + 100, 1e-3);
 //        EXPECT_NEAR(H.AP, sat->orbit.AP, 1e-3);
 //        EXPECT_NEAR(H.a_semi, 0.5f * (H.AP + H.PE), 1e-2);
-//        EXPECT_NEAR(H.v_periapsis(unit_kmps), std::sqrt(KspSystem::Jool.GM() * (2.0 / H.PE - 1.0 / H.a_semi)), 1e-3);
-//        EXPECT_NEAR(H.v_apoapsis(unit_kmps), std::sqrt(KspSystem::Jool.GM() * (2.0 / H.AP - 1.0 / H.a_semi)), 1e-3);
+//        EXPECT_NEAR(H.v_periapsis(unit_kmps), std::sqrt(KspSystem::Jool.GM_km3s2 * (2.0 / H.PE - 1.0 / H.a_semi)), 1e-3);
+//        EXPECT_NEAR(H.v_apoapsis(unit_kmps), std::sqrt(KspSystem::Jool.GM_km3s2 * (2.0 / H.AP - 1.0 / H.a_semi)), 1e-3);
 //    }
 //}
 //
