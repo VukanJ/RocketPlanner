@@ -19,6 +19,7 @@ namespace {
         return IM_COL32(int(c.r * 255), int(c.g * 255), int(c.b * 255), int(a * 255));
     }
 
+    // Distinct color per body for visual identification
     Color3 bodyColor(const Body* b) {
         if (b == &KspSystem::Kerbol) { return {1.0f, 0.9f, 0.3f}; }
         if (b == &KspSystem::Moho)   { return {0.6f, 0.5f, 0.4f}; }
@@ -40,6 +41,10 @@ namespace {
         return {1.0f, 1.0f, 1.0f};
     }
 
+    // Sample an orbit as 3D world-space points.
+    // Applies the same LAN → inclination → AoP rotation as Orbit.cpp,
+    // but uses the polar form r(θ) to trace the full ellipse rather
+    // than solving for a single position from meanAnomaly.
     void sampleOrbit(const Orbit& orbit, std::vector<glm::vec3>& pts) {
         pts.resize(ORBIT_SAMPLES);
         float a = orbit.a_semi;
@@ -58,9 +63,11 @@ namespace {
         }
     }
 
+    // Project a 3D world-space point to 2D ImGui window coordinates via
+    // the combined view-projection matrix. Returns z in NDC for depth checks.
     glm::vec3 project(const glm::vec3& wp, const glm::mat4& vp, ImVec2 origin, ImVec2 sz) {
         glm::vec4 c = vp * glm::vec4(wp, 1.0f);
-        if (c.w <= 0.0f) return {-1, -1, -1};
+        if (c.w <= 0.0f) { return {-1, -1, -1}; }
         float ndcX = c.x / c.w;
         float ndcY = c.y / c.w;
         float sx = (ndcX + 1.0f) * 0.5f * sz.x + origin.x;
@@ -68,6 +75,8 @@ namespace {
         return {sx, sy, c.z / c.w};
     }
 
+    // Draw an orbit as individual line segments, culling segments where
+    // either endpoint is behind the camera to prevent wrap-around artifacts.
     void drawOrbitLine(ImDrawList* dl, const std::vector<glm::vec3>& pts,
                        const glm::mat4& vp, ImVec2 origin, ImVec2 sz,
                        ImU32 color, float thickness)
@@ -88,9 +97,12 @@ namespace {
     }
 }
 
+// Renders the system map as a floating ImGui window. Shows all bodies
+// orbiting Kerbol with their orbits, positions, and any Hohmann transfer
+// arc for the currently selected mission.
 void SystemMap::render(const Mission& mission) {
     ImGui::Checkbox("System Map", &show);
-    if (!show) return;
+    if (!show) { return; }
 
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
     if (!ImGui::Begin("System Map", &show)) {
@@ -107,25 +119,28 @@ void SystemMap::render(const Mission& mission) {
         return;
     }
 
+    // Invisible button captures mouse input for the map area
     ImGui::InvisibleButton("##maparea", wsz);
     bool hovered = ImGui::IsItemHovered();
     bool active = ImGui::IsItemActive();
 
+    // Scroll to zoom, drag to rotate camera
     if (hovered) {
         ImGuiIO& io = ImGui::GetIO();
         if (io.MouseWheel != 0.0f) {
             distance *= (1.0f - io.MouseWheel * 0.1f);
-            if (distance < 100.0f) distance = 100.0f;
+            if (distance < 100.0f) { distance = 100.0f; }
         }
     }
     if (active && ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
         ImVec2 d = ImGui::GetIO().MouseDelta;
         azimuth += d.x * 0.005f;
         elevation += d.y * 0.005f;
-        if (elevation > M_PI * 0.49f) elevation = M_PI * 0.49f;
-        if (elevation < -M_PI * 0.49f) elevation = -M_PI * 0.49f;
+        if (elevation > M_PI * 0.49f) { elevation = M_PI * 0.49f; }
+        if (elevation < -M_PI * 0.49f) { elevation = -M_PI * 0.49f; }
     }
 
+    // Spherical camera → lookAt view matrix, perspective projection
     glm::vec3 camPos(
         distance * cosf(elevation) * sinf(azimuth),
         distance * sinf(elevation),
@@ -143,34 +158,20 @@ void SystemMap::render(const Mission& mission) {
     std::vector<ImVec2> bodyScreenPos;
     std::vector<const Body*> bodyList;
 
+    // Draw each planet's orbit and compute its screen position
     for (auto& entry : bodyTable) {
         const Body* body = entry.body;
-        if (body->orbit.parent != &KspSystem::Kerbol) continue;
-        if (body->orbit.a_semi <= 0) continue;
+        if (body->orbit.parent != &KspSystem::Kerbol) { continue; }
+        if (body->orbit.a_semi <= 0) { continue; }
 
         Color3 c = bodyColor(body);
         sampleOrbit(body->orbit, pts);
         drawOrbitLine(dl, pts, vp, wpos, wsz, toImU32(c, 0.4f), 1.0f);
 
-        glm::vec3 wp(0, 0, 0);
-        {
-            glm::mat4 L = glm::rotate(glm::mat4(1.0f), -body->orbit.LAN * DEG, glm::vec3(0, 1, 0));
-            glm::mat4 I = glm::rotate(glm::mat4(1.0f), -body->orbit.inclination * DEG, glm::vec3(1, 0, 0));
-            glm::mat4 A = glm::rotate(glm::mat4(1.0f), -body->orbit.argumentOfPeriapsis * DEG, glm::vec3(0, 1, 0));
-            glm::mat4 xform = A * I * L;
-            float e = body->orbit.eccentricity;
-            float M = body->orbit.meanAnomaly;
-            float E = e > 0.0f ? M : M;
-            for (int k = 0; k < 8; ++k) {
-                float f = E - e * sinf(E) - M;
-                float fp = 1.0f - e * cosf(E);
-                E -= f / fp;
-            }
-            float phi = 2.0f * atan2f(sqrtf(1 + e) * sinf(E / 2), sqrtf(1 - e) * cosf(E / 2));
-            float r = body->orbit.a_semi * (1.0f - e * e) / (1.0f + e * cosf(phi));
-            glm::vec4 p(r * cosf(phi), 0.0f, r * sinf(phi), 1.0f);
-            wp = glm::vec3(xform * p);
-        }
+        // get_local_position solves Kepler's equation to find the body's
+        // position on its orbit at the current mean anomaly (t=0)
+        auto [pos, vel] = get_local_position(body->orbit);
+        glm::vec3 wp(pos.x(), pos.y(), pos.z());
 
         glm::vec3 sp = project(wp, vp, wpos, wsz);
         if (sp.z >= -1.0f && sp.z <= 1.0f) {
@@ -179,6 +180,7 @@ void SystemMap::render(const Mission& mission) {
         }
     }
 
+    // Draw central star (Kerbol) at the origin
     {
         glm::vec3 sp = project(glm::vec3(0, 0, 0), vp, wpos, wsz);
         if (sp.z >= -1.0f && sp.z <= 1.0f) {
@@ -188,6 +190,7 @@ void SystemMap::render(const Mission& mission) {
         }
     }
 
+    // Draw planet markers and labels
     for (size_t i = 0; i < bodyList.size(); ++i) {
         Color3 c = bodyColor(bodyList[i]);
         dl->AddCircleFilled(bodyScreenPos[i], 4.0f, toImU32(c));
@@ -195,6 +198,7 @@ void SystemMap::render(const Mission& mission) {
                     IM_COL32(220, 220, 220, 255), bodyList[i]->name);
     }
 
+    // Draw Hohmann transfer arcs between the selected origin and destination
     if (mission.originBody && mission.destinationBody &&
         mission.originBody->orbit.parent == &KspSystem::Kerbol &&
         mission.destinationBody->orbit.parent == &KspSystem::Kerbol)

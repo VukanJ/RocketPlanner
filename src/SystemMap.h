@@ -12,7 +12,7 @@ public:
 private:
     float azimuth = 0.4f;
     float elevation = 0.6f;
-    float distance = 80000.0f;
+    float distance = 8000000.0f;
     float fov = 45.0f;
 };
 
