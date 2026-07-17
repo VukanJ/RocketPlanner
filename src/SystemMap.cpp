@@ -161,21 +161,6 @@ void SystemMap::rebuildCache(const Mission& mission, int64_t seconds) {
         planetCache.push_back(std::move(co));
     }
 
-    // Cache transfer arcs
-    cachedHoh1 = {};
-    cachedHoh2 = {};
-    if (mission.originBody && mission.destinationBody &&
-        mission.originBody->orbit.parent == &KspSystem::Kerbol &&
-        mission.destinationBody->orbit.parent == &KspSystem::Kerbol)
-    {
-        cachedHoh1 = getHohmannOrbit(&KspSystem::Kerbol,
-                                     mission.originBody->orbit.PE,
-                                     mission.destinationBody->orbit.AP);
-        cachedHoh2 = getHohmannOrbit(&KspSystem::Kerbol,
-                                     mission.originBody->orbit.AP,
-                                     mission.destinationBody->orbit.PE);
-    }
-
     cachedOrigin = mission.originBody;
     cachedDest = mission.destinationBody;
     cachedDateSeconds = seconds;
@@ -270,17 +255,6 @@ void SystemMap::render(const Mission& mission, int64_t seconds) {
         dl->AddCircleFilled(bodyScreenPos[i], 4.0f, toImU32({visibleBodies[i]->r, visibleBodies[i]->g, visibleBodies[i]->b}));
         dl->AddText(ImVec2(bodyScreenPos[i].x + 8, bodyScreenPos[i].y - 6),
                     IM_COL32(220, 220, 220, 255), visibleBodies[i]->name);
-    }
-
-    // Draw cached Hohmann transfer arcs
-    std::vector<glm::vec3> pts;
-    if (cachedHoh1.a_semi > 0) {
-        sampleOrbit(cachedHoh1, pts);
-        drawOrbitLine(dl, pts, vp, wpos, wsz, IM_COL32(0, 255, 100, 200), 2.0f);
-    }
-    if (cachedHoh2.a_semi > 0) {
-        sampleOrbit(cachedHoh2, pts);
-        drawOrbitLine(dl, pts, vp, wpos, wsz, IM_COL32(100, 255, 0, 200), 2.0f);
     }
 
     ImGui::End();

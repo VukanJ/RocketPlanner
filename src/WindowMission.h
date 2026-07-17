@@ -8,7 +8,7 @@
 
 struct Mission {
     const Body* originBody = &KspSystem::Kerbin;
-    const Body* destinationBody = &KspSystem::Moho;
+    const Body* destinationBody = &KspSystem::Eve;
     bool oneWayTrip = false;
     bool apolloStyle = true;
 
@@ -73,12 +73,14 @@ public:
 
     bool render();
     void updateMissionSequence();
+    void calcLaunchWindow();
     void renderTimeInput();
 
     enum class InputPhase { FromTo, Sequence } input_phase = WindowMission::InputPhase::FromTo;
 
     std::vector<MissionPhase> msequence;
     bool advanced = false;
+    bool launchDateOptim = false;
     SystemMap systemMap;
 
     Date missionDate { 0 };

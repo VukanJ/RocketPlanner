@@ -31,10 +31,6 @@ private:
     const Body* cachedDest = nullptr;
     int64_t cachedDateSeconds = -1;
 
-    // Cached transfer arcs
-    Orbit cachedHoh1 = {};
-    Orbit cachedHoh2 = {};
-
     void rebuildCache(const Mission& mission, int64_t seconds);
 };
 

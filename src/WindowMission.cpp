@@ -122,6 +122,10 @@ bool WindowMission::render() {
         }
         ImGui::PopStyleColor(4);
 
+        if (ImGui::Button("Calculate launch window")) {
+            calcLaunchWindow();
+        }
+
         float dvTotal_min = 0;
         float dvTotal_max = 0;
         int updateCostFrom = -1;
