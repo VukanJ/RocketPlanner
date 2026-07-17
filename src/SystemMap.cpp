@@ -75,6 +75,20 @@ namespace {
         return {sx, sy, c.z / c.w};
     }
 
+    // Compute per-segment blend factor for the trail brighten effect.
+    // Returns t ∈ [0, 1] where t=1 means recently crossed (brightest).
+    std::vector<float> computeOrbitBrightness(float meanAnomaly) {
+        std::vector<float> t(ORBIT_SAMPLES);
+        constexpr float DECAY = 2.0f;
+        for (int i = 0; i < ORBIT_SAMPLES; ++i) {
+            float theta = 2.0f * M_PI * i / ORBIT_SAMPLES;
+            float delta = fmodf(meanAnomaly - theta, 2.0f * M_PI);
+            if (delta < 0.0f) { delta += 2.0f * M_PI; }
+            t[i] = expf(-DECAY * delta);
+        }
+        return t;
+    }
+
     // Draw an orbit as individual line segments, culling segments where
     // either endpoint is behind the camera to prevent wrap-around artifacts.
     void drawOrbitLine(ImDrawList* dl, const std::vector<glm::vec3>& pts,
@@ -95,6 +109,74 @@ namespace {
             }
         }
     }
+
+    // Overload: per-segment brightness for the trail effect.
+    // Blends between base color (t=0) and a brightened version (t=1).
+    void drawOrbitLine(ImDrawList* dl, const std::vector<glm::vec3>& pts,
+                       const glm::mat4& vp, ImVec2 origin, ImVec2 sz,
+                       Color3 base, const std::vector<float>& brightness, float thickness)
+    {
+        Color3 bright = { std::min(base.r + 0.4f, 1.0f),
+                          std::min(base.g + 0.4f, 1.0f),
+                          std::min(base.b + 0.4f, 1.0f) };
+        std::vector<ImVec2> screen(pts.size());
+        std::vector<bool> visible(pts.size());
+        for (size_t i = 0; i < pts.size(); ++i) {
+            glm::vec3 s = project(pts[i], vp, origin, sz);
+            screen[i] = {s.x, s.y};
+            visible[i] = (s.z > -1.0f && s.z < 1.0f);
+        }
+        for (size_t i = 0; i < pts.size(); ++i) {
+            size_t j = (i + 1) % pts.size();
+            if (visible[i] && visible[j]) {
+                float t = std::min(brightness[i], brightness[j]);
+                Color3 c = { base.r + (bright.r - base.r) * t,
+                             base.g + (bright.g - base.g) * t,
+                             base.b + (bright.b - base.b) * t };
+                dl->AddLine(screen[i], screen[j], toImU32(c), thickness);
+            }
+        }
+    }
+}
+
+// Rebuild cached 3D orbit data. Only called when the mission changes.
+void SystemMap::rebuildCache(const Mission& mission) {
+    planetCache.clear();
+
+    // Cache all planet orbits around Kerbol
+    for (auto& entry : bodyTable) {
+        const Body* body = entry.body;
+        if (body->orbit.parent != &KspSystem::Kerbol) { continue; }
+        if (body->orbit.a_semi <= 0) { continue; }
+
+        CachedOrbit co;
+        co.name = body->name;
+        Color3 bc = bodyColor(body);
+        co.r = bc.r; co.g = bc.g; co.b = bc.b;
+        sampleOrbit(body->orbit, co.points);
+        co.brightness = computeOrbitBrightness(body->orbit.meanAnomaly);
+        auto [pos, vel] = get_local_position(body->orbit);
+        co.worldPos = glm::vec3(pos.x(), pos.y(), pos.z());
+        planetCache.push_back(std::move(co));
+    }
+
+    // Cache transfer arcs
+    cachedHoh1 = {};
+    cachedHoh2 = {};
+    if (mission.originBody && mission.destinationBody &&
+        mission.originBody->orbit.parent == &KspSystem::Kerbol &&
+        mission.destinationBody->orbit.parent == &KspSystem::Kerbol)
+    {
+        cachedHoh1 = getHohmannOrbit(&KspSystem::Kerbol,
+                                     mission.originBody->orbit.PE,
+                                     mission.destinationBody->orbit.AP);
+        cachedHoh2 = getHohmannOrbit(&KspSystem::Kerbol,
+                                     mission.originBody->orbit.AP,
+                                     mission.destinationBody->orbit.PE);
+    }
+
+    cachedOrigin = mission.originBody;
+    cachedDest = mission.destinationBody;
 }
 
 // Renders the system map as a floating ImGui window. Shows all bodies
@@ -140,43 +222,37 @@ void SystemMap::render(const Mission& mission) {
         if (elevation < -M_PI * 0.49f) { elevation = -M_PI * 0.49f; }
     }
 
+    // Rebuild cache only when the mission selection changes
+    if (planetCache.empty() || cachedOrigin != mission.originBody || cachedDest != mission.destinationBody) {
+        rebuildCache(mission);
+    }
+
     // Spherical camera → lookAt view matrix, perspective projection
     glm::vec3 camPos(
         distance * cosf(elevation) * sinf(azimuth),
         distance * sinf(elevation),
         distance * cosf(elevation) * cosf(azimuth)
     );
-    glm::mat4 view = glm::lookAt(camPos, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+    glm::mat4 view = glm::lookAtLH(camPos, glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
     float aspect = wsz.x / wsz.y;
-    glm::mat4 proj = glm::perspective(glm::radians(fov), aspect, distance * 0.001f, distance * 200.0f);
+    glm::mat4 proj = glm::perspectiveLH(glm::radians(fov), aspect, distance * 0.001f, distance * 200.0f);
     glm::mat4 vp = proj * view;
 
     ImDrawList* dl = ImGui::GetWindowDrawList();
     dl->AddRectFilled(wpos, ImVec2(wpos.x + wsz.x, wpos.y + wsz.y), IM_COL32(10, 10, 15, 255));
 
-    std::vector<glm::vec3> pts;
+    // Draw each cached planet orbit and compute its screen position
     std::vector<ImVec2> bodyScreenPos;
-    std::vector<const Body*> bodyList;
+    std::vector<const CachedOrbit*> visibleBodies;
 
-    // Draw each planet's orbit and compute its screen position
-    for (auto& entry : bodyTable) {
-        const Body* body = entry.body;
-        if (body->orbit.parent != &KspSystem::Kerbol) { continue; }
-        if (body->orbit.a_semi <= 0) { continue; }
+    for (auto& co : planetCache) {
+        Color3 c = { co.r, co.g, co.b };
+        drawOrbitLine(dl, co.points, vp, wpos, wsz, c, co.brightness, 1.0f);
 
-        Color3 c = bodyColor(body);
-        sampleOrbit(body->orbit, pts);
-        drawOrbitLine(dl, pts, vp, wpos, wsz, toImU32(c, 0.4f), 1.0f);
-
-        // get_local_position solves Kepler's equation to find the body's
-        // position on its orbit at the current mean anomaly (t=0)
-        auto [pos, vel] = get_local_position(body->orbit);
-        glm::vec3 wp(pos.x(), pos.y(), pos.z());
-
-        glm::vec3 sp = project(wp, vp, wpos, wsz);
+        glm::vec3 sp = project(co.worldPos, vp, wpos, wsz);
         if (sp.z >= -1.0f && sp.z <= 1.0f) {
             bodyScreenPos.push_back({sp.x, sp.y});
-            bodyList.push_back(body);
+            visibleBodies.push_back(&co);
         }
     }
 
@@ -184,39 +260,27 @@ void SystemMap::render(const Mission& mission) {
     {
         glm::vec3 sp = project(glm::vec3(0, 0, 0), vp, wpos, wsz);
         if (sp.z >= -1.0f && sp.z <= 1.0f) {
-            Color3 c = bodyColor(&KspSystem::Kerbol);
-            dl->AddCircleFilled(ImVec2(sp.x, sp.y), 8.0f, toImU32(c));
+            dl->AddCircleFilled(ImVec2(sp.x, sp.y), 8.0f, IM_COL32(255, 230, 77, 255));
             dl->AddText(ImVec2(sp.x + 12, sp.y - 6), IM_COL32(255, 255, 200, 255), "Kerbol");
         }
     }
 
     // Draw planet markers and labels
-    for (size_t i = 0; i < bodyList.size(); ++i) {
-        Color3 c = bodyColor(bodyList[i]);
-        dl->AddCircleFilled(bodyScreenPos[i], 4.0f, toImU32(c));
+    for (size_t i = 0; i < visibleBodies.size(); ++i) {
+        dl->AddCircleFilled(bodyScreenPos[i], 4.0f, toImU32({visibleBodies[i]->r, visibleBodies[i]->g, visibleBodies[i]->b}));
         dl->AddText(ImVec2(bodyScreenPos[i].x + 8, bodyScreenPos[i].y - 6),
-                    IM_COL32(220, 220, 220, 255), bodyList[i]->name);
+                    IM_COL32(220, 220, 220, 255), visibleBodies[i]->name);
     }
 
-    // Draw Hohmann transfer arcs between the selected origin and destination
-    if (mission.originBody && mission.destinationBody &&
-        mission.originBody->orbit.parent == &KspSystem::Kerbol &&
-        mission.destinationBody->orbit.parent == &KspSystem::Kerbol)
-    {
-        Orbit hoh = getHohmannOrbit(&KspSystem::Kerbol,
-                                    mission.originBody->orbit.PE,
-                                    mission.destinationBody->orbit.AP);
-        if (hoh.a_semi > 0) {
-            sampleOrbit(hoh, pts);
-            drawOrbitLine(dl, pts, vp, wpos, wsz, IM_COL32(0, 255, 100, 200), 2.0f);
-        }
-        Orbit hoh2 = getHohmannOrbit(&KspSystem::Kerbol,
-                                     mission.originBody->orbit.AP,
-                                     mission.destinationBody->orbit.PE);
-        if (hoh2.a_semi > 0) {
-            sampleOrbit(hoh2, pts);
-            drawOrbitLine(dl, pts, vp, wpos, wsz, IM_COL32(100, 255, 0, 200), 2.0f);
-        }
+    // Draw cached Hohmann transfer arcs
+    std::vector<glm::vec3> pts;
+    if (cachedHoh1.a_semi > 0) {
+        sampleOrbit(cachedHoh1, pts);
+        drawOrbitLine(dl, pts, vp, wpos, wsz, IM_COL32(0, 255, 100, 200), 2.0f);
+    }
+    if (cachedHoh2.a_semi > 0) {
+        sampleOrbit(cachedHoh2, pts);
+        drawOrbitLine(dl, pts, vp, wpos, wsz, IM_COL32(100, 255, 0, 200), 2.0f);
     }
 
     ImGui::End();
