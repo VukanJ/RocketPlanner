@@ -56,6 +56,16 @@ struct MissionPhase {
     void updateDeltaV();
 };
 
+struct Date {
+    int year = 0;
+    int day = 0;
+    int hour = 0;
+    int minute = 0;
+
+    Date(int64_t seconds);
+    int64_t toSeconds() const;
+};
+
 class WindowMission {
 public:
     WindowMission();
@@ -63,12 +73,15 @@ public:
 
     bool render();
     void updateMissionSequence();
+    void renderTimeInput();
 
     enum class InputPhase { FromTo, Sequence } input_phase = WindowMission::InputPhase::FromTo;
 
     std::vector<MissionPhase> msequence;
-    bool oberth = false;
+    bool advanced = false;
     SystemMap systemMap;
+
+    Date missionDate { 0 };
 };
 
 #endif // WINDOW_MISSION

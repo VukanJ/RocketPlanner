@@ -48,8 +48,10 @@ struct Orbit {
     Eigen::Vector3f normal() const;
     float v_apoapsis(float unit) const;
     float v_periapsis(float unit) const;
+    float period() const;
 };
 
 std::pair<vec3f, vec3f> get_local_position(const Orbit& o);
+std::pair<vec3f, vec3f> get_local_future_position(const Orbit& o, std::uint64_t seconds);
 
 #endif // ORBIT_H

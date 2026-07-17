@@ -140,7 +140,7 @@ namespace {
 }
 
 // Rebuild cached 3D orbit data. Only called when the mission changes.
-void SystemMap::rebuildCache(const Mission& mission) {
+void SystemMap::rebuildCache(const Mission& mission, int64_t seconds) {
     planetCache.clear();
 
     // Cache all planet orbits around Kerbol
@@ -154,8 +154,9 @@ void SystemMap::rebuildCache(const Mission& mission) {
         Color3 bc = bodyColor(body);
         co.r = bc.r; co.g = bc.g; co.b = bc.b;
         sampleOrbit(body->orbit, co.points);
-        co.brightness = computeOrbitBrightness(body->orbit.meanAnomaly);
-        auto [pos, vel] = get_local_position(body->orbit);
+        float advMeanAnomaly = fmodf(body->orbit.meanAnomaly + 2.0f * M_PI * (static_cast<float>(seconds) / body->orbit.period()), 2.0f * M_PI);
+        co.brightness = computeOrbitBrightness(advMeanAnomaly);
+        auto [pos, vel] = get_local_future_position(body->orbit, seconds);
         co.worldPos = glm::vec3(pos.x(), pos.y(), pos.z());
         planetCache.push_back(std::move(co));
     }
@@ -177,21 +178,20 @@ void SystemMap::rebuildCache(const Mission& mission) {
 
     cachedOrigin = mission.originBody;
     cachedDest = mission.destinationBody;
+    cachedDateSeconds = seconds;
 }
 
 // Renders the system map as a floating ImGui window. Shows all bodies
 // orbiting Kerbol with their orbits, positions, and any Hohmann transfer
 // arc for the currently selected mission.
-void SystemMap::render(const Mission& mission) {
-    ImGui::Checkbox("System Map", &show);
-    if (!show) { return; }
+void SystemMap::render(const Mission& mission, int64_t seconds) {
+    ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+    float panelWidth = 420.0f;
+    ImGui::SetNextWindowPos(ImVec2(panelWidth, 0), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2(displaySize.x - panelWidth, displaySize.y), ImGuiCond_Always);
 
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-    if (!ImGui::Begin("System Map", &show)) {
-        ImGui::PopStyleVar();
-        ImGui::End();
-        return;
-    }
+    ImGui::Begin("System Map", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar);
 
     ImVec2 wpos = ImGui::GetCursorScreenPos();
     ImVec2 wsz = ImGui::GetContentRegionAvail();
@@ -222,9 +222,9 @@ void SystemMap::render(const Mission& mission) {
         if (elevation < -M_PI * 0.49f) { elevation = -M_PI * 0.49f; }
     }
 
-    // Rebuild cache only when the mission selection changes
-    if (planetCache.empty() || cachedOrigin != mission.originBody || cachedDest != mission.destinationBody) {
-        rebuildCache(mission);
+    // Rebuild cache when mission selection or date changes
+    if (planetCache.empty() || cachedOrigin != mission.originBody || cachedDest != mission.destinationBody || cachedDateSeconds != seconds) {
+        rebuildCache(mission, seconds);
     }
 
     // Spherical camera → lookAt view matrix, perspective projection

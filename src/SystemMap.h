@@ -17,9 +17,7 @@ struct CachedOrbit {
 
 class SystemMap {
 public:
-    bool show = false;
-
-    void render(const Mission& mission);
+    void render(const Mission& mission, int64_t seconds);
 
 private:
     float azimuth = 0.4f;
@@ -31,12 +29,13 @@ private:
     std::vector<CachedOrbit> planetCache;
     const Body* cachedOrigin = nullptr;
     const Body* cachedDest = nullptr;
+    int64_t cachedDateSeconds = -1;
 
     // Cached transfer arcs
     Orbit cachedHoh1 = {};
     Orbit cachedHoh2 = {};
 
-    void rebuildCache(const Mission& mission);
+    void rebuildCache(const Mission& mission, int64_t seconds);
 };
 
 #endif // SYSTEM_MAP_H

@@ -16,6 +16,10 @@ float Orbit::v_periapsis(float unit) const {
     return unit * std::sqrt(parent->GM_km3s2 * (2.0f / PE - 1.0f / a_semi));
 }
 
+float Orbit::period() const {
+    return 2.0f * M_PI * std::sqrt(a_semi * a_semi * a_semi / parent->GM_km3s2);
+}
+
 Eigen::Vector3f Orbit::normal() const {
     // Calculate normal vector of orbital plane
     Eigen::Vector3f up(0, 1, 0);
@@ -69,4 +73,25 @@ std::pair<vec3f, vec3f> get_local_position(const Orbit& o) {
     r0 = transform * r0;
     v0 = transform * v0;
     return {r0, v0};
+}
+
+std::pair<vec3f, vec3f> get_local_future_position(const Orbit& o, std::uint64_t seconds) {
+    // Compute true anomaly at a future time
+    float e = o.eccentricity;
+    float M = fmod(o.meanAnomaly + 2.0f * M_PI * (seconds / o.period()), 2.0f * M_PI);
+    float E0 = e > 0 ? EccentricAnomalySolver(o.meanAnomaly, e) : o.meanAnomaly;
+    float Et = e > 0 ? EccentricAnomalySolver(M, e) : M;
+
+    auto [r0, v0] = get_local_position(o);
+
+    float r0mag = r0.norm();
+
+    vec3f r_t;
+    vec3f v_t;
+
+    r_t = o.a_semi / r0mag * (cos(Et-E0) - e * cos(E0)) * r0 + o.period() / (2.0 * M_PI) * (sin(Et-E0) - e * (sin(Et) - sin(E0))) * v0;
+    float rtmag = r_t.norm();
+    v_t = -std::sqrt(o.parent->GM_km3s2 * o.a_semi) / (rtmag * r0mag) * sin(Et-E0) * r0 + o.a_semi / rtmag * (cos(Et-E0) - e * cos(Et)) * v0;
+
+    return {r_t, v_t};
 }

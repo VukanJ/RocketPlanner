@@ -9,6 +9,24 @@
 #include "eigen3/Eigen/Geometry"
 #include "DeltaV.h"
 
+Date::Date(int64_t seconds) {
+    // Convert seconds to KSP date
+    int64_t totalMinutes = seconds / 60;
+    minute = totalMinutes % 60;
+    int64_t totalHours = totalMinutes / 60;
+    hour = totalHours % 6;
+    int64_t totalDays = totalHours / 6;
+    day = totalDays % 426;
+    year = totalDays / 426;
+}
+
+int64_t Date::toSeconds() const {
+    return static_cast<int64_t>(year) * 426 * 6 * 60 * 60 +
+           static_cast<int64_t>(day) * 6 * 60 * 60 +
+           static_cast<int64_t>(hour) * 60 * 60 +
+           static_cast<int64_t>(minute) * 60;
+}
+
 namespace {
     bool renderBodyCombo(const char* label, const Body*& selected) {
         bool changed = false;
@@ -82,8 +100,11 @@ bool WindowMission::render() {
         return endWin;
     }
     else if (input_phase == InputPhase::Sequence) {
-        ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
-        ImGui::Begin("Mission Sequence", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysVerticalScrollbar);
+        ImVec2 displaySize = ImGui::GetIO().DisplaySize;
+        float panelWidth = 420.0f;
+        ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
+        ImGui::SetNextWindowSize(ImVec2(panelWidth, displaySize.y), ImGuiCond_Always);
+        ImGui::Begin("Mission Sequence", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysVerticalScrollbar);
 
         ImGui::TextColored({1, 1, 0, 1}, "Ctrl+LMB to enter value");
 
@@ -91,13 +112,13 @@ bool WindowMission::render() {
         ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.3f, 0.15f, 0.0f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(0.4f, 0.2f, 0.0f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0.4f, 0.2f, 0.0f, 1.0f));
-        if (ImGui::Checkbox("Oberth effect", &oberth)) {
+        if (ImGui::Checkbox("Advanced navigation", &advanced)) {
             updateMissionSequence();
         }
         ImGui::SameLine();
         ImGui::TextDisabled("(?)");
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Assume interplanetary burns performed in low orbit. Saves Δv via Oberth effect.");
+            ImGui::SetTooltip("Assume interplanetary burns performed in low orbit. Saves Δv via Oberth effect. Launch date optimization");
         }
         ImGui::PopStyleColor(4);
 
@@ -239,9 +260,36 @@ bool WindowMission::render() {
         ImGui::End();
     }
 
-    systemMap.render(mission);
+    systemMap.render(mission, missionDate.toSeconds());
+
+    if (advanced) {
+        renderTimeInput();
+    }
 
     return endWin;
+}
+
+void WindowMission::renderTimeInput() {
+    ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_Appearing);
+    ImGui::Begin("Mission Time", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+
+    ImGui::PushItemWidth(110);
+    ImGui::InputInt("Year", &missionDate.year);
+    if (ImGui::InputInt("Day", &missionDate.day)) {
+        if (missionDate.day < 0) { missionDate.day = 426; }
+        if (missionDate.day > 426) { missionDate.day = 0; }
+    }
+    if (ImGui::InputInt("Hour", &missionDate.hour)) {
+        if (missionDate.hour < 0) { missionDate.hour = 6; }
+        if (missionDate.hour > 6) { missionDate.hour = 0; }
+    }
+    if (ImGui::InputInt("Minute", &missionDate.minute)) {
+        if (missionDate.minute < 0) { missionDate.minute = 60; }
+        if (missionDate.minute > 60) { missionDate.minute = 0; }
+    }
+
+    ImGui::PopItemWidth();
+    ImGui::End();
 }
 
 void WindowMission::updateMissionSequence() {
@@ -269,7 +317,7 @@ void WindowMission::updateMissionSequence() {
         else {
             if (to->orbit.parent == from->orbit.parent) {
                 // Planet to planet — both orbit the same parent body
-                if (oberth) {
+                if (advanced) {
                     msequence.push_back(MissionPhase { MissionPhaseType::ORBITAL_INSERTION, from, to, startOrbit, destOrbit });
                 }
                 else {
@@ -289,7 +337,7 @@ void WindowMission::updateMissionSequence() {
                     msequence.push_back(MissionPhase { MissionPhaseType::INCLINATION_CORRECTION, from, to, startOrbit });
                 }
             }
-            if (!oberth) {
+            if (!advanced) {
                 msequence.push_back(MissionPhase::hohmann(from, to, startOrbit, destOrbit));
             }
         }
