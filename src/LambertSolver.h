@@ -8,7 +8,7 @@
 
 class LambertSolver {
 public:
-    LambertSolver(const Body* ref, Orbit& origin, Orbit& target, std::uint64_t date);
+    void init(const Body* ref, const Orbit& origin, const Orbit& target, std::uint64_t date);
 
     void solve(float t_departure, float dt);
 
@@ -18,8 +18,8 @@ public:
     vec3f v1; // Velocity at departure
     vec3f v2; // Velocity at arrival
 
-    std::uint64_t date;
-    const Body* refBody;
+    std::uint64_t date = 0;
+    const Body* refBody = nullptr;
     Orbit originOrbit;
     Orbit targetOrbit;
 };

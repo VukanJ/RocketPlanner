@@ -123,7 +123,8 @@ bool WindowMission::render() {
         ImGui::PopStyleColor(4);
 
         if (ImGui::Button("Calculate launch window")) {
-            calcLaunchWindow();
+            transfer_solver.init(mission.originBody->orbit.parent, mission.originBody->orbit, mission.destinationBody->orbit, missionDate.toSeconds());
+            transfer_solver.solve(220*6*60*60, 270*6*60*60); // Duna transfer after t=0
         }
 
         float dvTotal_min = 0;

@@ -26,6 +26,7 @@ set(ROCKET_SOURCES
   src/gui.cpp
   src/WindowMission.cpp
   src/SystemMap.cpp
+  src/LambertSolver.cpp
 )
 
 # ---- Agave Font ----

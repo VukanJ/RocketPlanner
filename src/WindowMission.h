@@ -2,13 +2,14 @@
 #define WINDOW_MISSION
 
 #include "DeltaV.h"
+#include "LambertSolver.h"
 #include "SystemMap.h"
 #include "kspConstants.h"
 #include <vector>
 
 struct Mission {
     const Body* originBody = &KspSystem::Kerbin;
-    const Body* destinationBody = &KspSystem::Eve;
+    const Body* destinationBody = &KspSystem::Duna;
     bool oneWayTrip = false;
     bool apolloStyle = true;
 
@@ -84,6 +85,7 @@ public:
     SystemMap systemMap;
 
     Date missionDate { 0 };
+    LambertSolver transfer_solver;
 };
 
 #endif // WINDOW_MISSION
