@@ -84,7 +84,7 @@ public:
     bool launchDateOptim = false;
     SystemMap systemMap;
 
-    Date missionDate { 0 };
+    Date currentDate { 0 };
     LambertSolver transfer_solver;
 };
 

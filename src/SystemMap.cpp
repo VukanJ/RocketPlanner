@@ -45,7 +45,8 @@ namespace {
     // Applies the same LAN → inclination → AoP rotation as Orbit.cpp,
     // but uses the polar form r(θ) to trace the full ellipse rather
     // than solving for a single position from meanAnomaly.
-    void sampleOrbit(const Orbit& orbit, std::vector<glm::vec3>& pts) {
+    void sampleOrbit(const Orbit& orbit, std::vector<glm::vec3>& pts,
+                     float startAngle = 0.0f, float endAngle = 2.0f * M_PI) {
         pts.resize(ORBIT_SAMPLES);
         float a = orbit.a_semi;
         float e = orbit.eccentricity;
@@ -56,7 +57,7 @@ namespace {
         glm::mat4 xform = AoP_rot * inc_rot * LAN_rot;
 
         for (int i = 0; i < ORBIT_SAMPLES; ++i) {
-            float theta = 2.0f * M_PI * i / ORBIT_SAMPLES;
+            float theta = startAngle + (endAngle - startAngle) * i / ORBIT_SAMPLES;
             float r = a * (1.0f - e * e) / (1.0f + e * cosf(theta));
             glm::vec4 p(r * cosf(theta), 0.0f, r * sinf(theta), 1.0f);
             pts[i] = glm::vec3(xform * p);
@@ -93,7 +94,7 @@ namespace {
     // either endpoint is behind the camera to prevent wrap-around artifacts.
     void drawOrbitLine(ImDrawList* dl, const std::vector<glm::vec3>& pts,
                        const glm::mat4& vp, ImVec2 origin, ImVec2 sz,
-                       ImU32 color, float thickness)
+                       ImU32 color, float thickness, bool closed = true)
     {
         std::vector<ImVec2> screen(pts.size());
         std::vector<bool> visible(pts.size());
@@ -102,7 +103,8 @@ namespace {
             screen[i] = {s.x, s.y};
             visible[i] = (s.z > -1.0f && s.z < 1.0f);
         }
-        for (size_t i = 0; i < pts.size(); ++i) {
+        size_t count = closed ? pts.size() : pts.size() - 1;
+        for (size_t i = 0; i < count; ++i) {
             size_t j = (i + 1) % pts.size();
             if (visible[i] && visible[j]) {
                 dl->AddLine(screen[i], screen[j], color, thickness);
@@ -241,6 +243,11 @@ void SystemMap::render(const Mission& mission, int64_t seconds) {
         }
     }
 
+    // Draw debug orbits (transfer orbits, etc.)
+    for (auto& dbg : debugOrbits) {
+        drawOrbitDebug(dbg.orbit, dl, vp, wpos, wsz, dbg.color, dbg.thickness, dbg.startAngle, dbg.endAngle);
+    }
+
     // Draw central star (Kerbol) at the origin
     {
         glm::vec3 sp = project(glm::vec3(0, 0, 0), vp, wpos, wsz);
@@ -259,4 +266,105 @@ void SystemMap::render(const Mission& mission, int64_t seconds) {
 
     ImGui::End();
     ImGui::PopStyleVar();
+}
+
+void SystemMap::addDebugOrbit(const DebugOrbit& dbg) {
+    debugOrbits.push_back(dbg);
+}
+
+void SystemMap::clearDebugOrbits() {
+    debugOrbits.clear();
+}
+
+void SystemMap::drawOrbitDebug(const Orbit& orbit, ImDrawList* dl,
+                               const glm::mat4& vp, ImVec2 origin, ImVec2 sz,
+                               ImU32 color, float thickness,
+                               float startAngle, float endAngle)
+{
+    // Draw the orbit arc
+    std::vector<glm::vec3> pts;
+    sampleOrbit(orbit, pts, startAngle, endAngle);
+    drawOrbitLine(dl, pts, vp, origin, sz, color, thickness, false);
+
+    float a = orbit.a_semi;
+    float e = orbit.eccentricity;
+    float b = a * sqrtf(1.0f - e * e);
+    float ae = a * e;
+    float r_p = a * (1.0f - e);
+    float r_a = a * (1.0f + e);
+
+    // Build the same rotation chain as sampleOrbit
+    glm::mat4 LAN_rot = glm::rotate(glm::mat4(1.0f), -orbit.LAN * DEG, glm::vec3(0, 1, 0));
+    glm::mat4 inc_rot = glm::rotate(glm::mat4(1.0f), -orbit.inclination * DEG, glm::vec3(1, 0, 0));
+    glm::mat4 AoP_rot = glm::rotate(glm::mat4(1.0f), -orbit.argumentOfPeriapsis * DEG, glm::vec3(0, 1, 0));
+    glm::mat4 xform = AoP_rot * inc_rot * LAN_rot;
+
+    // Helper: rotate a perifocal point to world space and project to screen
+    auto toScreen = [&](float x, float y, float z) -> glm::vec3 {
+        glm::vec4 p = xform * glm::vec4(x, y, z, 1.0f);
+        return project(glm::vec3(p), vp, origin, sz);
+    };
+
+    // Helper: draw a dashed line between two screen-space points
+    auto drawDashed = [&](ImVec2 from, ImVec2 to, ImU32 c, float thickness, float dashLen = 8.0f, float gapLen = 5.0f) {
+        float dx = to.x - from.x;
+        float dy = to.y - from.y;
+        float len = sqrtf(dx * dx + dy * dy);
+        if (len < 1.0f) return;
+        float nx = dx / len;
+        float ny = dy / len;
+        float pos = 0.0f;
+        while (pos < len) {
+            float end = std::min(pos + dashLen, len);
+            dl->AddLine(ImVec2(from.x + nx * pos, from.y + ny * pos),
+                        ImVec2(from.x + nx * end, from.y + ny * end),
+                        c, thickness);
+            pos = end + gapLen;
+        }
+    };
+
+    // Helper: draw a labeled dot
+    auto drawDot = [&](const glm::vec3& sp, ImU32 c, const char* label, float radius = 4.0f) {
+        if (sp.z < -1.0f || sp.z > 1.0f) return;
+        dl->AddCircleFilled(ImVec2(sp.x, sp.y), radius, c);
+        dl->AddText(ImVec2(sp.x + 8, sp.y - 6), c, label);
+    };
+
+    // Key positions in perifocal frame
+    struct Annotation {
+        float x, y, z;
+        const char* label;
+        ImU32 color;
+        float dotRadius;
+    };
+
+    // Perifocal positions: x = radial (toward periapsis), z = transverse
+    // Periapsis is at +x, apoapsis at -x
+    // Foci: primary at origin, secondary at (-2ae, 0, 0)
+
+    // Points to annotate
+    std::vector<Annotation> annotations = {
+        { r_p,  0, 0, "PE",      IM_COL32(100, 255, 100, 255), 5.0f },
+        {-r_a,  0, 0, "AP",      IM_COL32(255, 100, 100, 255), 5.0f },
+        {-2*ae, 0, 0, "F'",      IM_COL32(200, 200, 200, 255), 3.0f },
+    };
+
+    for (auto& a : annotations) {
+        glm::vec3 sp = toScreen(a.x, a.y, a.z);
+        drawDot(sp, a.color, a.label, a.dotRadius);
+    }
+
+    // Semi-major axis line: from AP (-r_a, 0, 0) to PE (r_p, 0, 0)
+    {
+        glm::vec3 spA = toScreen(-r_a, 0, 0);
+        glm::vec3 spB = toScreen( r_p, 0, 0);
+        if (spA.z >= -1.0f && spA.z <= 1.0f && spB.z >= -1.0f && spB.z <= 1.0f) {
+            drawDashed({spA.x, spA.y}, {spB.x, spB.y}, IM_COL32(180, 180, 180, 180), 1.0f);
+            float mx = (spA.x + spB.x) * 0.5f;
+            float my = (spA.y + spB.y) * 0.5f;
+            char buf[32];
+            snprintf(buf, sizeof(buf), "a=%.0f", a);
+            dl->AddText(ImVec2(mx + 4, my - 14), IM_COL32(180, 180, 180, 220), buf);
+        }
+    }
 }

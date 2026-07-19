@@ -123,8 +123,20 @@ bool WindowMission::render() {
         ImGui::PopStyleColor(4);
 
         if (ImGui::Button("Calculate launch window")) {
-            transfer_solver.init(mission.originBody->orbit.parent, mission.originBody->orbit, mission.destinationBody->orbit, missionDate.toSeconds());
+            transfer_solver.init(mission.originBody->orbit.parent, mission.originBody->orbit, mission.destinationBody->orbit, currentDate.toSeconds());
             transfer_solver.solve(220*6*60*60, 270*6*60*60); // Duna transfer after t=0
+
+            auto nu1_1 = transfer_solver.transferOrbit1.trueAnomalyAt(transfer_solver.r1);
+            auto nu2_1 = transfer_solver.transferOrbit1.trueAnomalyAt(transfer_solver.r2);
+            if (nu2_1 < nu1_1) nu2_1 += 2.0f * M_PI;
+
+            auto nu1_2 = transfer_solver.transferOrbit2.trueAnomalyAt(transfer_solver.r1);
+            auto nu2_2 = transfer_solver.transferOrbit2.trueAnomalyAt(transfer_solver.r2);
+            if (nu2_2 < nu1_2) nu2_2 += 2.0f * M_PI;
+
+            systemMap.clearDebugOrbits();
+            systemMap.addDebugOrbit({transfer_solver.transferOrbit1, IM_COL32(0, 200, 255, 200), 2.5f, nu1_1, nu2_1});
+            systemMap.addDebugOrbit({transfer_solver.transferOrbit2, IM_COL32(255, 100, 200, 200), 2.5f, nu1_2, nu2_2});
         }
 
         float dvTotal_min = 0;
@@ -265,7 +277,7 @@ bool WindowMission::render() {
         ImGui::End();
     }
 
-    systemMap.render(mission, missionDate.toSeconds());
+    systemMap.render(mission, currentDate.toSeconds());
 
     if (advanced) {
         renderTimeInput();
@@ -279,19 +291,19 @@ void WindowMission::renderTimeInput() {
     ImGui::Begin("Mission Time", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
 
     ImGui::PushItemWidth(110);
-    ImGui::InputInt("Year", &missionDate.year);
-    if (missionDate.year < 1) { missionDate.year = 1; }
-    if (ImGui::InputInt("Day", &missionDate.day)) {
-        if (missionDate.day < 1) { missionDate.day = 426; }
-        if (missionDate.day > 426) { missionDate.day = 1; }
+    ImGui::InputInt("Year", &currentDate.year);
+    if (currentDate.year < 1) { currentDate.year = 1; }
+    if (ImGui::InputInt("Day", &currentDate.day)) {
+        if (currentDate.day < 1) { currentDate.day = 426; }
+        if (currentDate.day > 426) { currentDate.day = 1; }
     }
-    if (ImGui::InputInt("Hour", &missionDate.hour)) {
-        if (missionDate.hour < 0) { missionDate.hour = 5; }
-        if (missionDate.hour > 5) { missionDate.hour = 0; }
+    if (ImGui::InputInt("Hour", &currentDate.hour)) {
+        if (currentDate.hour < 0) { currentDate.hour = 5; }
+        if (currentDate.hour > 5) { currentDate.hour = 0; }
     }
-    if (ImGui::InputInt("Minute", &missionDate.minute)) {
-        if (missionDate.minute < 0) { missionDate.minute = 59; }
-        if (missionDate.minute > 59) { missionDate.minute = 0; }
+    if (ImGui::InputInt("Minute", &currentDate.minute)) {
+        if (currentDate.minute < 0) { currentDate.minute = 59; }
+        if (currentDate.minute > 59) { currentDate.minute = 0; }
     }
 
     ImGui::PopItemWidth();

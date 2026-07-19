@@ -18,6 +18,13 @@ public:
     vec3f v1; // Velocity at departure
     vec3f v2; // Velocity at arrival
 
+    Orbit transferOrbit1;
+    Orbit transferOrbit2;
+    float deltaV1_depart = 0;
+    float deltaV1_arrive = 0;
+    float deltaV2_depart = 0;
+    float deltaV2_arrive = 0;
+
     std::uint64_t date = 0;
     const Body* refBody = nullptr;
     Orbit originOrbit;

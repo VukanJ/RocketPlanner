@@ -47,6 +47,39 @@ void LambertSolver::solve(float t_departure, float dt) {
         }
         a = 0.5f * (A + B);
     }
+    // Done
     
-    // Compute transfer orbit velocities via Lagrange coefficients
+    // Construct the two possible focal points by circle intersection
+    const float R1 = 2.0f * a - r1.norm();
+    const float R2 = 2.0f * a - r2.norm();
+    const float d = (r2 - r1).norm();
+    vec3f d_hat = (r2 - r1) / d;
+
+    float a_param = (R1 * R1 - R2 * R2 + d * d) / (2.0f * d);
+    float h = std::sqrt(std::max(R1 * R1 - a_param * a_param, 0.0f));
+
+    vec3f m = r1 + a_param * d_hat;
+    vec3f n = r1.cross(r2).normalized();
+    vec3f perp = n.cross(d_hat);
+    vec3f focal1 = m + h * perp;
+    vec3f focal2 = m - h * perp;
+
+    // Reconstruct both transfer orbits
+    transferOrbit1 = Orbit::fromLambert(refBody, r1, r2, focal1, a);
+    transferOrbit2 = Orbit::fromLambert(refBody, r1, r2, focal2, a);
+
+    // Get transfer orbit velocities at r1 and r2
+    auto [r1_check1, v1t1] = get_local_position(transferOrbit1);
+    auto [r2_check1, v2t1] = get_local_future_position(transferOrbit1, dt);
+    auto [r1_check2, v1t2] = get_local_position(transferOrbit2);
+    auto [r2_check2, v2t2] = get_local_future_position(transferOrbit2, dt);
+
+    // Departure velocities on the original orbits
+    auto [r1_orig, v1_orig] = get_local_future_position(originOrbit, date + t_departure);
+    auto [r2_orig, v2_orig] = get_local_future_position(targetOrbit, date + t_departure + dt);
+
+    deltaV1_depart = (v1t1 - v1_orig).norm();
+    deltaV1_arrive = (v2t1 - v2_orig).norm();
+    deltaV2_depart = (v1t2 - v1_orig).norm();
+    deltaV2_arrive = (v2t2 - v2_orig).norm();
 }

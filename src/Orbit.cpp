@@ -4,6 +4,84 @@
 
 #include <cmath>
 
+Orbit Orbit::circular(const Body *ref, float R) {
+    Orbit o;
+    o.parent = ref;
+    o.AP = R;
+    o.PE = R;
+    o.a_semi = R;
+    return o;
+}
+
+Orbit Orbit::elliptic(const Body* ref, float ap, float pe) {
+    if (pe > ap) {
+        throw std::runtime_error("PE <= AP is required");
+    }
+    Orbit o;
+    o.parent = ref;
+    o.AP = ap;
+    o.PE = pe;
+    o.a_semi = 0.5 * (ap + pe);
+
+    float b = std::sqrt(ap * pe);
+
+    o.eccentricity = std::sqrt(1 - b*b / (o.a_semi * o.a_semi));
+    return o;
+}
+
+Orbit Orbit::fromLambert(const Body* ref, vec3f r1, vec3f r2, vec3f Fprime, float a) {
+    // Initialize an orbit and all its Keplerian orbital elements 
+    // given two positions on the orbit, r1 & r2, the hidden focal point Fprime and the semimajor axis.
+    // It is assumed that the sun is at the origin
+    Orbit orbit;
+
+    const float e = Fprime.norm() / (2.0f * a);
+
+    // Orbital plane normal (ensure prograde: n.y >= 0)
+    vec3f n = r1.cross(r2).normalized();
+    if (n.y() < 0.0f) { n = -n; }
+
+    orbit.parent = ref;
+    orbit.eccentricity = e;
+    orbit.a_semi = a;
+    orbit.AP = a * (1.0 + e);
+    orbit.PE = a * (1.0 - e);
+    orbit.inclination = acos(n.y()) * 180.0f / M_PI;
+
+    orbit.LAN = atan2(-n.x(), n.z()) * 180.0f / M_PI;
+    orbit.LDN = fmod(orbit.LAN + 180.0f, 360.0f);
+
+    // Argument of periapsis
+    float lan_rad = orbit.LAN * M_PI / 180.0f;
+    vec3f AN_hat(cos(lan_rad), 0.0f, sin(lan_rad));
+    vec3f e2 = n.cross(AN_hat);
+
+    // Periapsis position vector from focus at origin
+    vec3f r_p = (e - 1.0f) / (2.0f * e) * Fprime;
+    vec3f r_p_hat = r_p.normalized();
+
+    float cosw = r_p_hat.dot(AN_hat);
+    float sinw = r_p_hat.dot(e2);
+    orbit.argumentOfPeriapsis = atan2(sinw, cosw) * 180.0f / M_PI;
+
+    // True anomaly at r1
+    vec3f r1_hat = r1.normalized();
+    float cosnu = r1_hat.dot(r_p_hat);
+    float sinnu = r1_hat.dot(n.cross(r_p_hat));
+    float nu = atan2(sinnu, cosnu);
+
+    // Eccentric anomaly (numerically stable atan2 form)
+    float E = 2.0f * atan2(sqrt(1.0f - e) * sin(nu / 2.0f),
+                           sqrt(1.0f + e) * cos(nu / 2.0f));
+
+    // Mean anomaly (Kepler's equation)
+    orbit.meanAnomaly = E - e * sin(E);
+    if (orbit.meanAnomaly < 0.0f) { orbit.meanAnomaly += 2.0f * M_PI; }
+    if (orbit.meanAnomaly >= 2.0f * M_PI) { orbit.meanAnomaly -= 2.0f * M_PI; }
+
+    return orbit;
+}
+
 inline constexpr float deg2rad(float f) {
     return f * M_PI / 180.0f;
 }
@@ -18,6 +96,15 @@ float Orbit::v_periapsis(float unit) const {
 
 float Orbit::period() const {
     return 2.0f * M_PI * std::sqrt(a_semi * a_semi * a_semi / parent->GM_km3s2);
+}
+
+float Orbit::trueAnomalyAt(const vec3f& r) const {
+    Eigen::Matrix3f transform =
+        Eigen::AngleAxisf(deg2rad(-argumentOfPeriapsis), Eigen::Vector3f::UnitY()).toRotationMatrix() *
+        Eigen::AngleAxisf(deg2rad(-inclination), Eigen::Vector3f::UnitX()).toRotationMatrix() *
+        Eigen::AngleAxisf(deg2rad(-LAN), Eigen::Vector3f::UnitY()).toRotationMatrix();
+    vec3f r_perifocal = transform.transpose() * r;
+    return std::atan2(r_perifocal.z(), r_perifocal.x());
 }
 
 Eigen::Vector3f Orbit::normal() const {
