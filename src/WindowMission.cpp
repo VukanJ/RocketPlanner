@@ -16,13 +16,13 @@ Date::Date(int64_t seconds) {
     int64_t totalHours = totalMinutes / 60;
     hour = totalHours % 6;
     int64_t totalDays = totalHours / 6;
-    day = totalDays % 426;
-    year = totalDays / 426;
+    day = (totalDays % 426) + 1;
+    year = (totalDays / 426) + 1;
 }
 
 int64_t Date::toSeconds() const {
-    return static_cast<int64_t>(year) * 426 * 6 * 60 * 60 +
-           static_cast<int64_t>(day) * 6 * 60 * 60 +
+    return static_cast<int64_t>(year - 1) * 426 * 6 * 60 * 60 +
+           static_cast<int64_t>(day - 1) * 6 * 60 * 60 +
            static_cast<int64_t>(hour) * 60 * 60 +
            static_cast<int64_t>(minute) * 60;
 }
@@ -280,17 +280,18 @@ void WindowMission::renderTimeInput() {
 
     ImGui::PushItemWidth(110);
     ImGui::InputInt("Year", &missionDate.year);
+    if (missionDate.year < 1) { missionDate.year = 1; }
     if (ImGui::InputInt("Day", &missionDate.day)) {
-        if (missionDate.day < 0) { missionDate.day = 426; }
-        if (missionDate.day > 426) { missionDate.day = 0; }
+        if (missionDate.day < 1) { missionDate.day = 426; }
+        if (missionDate.day > 426) { missionDate.day = 1; }
     }
     if (ImGui::InputInt("Hour", &missionDate.hour)) {
-        if (missionDate.hour < 0) { missionDate.hour = 6; }
-        if (missionDate.hour > 6) { missionDate.hour = 0; }
+        if (missionDate.hour < 0) { missionDate.hour = 5; }
+        if (missionDate.hour > 5) { missionDate.hour = 0; }
     }
     if (ImGui::InputInt("Minute", &missionDate.minute)) {
-        if (missionDate.minute < 0) { missionDate.minute = 60; }
-        if (missionDate.minute > 60) { missionDate.minute = 0; }
+        if (missionDate.minute < 0) { missionDate.minute = 59; }
+        if (missionDate.minute > 59) { missionDate.minute = 0; }
     }
 
     ImGui::PopItemWidth();
