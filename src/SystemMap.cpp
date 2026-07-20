@@ -54,7 +54,7 @@ namespace {
         glm::mat4 LAN_rot = glm::rotate(glm::mat4(1.0f), -orbit.LAN * DEG, glm::vec3(0, 1, 0));
         glm::mat4 inc_rot = glm::rotate(glm::mat4(1.0f), -orbit.inclination * DEG, glm::vec3(1, 0, 0));
         glm::mat4 AoP_rot = glm::rotate(glm::mat4(1.0f), -orbit.argumentOfPeriapsis * DEG, glm::vec3(0, 1, 0));
-        glm::mat4 xform = AoP_rot * inc_rot * LAN_rot;
+        glm::mat4 xform = LAN_rot * inc_rot * AoP_rot;
 
         for (int i = 0; i < ORBIT_SAMPLES; ++i) {
             float theta = startAngle + (endAngle - startAngle) * i / ORBIT_SAMPLES;
@@ -297,7 +297,7 @@ void SystemMap::drawOrbitDebug(const Orbit& orbit, ImDrawList* dl,
     glm::mat4 LAN_rot = glm::rotate(glm::mat4(1.0f), -orbit.LAN * DEG, glm::vec3(0, 1, 0));
     glm::mat4 inc_rot = glm::rotate(glm::mat4(1.0f), -orbit.inclination * DEG, glm::vec3(1, 0, 0));
     glm::mat4 AoP_rot = glm::rotate(glm::mat4(1.0f), -orbit.argumentOfPeriapsis * DEG, glm::vec3(0, 1, 0));
-    glm::mat4 xform = AoP_rot * inc_rot * LAN_rot;
+    glm::mat4 xform = LAN_rot * inc_rot * AoP_rot;
 
     // Helper: rotate a perifocal point to world space and project to screen
     auto toScreen = [&](float x, float y, float z) -> glm::vec3 {

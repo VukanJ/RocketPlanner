@@ -48,13 +48,13 @@ Orbit Orbit::fromLambert(const Body* ref, vec3f r1, vec3f r2, vec3f Fprime, floa
     orbit.PE = a * (1.0 - e);
     orbit.inclination = acos(n.y()) * 180.0f / M_PI;
 
-    orbit.LAN = atan2(-n.x(), n.z()) * 180.0f / M_PI;
+    orbit.LAN = atan2(n.x(), -n.z()) * 180.0f / M_PI;
     orbit.LDN = fmod(orbit.LAN + 180.0f, 360.0f);
 
     // Argument of periapsis
     float lan_rad = orbit.LAN * M_PI / 180.0f;
     vec3f AN_hat(cos(lan_rad), 0.0f, sin(lan_rad));
-    vec3f e2 = n.cross(AN_hat);
+    vec3f e2 = AN_hat.cross(n);
 
     // Periapsis position vector from focus at origin
     vec3f r_p = (e - 1.0f) / (2.0f * e) * Fprime;
@@ -100,9 +100,9 @@ float Orbit::period() const {
 
 float Orbit::trueAnomalyAt(const vec3f& r) const {
     Eigen::Matrix3f transform =
-        Eigen::AngleAxisf(deg2rad(-argumentOfPeriapsis), Eigen::Vector3f::UnitY()).toRotationMatrix() *
+        Eigen::AngleAxisf(deg2rad(-LAN), Eigen::Vector3f::UnitY()).toRotationMatrix() *
         Eigen::AngleAxisf(deg2rad(-inclination), Eigen::Vector3f::UnitX()).toRotationMatrix() *
-        Eigen::AngleAxisf(deg2rad(-LAN), Eigen::Vector3f::UnitY()).toRotationMatrix();
+        Eigen::AngleAxisf(deg2rad(-argumentOfPeriapsis), Eigen::Vector3f::UnitY()).toRotationMatrix();
     vec3f r_perifocal = transform.transpose() * r;
     return std::atan2(r_perifocal.z(), r_perifocal.x());
 }
@@ -154,9 +154,9 @@ std::pair<vec3f, vec3f> get_local_position(const Orbit& o) {
     v0.y() = 0;
     v0.z() = sqrt(o.parent->GM_km3s2 / p) * (e + cos(phi));
 
-    auto transform = Eigen::AngleAxisf(deg2rad(-o.argumentOfPeriapsis), Eigen::Vector3f::UnitY()) *
+    auto transform = Eigen::AngleAxisf(deg2rad(-o.LAN), Eigen::Vector3f::UnitY()) *
                      Eigen::AngleAxisf(deg2rad(-o.inclination), Eigen::Vector3f::UnitX()) *
-                     Eigen::AngleAxisf(deg2rad(-o.LAN), Eigen::Vector3f::UnitY());
+                     Eigen::AngleAxisf(deg2rad(-o.argumentOfPeriapsis), Eigen::Vector3f::UnitY());
     r0 = transform * r0;
     v0 = transform * v0;
     return {r0, v0};

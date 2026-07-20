@@ -75,7 +75,7 @@ public:
     bool render();
     void updateMissionSequence();
     void calcLaunchWindow();
-    void renderTimeInput();
+    bool renderTimeInput();
 
     enum class InputPhase { FromTo, Sequence } input_phase = WindowMission::InputPhase::FromTo;
 
@@ -86,6 +86,7 @@ public:
 
     Date currentDate { 0 };
     LambertSolver transfer_solver;
+    bool update_solver = false;
 };
 
 #endif // WINDOW_MISSION

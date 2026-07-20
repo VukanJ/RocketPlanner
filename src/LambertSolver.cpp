@@ -2,8 +2,7 @@
 #include <cmath>
 #include <Eigen/Geometry>
 
-void LambertSolver::init(const Body* ref, const Orbit& origin, const Orbit& target, std::uint64_t date_seconds) {
-    date = date_seconds;
+void LambertSolver::init(const Body* ref, const Orbit& origin, const Orbit& target) {
     refBody = ref;
     originOrbit = origin;
     targetOrbit = target;
@@ -17,9 +16,9 @@ float Lambert(float s, float c, float a, float mu) {
 
 void LambertSolver::solve(float t_departure, float dt) {
     // Get initial orbital position and position of target after given flight time dt
-    auto [r1_local, v1_local] = get_local_future_position(originOrbit, date + t_departure);
+    auto [r1_local, v1_local] = get_local_future_position(originOrbit, t_departure);
     r1 = r1_local;
-    auto [r2_local, v2_local] = get_local_future_position(targetOrbit, date + t_departure + dt);
+    auto [r2_local, v2_local] = get_local_future_position(targetOrbit, t_departure + dt);
     r2 = r2_local;
 
     const float mu = originOrbit.parent->GM_km3s2;
@@ -75,8 +74,8 @@ void LambertSolver::solve(float t_departure, float dt) {
     auto [r2_check2, v2t2] = get_local_future_position(transferOrbit2, dt);
 
     // Departure velocities on the original orbits
-    auto [r1_orig, v1_orig] = get_local_future_position(originOrbit, date + t_departure);
-    auto [r2_orig, v2_orig] = get_local_future_position(targetOrbit, date + t_departure + dt);
+    auto [r1_orig, v1_orig] = get_local_future_position(originOrbit, t_departure);
+    auto [r2_orig, v2_orig] = get_local_future_position(targetOrbit, t_departure + dt);
 
     deltaV1_depart = (v1t1 - v1_orig).norm();
     deltaV1_arrive = (v2t1 - v2_orig).norm();

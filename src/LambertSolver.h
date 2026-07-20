@@ -8,7 +8,7 @@
 
 class LambertSolver {
 public:
-    void init(const Body* ref, const Orbit& origin, const Orbit& target, std::uint64_t date);
+    void init(const Body* ref, const Orbit& origin, const Orbit& target);
 
     void solve(float t_departure, float dt);
 
@@ -25,7 +25,6 @@ public:
     float deltaV2_depart = 0;
     float deltaV2_arrive = 0;
 
-    std::uint64_t date = 0;
     const Body* refBody = nullptr;
     Orbit originOrbit;
     Orbit targetOrbit;

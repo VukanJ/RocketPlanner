@@ -392,6 +392,31 @@ TEST(OrbitalDataTest, GMConsistentWithSurfaceGravity) {
     }
 }
 
+TEST(OrbitTest, LambertElementsReconstructBothEndpoints) {
+    Orbit expected;
+    expected.parent = &KspSystem::Kerbol;
+    expected.a_semi = 12'000'000.0;
+    expected.eccentricity = 0.2f;
+    expected.AP = expected.a_semi * (1.0 + expected.eccentricity);
+    expected.PE = expected.a_semi * (1.0 - expected.eccentricity);
+    expected.inclination = 35.0f;
+    expected.LAN = 70.0f;
+    expected.argumentOfPeriapsis = 40.0f;
+
+    constexpr std::uint64_t flightTime = 100'000;
+    auto [r1, unusedV1] = get_local_position(expected);
+    auto [r2, unusedV2] = get_local_future_position(expected, flightTime);
+    vec3f otherFocus = (2.0f * expected.eccentricity / (expected.eccentricity - 1.0f)) * r1;
+
+    Orbit reconstructed = Orbit::fromLambert(expected.parent, r1, r2, otherFocus, expected.a_semi);
+    auto [reconstructedR1, unusedReconstructedV1] = get_local_position(reconstructed);
+    auto [reconstructedR2, unusedReconstructedV2] =
+        get_local_future_position(reconstructed, flightTime);
+
+    EXPECT_NEAR((reconstructedR1 - r1).norm(), 0.0f, 2.0f);
+    EXPECT_NEAR((reconstructedR2 - r2).norm(), 0.0f, 2.0f);
+}
+
 // ---------------------------------------------------------------------------
 // DeltaV calculators
 // ---------------------------------------------------------------------------
