@@ -10,7 +10,7 @@ class LambertSolver {
 public:
     void init(const Body* ref, const Orbit& origin, const Orbit& target);
 
-    void solve(float t_departure, float dt);
+    bool solve(float t_departure, float dt);
 
     vec3f r1; // Position at departure
     vec3f r2; // Position at arrival

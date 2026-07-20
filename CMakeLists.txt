@@ -106,6 +106,7 @@ set(UNITTEST_SOURCES
   src/unittest.cpp src/rocket.cpp src/parts.cpp src/PartSerializer.cpp
   src/stage.cpp src/LoadKspParts.cpp src/NelderMead.cpp
   src/RocketSolver.cpp src/RocketConfig.cpp src/DeltaV.cpp src/Orbit.cpp
+  src/LambertSolver.cpp
 )
 
 add_executable(unittest ${UNITTEST_SOURCES})

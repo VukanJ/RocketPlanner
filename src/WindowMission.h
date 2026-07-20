@@ -5,6 +5,7 @@
 #include "LambertSolver.h"
 #include "SystemMap.h"
 #include "kspConstants.h"
+#include <limits>
 #include <vector>
 
 struct Mission {
@@ -67,6 +68,30 @@ struct Date {
     int64_t toSeconds() const;
 };
 
+struct PorkchopPlot {
+    static constexpr int minResolution = 16;
+    static constexpr int maxResolution = 512;
+
+    bool isOpen = false;
+    Date launchStart { 0 };
+    Date launchEnd { 0 };
+    int flightTimeStartDays = 50;
+    int flightTimeEndDays = 400;
+    int resolution = 96;
+    int calculatedResolution = 0;
+    Date calculatedLaunchStart { 0 };
+    Date calculatedLaunchEnd { 0 };
+    int calculatedFlightTimeStartDays = 0;
+    int calculatedFlightTimeEndDays = 0;
+    int colormapIndex = 0;
+    std::vector<float> deltaV;
+    float minDeltaV = std::numeric_limits<float>::infinity();
+    float maxDeltaV = 0.0f;
+    float colorMinDeltaV = 0.0f;
+    float colorMaxDeltaV = 0.0f;
+    bool calculated = false;
+};
+
 class WindowMission {
 public:
     WindowMission();
@@ -76,6 +101,8 @@ public:
     void updateMissionSequence();
     void calcLaunchWindow();
     bool renderTimeInput();
+    void renderPorkchopPlot();
+    void generatePorkchopPlot();
 
     enum class InputPhase { FromTo, Sequence } input_phase = WindowMission::InputPhase::FromTo;
 
@@ -87,6 +114,7 @@ public:
     Date currentDate { 0 };
     LambertSolver transfer_solver;
     bool update_solver = false;
+    PorkchopPlot porkchopPlot;
 };
 
 #endif // WINDOW_MISSION

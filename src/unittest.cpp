@@ -7,6 +7,7 @@
 #include "imgui.h"
 #include "parts.h"
 #include "kspConstants.h"
+#include "LambertSolver.h"
 #include "utils.h"
 #include "Orbit.h"
 
@@ -415,6 +416,22 @@ TEST(OrbitTest, LambertElementsReconstructBothEndpoints) {
 
     EXPECT_NEAR((reconstructedR1 - r1).norm(), 0.0f, 2.0f);
     EXPECT_NEAR((reconstructedR2 - r2).norm(), 0.0f, 2.0f);
+}
+
+TEST(LambertSolverTest, ComputesFiniteTransferDeltaV) {
+    LambertSolver solver;
+    solver.init(KspSystem::Kerbin.orbit.parent, KspSystem::Kerbin.orbit, KspSystem::Eve.orbit);
+
+    constexpr float launchTime = (426 + 123) * 6 * 60 * 60;
+    const float transferTime = 0.505f * Orbit::elliptic(
+        KspSystem::Kerbin.orbit.parent, KspSystem::Kerbin.orbit.AP, KspSystem::Eve.orbit.PE).period();
+
+    ASSERT_TRUE(solver.solve(launchTime, transferTime));
+    EXPECT_TRUE(std::isfinite(solver.deltaV1_depart));
+    EXPECT_TRUE(std::isfinite(solver.deltaV1_arrive));
+    EXPECT_TRUE(std::isfinite(solver.deltaV2_depart));
+    EXPECT_TRUE(std::isfinite(solver.deltaV2_arrive));
+
 }
 
 // ---------------------------------------------------------------------------

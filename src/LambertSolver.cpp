@@ -14,7 +14,11 @@ float Lambert(float s, float c, float a, float mu) {
     return sqrt(a * a * a / mu) * (alpha - sin(alpha) - beta + sin(beta));
 }
 
-void LambertSolver::solve(float t_departure, float dt) {
+bool LambertSolver::solve(float t_departure, float dt) {
+    if (dt <= 0.0f) {
+        return false;
+    }
+
     // Get initial orbital position and position of target after given flight time dt
     auto [r1_local, v1_local] = get_local_future_position(originOrbit, t_departure);
     r1 = r1_local;
@@ -23,13 +27,19 @@ void LambertSolver::solve(float t_departure, float dt) {
 
     const float mu = originOrbit.parent->GM_km3s2;
     const float c = (r2 - r1).norm();  // chord
+    if (c <= 0.0f) {
+        return false;
+    }
     const float s = 0.5f * (r1.norm() + r2.norm() + c);  // Semi-perimeter
     const float amin = 0.5f * s;  // minimum energy semimajor axis
     float amax = 2*s;
 
     // Find amax so that its travel time is below dt (T(a) is decreasing)
-    while (Lambert(s, c, amax, mu) > dt) {
+    for (int i = 0; i < 64 && Lambert(s, c, amax, mu) > dt; ++i) {
         amax *= 2;
+    }
+    if (Lambert(s, c, amax, mu) > dt) {
+        return false;
     }
 
     // Bisection algorithm
@@ -58,7 +68,11 @@ void LambertSolver::solve(float t_departure, float dt) {
     float h = std::sqrt(std::max(R1 * R1 - a_param * a_param, 0.0f));
 
     vec3f m = r1 + a_param * d_hat;
-    vec3f n = r1.cross(r2).normalized();
+    vec3f orbitalNormal = r1.cross(r2);
+    if (orbitalNormal.squaredNorm() == 0.0f) {
+        return false;
+    }
+    vec3f n = orbitalNormal.normalized();
     vec3f perp = n.cross(d_hat);
     vec3f focal1 = m + h * perp;
     vec3f focal2 = m - h * perp;
@@ -81,4 +95,5 @@ void LambertSolver::solve(float t_departure, float dt) {
     deltaV1_arrive = (v2t1 - v2_orig).norm();
     deltaV2_depart = (v1t2 - v1_orig).norm();
     deltaV2_arrive = (v2t2 - v2_orig).norm();
+    return true;
 }
