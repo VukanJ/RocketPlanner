@@ -87,7 +87,6 @@ struct PorkchopPlot {
     std::vector<float> deltaV;
     float minDeltaV = std::numeric_limits<float>::infinity();
     float maxDeltaV = 0.0f;
-    float colorMinDeltaV = 0.0f;
     float colorMaxDeltaV = 0.0f;
     bool calculated = false;
 };

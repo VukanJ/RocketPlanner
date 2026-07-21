@@ -8,6 +8,12 @@
 constexpr inline float unit_mps = 1000.0;
 constexpr inline float unit_kmps = 1.0;
 
+constexpr inline float unit_s = 1.0;
+constexpr inline float unit_min = 1.0 / 60.0;
+constexpr inline float unit_hr = 1.0 / 3600.0;
+constexpr inline float unit_day = 1.0 / (6.0 * 3600.0);
+constexpr inline float unit_year = 1.0 / (426.0 * 6.0 * 3600.0);
+
 auto inline constexpr deg2rad(auto f) {
     return f * M_PI / 180.0;
 }

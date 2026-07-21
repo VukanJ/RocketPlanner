@@ -27,12 +27,15 @@ struct Orbit {
     Eigen::Vector3f normal() const;
     float v_apoapsis(float unit) const;
     float v_periapsis(float unit) const;
-    float period() const;
+    float period(float unit=1) const;
     float trueAnomalyAt(const vec3f& r) const;
 
 };
 
 std::pair<vec3f, vec3f> get_local_position(const Orbit& o);
 std::pair<vec3f, vec3f> get_local_future_position(const Orbit& o, std::uint64_t seconds);
+
+float default_transfer_time_estimate(const Body* from, const Body* to);
+float default_transfer_window_estimate(const Body* from, const Body* to);
 
 #endif // ORBIT_H

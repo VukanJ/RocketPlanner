@@ -1,4 +1,5 @@
 #include "WindowMission.h"
+#include "Orbit.h"
 #include "gui.h"
 #include "utils.h"
 #include "imgui.h"
@@ -111,7 +112,9 @@ namespace {
 
 WindowMission::WindowMission() {
     porkchopPlot.launchStart = currentDate;
-    porkchopPlot.launchEnd = Date(currentDate.toSeconds() + 200 * kKerbalDaySeconds);
+    porkchopPlot.launchEnd = Date(default_transfer_window_estimate(mission.originBody, mission.destinationBody));
+    porkchopPlot.flightTimeStartDays = default_transfer_time_estimate(mission.originBody, mission.destinationBody) / kKerbalDaySeconds * 0.5f;
+    porkchopPlot.flightTimeEndDays = porkchopPlot.flightTimeStartDays * 4.0f;
 }
 
 bool WindowMission::render() {
@@ -169,6 +172,10 @@ bool WindowMission::render() {
         ImGui::PopStyleColor(4);
 
         if (advanced && ImGui::Button("Porkchop plot")) {
+            porkchopPlot.launchStart = currentDate;
+            porkchopPlot.launchEnd = Date(default_transfer_window_estimate(mission.originBody, mission.destinationBody));
+            porkchopPlot.flightTimeStartDays = default_transfer_time_estimate(mission.originBody, mission.destinationBody) / kKerbalDaySeconds * 0.5f;
+            porkchopPlot.flightTimeEndDays = porkchopPlot.flightTimeStartDays * 4.0f;
             porkchopPlot.isOpen = true;
         }
 
@@ -353,14 +360,10 @@ void WindowMission::renderPorkchopPlot() {
 
     renderDateInput("Launch start", porkchopPlot.launchStart);
     renderDateInput("Launch end", porkchopPlot.launchEnd);
-    ImGui::SetNextItemWidth(150.0f);
+    ImGui::PushItemWidth(300.0f);
     ImGui::InputInt("Minimum flight time (days)", &porkchopPlot.flightTimeStartDays);
-    ImGui::SetNextItemWidth(150.0f);
     ImGui::InputInt("Maximum flight time (days)", &porkchopPlot.flightTimeEndDays);
-    ImGui::SetNextItemWidth(150.0f);
-    ImGui::SliderInt("Resolution", &porkchopPlot.resolution,
-                     PorkchopPlot::minResolution, PorkchopPlot::maxResolution);
-    ImGui::SetNextItemWidth(150.0f);
+    ImGui::SliderInt("Resolution", &porkchopPlot.resolution, PorkchopPlot::minResolution, PorkchopPlot::maxResolution);
     ImGui::Combo("Colormap", &porkchopPlot.colormapIndex,
                  [](void* data, int index, const char** outText) {
                      const auto* colormaps = static_cast<const ColormapOption*>(data);
@@ -369,56 +372,41 @@ void WindowMission::renderPorkchopPlot() {
                  },
                   getPorkchopColormaps(),
                   kNumPorkchopColormaps);
+    ImGui::PopItemWidth();
 
     porkchopPlot.flightTimeStartDays = std::max(porkchopPlot.flightTimeStartDays, 1);
-    porkchopPlot.flightTimeEndDays = std::max(
-        porkchopPlot.flightTimeEndDays, porkchopPlot.flightTimeStartDays + 1);
+    porkchopPlot.flightTimeEndDays = std::max(porkchopPlot.flightTimeEndDays, porkchopPlot.flightTimeStartDays + 1);
 
     if (ImGui::Button("Enter")) {
         generatePorkchopPlot();
     }
 
     if (porkchopPlot.calculated) {
-        const double launchStartDay =
-            static_cast<double>(porkchopPlot.calculatedLaunchStart.toSeconds()) / kKerbalDaySeconds;
-        const double launchEndDay =
-            static_cast<double>(porkchopPlot.calculatedLaunchEnd.toSeconds()) / kKerbalDaySeconds;
+        const double launchStartDay = static_cast<double>(porkchopPlot.calculatedLaunchStart.toSeconds()) / kKerbalDaySeconds;
+        const double launchEndDay = static_cast<double>(porkchopPlot.calculatedLaunchEnd.toSeconds()) / kKerbalDaySeconds;
 
         ImGui::Separator();
         ImGui::Text("Total heliocentric transfer delta-v (m/s)");
         ImGui::SetNextItemWidth(250.0f);
-        ImGui::SliderFloat("Color minimum", &porkchopPlot.colorMinDeltaV,
-                           porkchopPlot.minDeltaV, porkchopPlot.maxDeltaV, "%.0f m/s");
-        ImGui::SetNextItemWidth(250.0f);
-        ImGui::SliderFloat("Color maximum", &porkchopPlot.colorMaxDeltaV,
-                           porkchopPlot.minDeltaV, porkchopPlot.maxDeltaV, "%.0f m/s");
-        porkchopPlot.colorMinDeltaV = std::min(
-            porkchopPlot.colorMinDeltaV, porkchopPlot.colorMaxDeltaV);
-        porkchopPlot.colorMaxDeltaV = std::max(
-            porkchopPlot.colorMaxDeltaV, porkchopPlot.colorMinDeltaV + 1.0f);
+        ImGui::SliderFloat("Color maximum", &porkchopPlot.colorMaxDeltaV, porkchopPlot.minDeltaV, porkchopPlot.maxDeltaV, "%.0f m/s");
+        porkchopPlot.colorMaxDeltaV = std::max(porkchopPlot.colorMaxDeltaV, 1.0f);
 
-        const ImPlotColormap colormap =
-            getPorkchopColormaps()[porkchopPlot.colormapIndex].value;
+        const ImPlotColormap colormap = getPorkchopColormaps()[porkchopPlot.colormapIndex].value;
         ImPlot::PushColormap(colormap);
         if (ImPlot::BeginPlot("##PorkchopHeatmap", ImVec2(-1, -1))) {
             ImPlot::SetupAxes("Launch day (since Y1 D1)", "Flight time (days)");
             ImPlot::SetupAxisLimits(ImAxis_X1, launchStartDay, launchEndDay, ImPlotCond_Always);
-            ImPlot::SetupAxisLimits(
-                ImAxis_Y1, porkchopPlot.calculatedFlightTimeStartDays,
-                porkchopPlot.calculatedFlightTimeEndDays,
-                ImPlotCond_Always);
+            ImPlot::SetupAxisLimits( ImAxis_Y1, porkchopPlot.calculatedFlightTimeStartDays, porkchopPlot.calculatedFlightTimeEndDays, ImPlotCond_Always);
             ImPlot::PlotHeatmap("Total delta-v", porkchopPlot.deltaV.data(),
                                 porkchopPlot.calculatedResolution,
                                 porkchopPlot.calculatedResolution,
                                 porkchopPlot.colorMaxDeltaV,
-                                porkchopPlot.colorMinDeltaV, nullptr,
+                                0, nullptr,
                                 ImPlotPoint(launchStartDay, porkchopPlot.calculatedFlightTimeStartDays),
                                 ImPlotPoint(launchEndDay, porkchopPlot.calculatedFlightTimeEndDays));
             ImPlot::EndPlot();
         }
-        ImPlot::ColormapScale(
-            "Delta-v", porkchopPlot.colorMaxDeltaV, porkchopPlot.colorMinDeltaV,
-            ImVec2(0, 0), "%.0f m/s");
+        ImPlot::ColormapScale("Delta-v", porkchopPlot.colorMaxDeltaV, 0, ImVec2(0, 0), "%.0f m/s");
         ImPlot::PopColormap();
     }
 
@@ -442,10 +430,8 @@ void WindowMission::generatePorkchopPlot() {
     solver.init(mission.originBody->orbit.parent, mission.originBody->orbit,
                 mission.destinationBody->orbit);
     for (int flightIndex = 0; flightIndex < porkchopPlot.resolution; ++flightIndex) {
-        const float flightFraction =
-            static_cast<float>(flightIndex) / (porkchopPlot.resolution - 1);
-        const float flightDays = porkchopPlot.flightTimeStartDays +
-            flightFraction * (porkchopPlot.flightTimeEndDays - porkchopPlot.flightTimeStartDays);
+        const float flightFraction = static_cast<float>(flightIndex) / (porkchopPlot.resolution - 1);
+        const float flightDays = porkchopPlot.flightTimeStartDays + flightFraction * (porkchopPlot.flightTimeEndDays - porkchopPlot.flightTimeStartDays);
         const float flightSeconds = flightDays * kKerbalDaySeconds;
 
         for (int launchIndex = 0; launchIndex < porkchopPlot.resolution; ++launchIndex) {
@@ -481,8 +467,7 @@ void WindowMission::generatePorkchopPlot() {
     porkchopPlot.calculatedLaunchEnd = porkchopPlot.launchEnd;
     porkchopPlot.calculatedFlightTimeStartDays = porkchopPlot.flightTimeStartDays;
     porkchopPlot.calculatedFlightTimeEndDays = porkchopPlot.flightTimeEndDays;
-    porkchopPlot.colorMinDeltaV = porkchopPlot.minDeltaV;
-    porkchopPlot.colorMaxDeltaV = porkchopPlot.maxDeltaV;
+    porkchopPlot.colorMaxDeltaV = (porkchopPlot.maxDeltaV - porkchopPlot.minDeltaV) * 0.2f + porkchopPlot.minDeltaV;
     porkchopPlot.calculated = true;
 }
 
