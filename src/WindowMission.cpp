@@ -12,6 +12,7 @@
 
 #include "eigen3/Eigen/Geometry"
 #include "DeltaV.h"
+#include "helper.h"
 
 Date::Date(int64_t seconds) {
     // Convert seconds to KSP date
@@ -39,15 +40,21 @@ namespace {
         ImPlotColormap value;
     };
 
-    ColormapOption kPorkchopColormaps[] = {
-        { "Viridis", ImPlotColormap_Viridis },
-        { "Plasma", ImPlotColormap_Plasma },
-        { "Hot", ImPlotColormap_Hot },
-        { "Cool", ImPlotColormap_Cool },
-        { "Jet", ImPlotColormap_Jet },
-        { "Spectral", ImPlotColormap_Spectral },
-        { "Greys", ImPlotColormap_Greys },
-    };
+    constexpr int kNumPorkchopColormaps = 8;
+
+    ColormapOption* getPorkchopColormaps() {
+        static ColormapOption colormaps[] = {
+            { "CMRmap", ImPlot::AddColormap("CMRmap", cmap_data_CMRmap, 256) },
+            { "Viridis", ImPlotColormap_Viridis },
+            { "Plasma", ImPlotColormap_Plasma },
+            { "Hot", ImPlotColormap_Hot },
+            { "Cool", ImPlotColormap_Cool },
+            { "Jet", ImPlotColormap_Jet },
+            { "Spectral", ImPlotColormap_Spectral },
+            { "Greys", ImPlotColormap_Greys },
+        };
+        return colormaps;
+    }
 
     bool renderBodyCombo(const char* label, const Body*& selected) {
         bool changed = false;
@@ -106,7 +113,6 @@ WindowMission::WindowMission() {
     porkchopPlot.launchStart = currentDate;
     porkchopPlot.launchEnd = Date(currentDate.toSeconds() + 200 * kKerbalDaySeconds);
 }
-
 
 bool WindowMission::render() {
     bool endWin = false;
@@ -361,8 +367,8 @@ void WindowMission::renderPorkchopPlot() {
                      *outText = colormaps[index].name;
                      return true;
                  },
-                 kPorkchopColormaps,
-                 static_cast<int>(std::size(kPorkchopColormaps)));
+                  getPorkchopColormaps(),
+                  kNumPorkchopColormaps);
 
     porkchopPlot.flightTimeStartDays = std::max(porkchopPlot.flightTimeStartDays, 1);
     porkchopPlot.flightTimeEndDays = std::max(
@@ -392,7 +398,7 @@ void WindowMission::renderPorkchopPlot() {
             porkchopPlot.colorMaxDeltaV, porkchopPlot.colorMinDeltaV + 1.0f);
 
         const ImPlotColormap colormap =
-            kPorkchopColormaps[porkchopPlot.colormapIndex].value;
+            getPorkchopColormaps()[porkchopPlot.colormapIndex].value;
         ImPlot::PushColormap(colormap);
         if (ImPlot::BeginPlot("##PorkchopHeatmap", ImVec2(-1, -1))) {
             ImPlot::SetupAxes("Launch day (since Y1 D1)", "Flight time (days)");
