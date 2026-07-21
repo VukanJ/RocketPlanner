@@ -174,8 +174,9 @@ bool WindowMission::render() {
         if (advanced && ImGui::Button("Porkchop plot")) {
             porkchopPlot.launchStart = currentDate;
             porkchopPlot.launchEnd = Date(default_transfer_window_estimate(mission.originBody, mission.destinationBody));
-            porkchopPlot.flightTimeStartDays = default_transfer_time_estimate(mission.originBody, mission.destinationBody) / kKerbalDaySeconds * 0.5f;
-            porkchopPlot.flightTimeEndDays = porkchopPlot.flightTimeStartDays * 4.0f;
+            float trans = default_transfer_time_estimate(mission.originBody, mission.destinationBody) / kKerbalDaySeconds;
+            porkchopPlot.flightTimeStartDays = trans * 0.5f;
+            porkchopPlot.flightTimeEndDays = porkchopPlot.flightTimeStartDays * 2.0f;
             porkchopPlot.isOpen = true;
         }
 
