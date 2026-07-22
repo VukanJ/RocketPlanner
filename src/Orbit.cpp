@@ -1,5 +1,6 @@
 #include "Orbit.h"
 #include "DeltaV.h"
+#include "helper.h"
 #include "kspConstants.h"
 #include "eigen3/Eigen/Geometry"
 #include "utils.h"

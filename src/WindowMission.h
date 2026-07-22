@@ -43,8 +43,6 @@ struct MissionPhase {
     bool optional = true;
     bool prograde = true;
 
-    bool active = true;
-    
     static MissionPhase takeoff(const Body* body, float alt) {
         return { MissionPhaseType::TAKEOFF, body, nullptr, alt, 0, false};
     }
@@ -88,6 +86,8 @@ struct PorkchopPlot {
     float minDeltaV = std::numeric_limits<float>::infinity();
     float maxDeltaV = 0.0f;
     float colorMaxDeltaV = 0.0f;
+    int cheapestLaunchIndex = -1;
+    int cheapestFlightIndex = -1;
     bool calculated = false;
 };
 
@@ -99,6 +99,7 @@ public:
     bool render();
     void updateMissionSequence();
     void calcLaunchWindow();
+    void showTransferOrbit(float launchSeconds, float flightSeconds);
     bool renderTimeInput();
     void renderPorkchopPlot();
     void generatePorkchopPlot();
@@ -106,7 +107,7 @@ public:
     enum class InputPhase { FromTo, Sequence } input_phase = WindowMission::InputPhase::FromTo;
 
     std::vector<MissionPhase> msequence;
-    bool advanced = false;
+    bool advanced = true;
     bool launchDateOptim = false;
     SystemMap systemMap;
 
