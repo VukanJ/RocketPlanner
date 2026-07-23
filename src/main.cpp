@@ -1,5 +1,6 @@
 #include <iostream>
 #include <filesystem>
+#include <fstream>
 
 #include "WindowSimulator.h"
 #include "gui.h"
@@ -12,6 +13,7 @@
 #include "backends/imgui_impl_glfw.h"
 #include "backends/imgui_impl_opengl3.h"
 #include <GLFW/glfw3.h>
+#include <nlohmann/json.hpp>
 
 std::string findKSP() {
     const char* home = std::getenv("HOME");
@@ -27,12 +29,57 @@ std::string findKSP() {
     return "";
 }
 
+static std::filesystem::path getConfigPath() {
+    const char* home = std::getenv("HOME");
+    auto dir = std::filesystem::path(home) / ".rocket_planner";
+    std::filesystem::create_directories(dir);
+    return dir / "config.json";
+}
+
+struct WindowSize { int width; int height; };
+
+static WindowSize loadWindowSize() {
+    constexpr WindowSize defaults{1280, 720};
+    auto path = getConfigPath();
+    if (!std::filesystem::exists(path)) { return defaults; }
+
+    std::ifstream file(path);
+    if (!file.is_open()) { return defaults; }
+
+    try {
+        auto json = nlohmann::json::parse(file);
+        return {
+            json.value("window_width", defaults.width),
+            json.value("window_height", defaults.height)
+        };
+    } catch (...) {
+        return defaults;
+    }
+}
+
+static void saveWindowSize(GLFWwindow* window) {
+    int w, h;
+    glfwGetWindowSize(window, &w, &h);
+
+    nlohmann::json json;
+    json["window_width"] = w;
+    json["window_height"] = h;
+
+    std::ofstream file(getConfigPath());
+    if (file.is_open()) {
+        file << json.dump(4) << std::endl;
+    }
+}
+
 static void run_interactive() {
     if (!glfwInit()) {
         return;
     }
 
-    GLFWwindow* window = glfwCreateWindow(1280, 720, "Rocket Optimizer", nullptr, nullptr);
+    GLFWwindow* window = [&]() {
+        auto [w, h] = loadWindowSize();
+        return glfwCreateWindow(w, h, "Rocket Optimizer", nullptr, nullptr);
+    }();
     if (!window) {
         glfwTerminate();
         return;
@@ -85,6 +132,8 @@ static void run_interactive() {
 
         glfwSwapBuffers(window);
     }
+
+    saveWindowSize(window);
 
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
