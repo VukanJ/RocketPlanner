@@ -4,7 +4,6 @@
 #include "Orbit.h"
 #include "kspConstants.h"
 #include "utils.h"
-#include <cstdint>
 
 class LambertSolver {
 public:

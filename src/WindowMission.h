@@ -4,6 +4,7 @@
 #include "DeltaV.h"
 #include "LambertSolver.h"
 #include "SystemMap.h"
+#include "ThreadPool.h"
 #include "kspConstants.h"
 #include <limits>
 #include <vector>
@@ -13,9 +14,6 @@ struct Mission {
     const Body* destinationBody = &KspSystem::Duna;
     bool oneWayTrip = false;
     bool apolloStyle = true;
-
-    float initialApoapsis = 80;
-    float destinationApoapsis = 10;
 };
 
 enum class MissionPhaseType {
@@ -32,30 +30,6 @@ enum class MissionPhaseType {
     ORBITAL_REFUELING,
 };
 
-struct MissionPhase {
-    MissionPhaseType type = MissionPhaseType::TAKEOFF;
-    const Body* refBody = nullptr;
-    const Body* refBody2 = nullptr;
-    float alt1 = 0;
-    float alt2 = 0;
-    DeltaVRange dv_range;
-
-    bool optional = true;
-    bool prograde = true;
-
-    static MissionPhase takeoff(const Body* body, float alt) {
-        return { MissionPhaseType::TAKEOFF, body, nullptr, alt, 0, false};
-    }
-    static MissionPhase hohmann(const Body* from, const Body* to, float fromAlt, float toAlt) {
-        return { MissionPhaseType::HOHMANN_TRANSFER, from, to, fromAlt, toAlt, false};
-    }
-    static MissionPhase circularize_hyperbolic(const Body* from, const Body* to, float fromAlt, float toAlt) {
-        return { MissionPhaseType::CIRCULARIZE_HYPERBOLIC, from, to, fromAlt, toAlt, false};
-    }
-
-    void updateDeltaV();
-};
-
 struct Date {
     int year = 0;
     int day = 0;
@@ -66,11 +40,21 @@ struct Date {
     int64_t toSeconds() const;
 };
 
-struct PorkchopPlot {
+struct MissionPhase;
+
+class PorkchopPlot {
+public:
+    PorkchopPlot() = delete;
+    PorkchopPlot(MissionPhase* phase = nullptr) : phase(phase) { }
     static constexpr int minResolution = 16;
     static constexpr int maxResolution = 512;
+    void generate();
+    void init(Date launchStart);
+    void render();
 
-    bool isOpen = false;
+    MissionPhase* phase = nullptr;
+
+    bool winOpen = false;
     Date launchStart { 0 };
     Date launchEnd { 0 };
     int flightTimeStartDays = 50;
@@ -88,8 +72,35 @@ struct PorkchopPlot {
     float colorMaxDeltaV = 0.0f;
     int cheapestLaunchIndex = -1;
     int cheapestFlightIndex = -1;
-    bool calculated = false;
+    std::atomic<bool> calculated = false;
 };
+
+struct MissionPhase {
+    MissionPhaseType type = MissionPhaseType::TAKEOFF;
+    const Body* refBody = nullptr;
+    const Body* refBody2 = nullptr;
+    float alt1 = 0;
+    float alt2 = 0;
+    DeltaVRange dv_range;
+
+    bool optional = true;
+    bool prograde = true;
+
+    std::unique_ptr<PorkchopPlot> porkchopPlot = nullptr;
+
+    static MissionPhase takeoff(const Body* body, float alt) {
+        return { MissionPhaseType::TAKEOFF, body, nullptr, alt, 0, false};
+    }
+    static MissionPhase hohmann(const Body* from, const Body* to, float fromAlt, float toAlt) {
+        return { MissionPhaseType::HOHMANN_TRANSFER, from, to, fromAlt, toAlt, false};
+    }
+    static MissionPhase circularize_hyperbolic(const Body* from, const Body* to, float fromAlt, float toAlt) {
+        return { MissionPhaseType::CIRCULARIZE_HYPERBOLIC, from, to, fromAlt, toAlt, false};
+    }
+
+    void updateDeltaV();
+};
+
 
 class WindowMission {
 public:
@@ -101,8 +112,6 @@ public:
     void calcLaunchWindow();
     void showTransferOrbit(float launchSeconds, float flightSeconds);
     bool renderTimeInput();
-    void renderPorkchopPlot();
-    void generatePorkchopPlot();
 
     enum class InputPhase { FromTo, Sequence } input_phase = WindowMission::InputPhase::FromTo;
 
@@ -114,7 +123,8 @@ public:
     Date currentDate { 0 };
     LambertSolver transfer_solver;
     bool update_solver = false;
-    PorkchopPlot porkchopPlot;
+
+    static ThreadPool threadPool;
 };
 
 #endif // WINDOW_MISSION
