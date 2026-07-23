@@ -42,8 +42,6 @@ namespace {
         ImPlotColormap value;
     };
 
-    constexpr int kNumPorkchopColormaps = 8;
-
     ImVec2 add(const ImVec2& lhs, const ImVec2& rhs) {
         return {lhs.x + rhs.x, lhs.y + rhs.y};
     }
@@ -72,6 +70,7 @@ namespace {
                           ImGui::GetColorU32(ImGuiCol_Border));
     }
 
+    constexpr int kNumPorkchopColormaps = 9;
     ColormapOption* getPorkchopColormaps() {
         static ColormapOption colormaps[] = {
             { "CMRmap", ImPlot::AddColormap("CMRmap", cmap_data_CMRmap, 256) },
@@ -82,21 +81,23 @@ namespace {
             { "Jet", ImPlotColormap_Jet },
             { "Spectral", ImPlotColormap_Spectral },
             { "Greys", ImPlotColormap_Greys },
+            { "Pink", ImPlotColormap_Pink },
         };
         return colormaps;
     }
 
-    bool renderBodyCombo(const char* label, const Body*& selected) {
+    bool renderBodyCombo(const char* label, const Body*& selected, const Body* exclude) {
         bool changed = false;
         const char* preview = "None";
         for (auto& entry : bodyTable) {
-            if (entry.body == selected) {
+            if (entry.body == selected && entry.body != &KspSystem::Kerbol && entry.body != exclude) {
                 preview = entry.name;
                 break;
             }
         }
         if (ImGui::BeginCombo(label, preview)) {
             for (auto& entry : bodyTable) {
+                if (entry.body == &KspSystem::Kerbol || entry.body == exclude) { continue; }
                 bool isSelected = (entry.body == selected);
                 if (ImGui::Selectable(entry.name, isSelected)) {
                     selected = entry.body;
@@ -144,10 +145,8 @@ namespace {
         const bool firstTransferIsCheaper =
             solver.deltaV1_depart + solver.deltaV1_arrive
             <= solver.deltaV2_depart + solver.deltaV2_arrive;
-        const float departureCost = firstTransferIsCheaper
-            ? solver.deltaV1_depart : solver.deltaV2_depart;
-        const float arrivalCost = firstTransferIsCheaper
-            ? solver.deltaV1_arrive : solver.deltaV2_arrive;
+        const float departureCost = firstTransferIsCheaper ? solver.deltaV1_depart : solver.deltaV2_depart;
+        const float arrivalCost = firstTransferIsCheaper ? solver.deltaV1_arrive : solver.deltaV2_arrive;
 
         for (MissionPhase& phase : sequence) {
             if (phase.refBody != mission.originBody || phase.refBody2 != mission.destinationBody) {
@@ -163,27 +162,24 @@ namespace {
     }
 }
 
-WindowMission::WindowMission() {
-    //porkchopPlot.launchStart = currentDate;
-    //porkchopPlot.launchEnd = Date(default_transfer_window_estimate(mission.originBody, mission.destinationBody));
-    //porkchopPlot.flightTimeStartDays = default_transfer_time_estimate(mission.originBody, mission.destinationBody) / kKerbalDaySeconds * 0.5f;
-    //porkchopPlot.flightTimeEndDays = porkchopPlot.flightTimeStartDays * 4.0f;
-}
+WindowMission::WindowMission() { }
 
 bool WindowMission::render() {
     bool endWin = false;
     if (input_phase == InputPhase::FromTo) {
         ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
 
-        ImGui::Begin("Configure Mission", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoMove);
+        ImGui::Begin("Configure Mission", nullptr, ImGuiWindowFlags_AlwaysAutoResize 
+                                                 | ImGuiWindowFlags_NoCollapse 
+                                                 | ImGuiWindowFlags_NoBringToFrontOnFocus 
+                                                 | ImGuiWindowFlags_NoMove);
 
-        ImGui::Text("Origin");
-        renderBodyCombo("##origin", mission.originBody);
+        ImGui::SeparatorText("Origin");
+        renderBodyCombo("##origin", mission.originBody, mission.destinationBody);
 
-        ImGui::Separator();
+        ImGui::SeparatorText("Destination");
 
-        ImGui::Text("Destination");
-        renderBodyCombo("##dest", mission.destinationBody);
+        renderBodyCombo("##dest", mission.destinationBody, mission.originBody);
 
         ImGui::Separator();
 
@@ -206,7 +202,10 @@ bool WindowMission::render() {
         float panelWidth = 420.0f;
         ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
         ImGui::SetNextWindowSize(ImVec2(panelWidth, displaySize.y), ImGuiCond_Always);
-        ImGui::Begin("Mission Sequence", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysVerticalScrollbar);
+        ImGui::Begin("Mission Sequence", nullptr, ImGuiWindowFlags_NoCollapse 
+                                                | ImGuiWindowFlags_NoBringToFrontOnFocus 
+                                                | ImGuiWindowFlags_NoMove 
+                                                | ImGuiWindowFlags_AlwaysVerticalScrollbar);
 
         ImGui::TextColored({1, 1, 0, 1}, "Ctrl+LMB to enter value");
 
@@ -408,25 +407,19 @@ void PorkchopPlot::render() {
 
     renderDateInput("Launch start", launchStart);
     renderDateInput("Launch end", launchEnd);
-    ImGui::PushItemWidth(500.0f);
-    ImGui::InputInt("Minimum flight time (days)", &flightTimeStartDays);
-    ImGui::InputInt("Maximum flight time (days)", &flightTimeEndDays);
+    ImGui::PushItemWidth(150.0f);
+    ImGui::Text("Flight time"); ImGui::SameLine();
+    ImGui::Text("Min:"); ImGui::SameLine(); ImGui::InputInt("##Min", &flightTimeStartDays); ImGui::SameLine(); 
+    ImGui::Text("Max:"); ImGui::SameLine(); ImGui::InputInt("##Max", &flightTimeEndDays);
+
     ImGui::SliderInt("Resolution", &resolution, PorkchopPlot::minResolution, PorkchopPlot::maxResolution);
-    ImGui::Combo("Colormap", &colormapIndex,
-                 [](void* data, int index, const char** outText) {
-                     const auto* colormaps = static_cast<const ColormapOption*>(data);
-                     *outText = colormaps[index].name;
-                     return true;
-                 },
-                  getPorkchopColormaps(),
-                  kNumPorkchopColormaps);
     ImGui::PopItemWidth();
 
     flightTimeStartDays = std::max(flightTimeStartDays, 1);
     flightTimeEndDays = std::max(flightTimeEndDays, flightTimeStartDays + 1);
 
     if (ImGui::Button("Generate")) {
-        generate();
+        WindowMission::threadPool.send([this]() { generate(); });
     }
 
     if (calculated) {
@@ -435,6 +428,17 @@ void PorkchopPlot::render() {
 
         ImGui::Separator();
         ImGui::Text("Total heliocentric transfer delta-v (m/s)");
+
+        ImGui::SetNextItemWidth(250.0f);
+        ImGui::Combo("Colormap", &colormapIndex,
+                     [](void* data, int index, const char** outText) {
+                         const auto* colormaps = static_cast<const ColormapOption*>(data);
+                         *outText = colormaps[index].name;
+                         return true;
+                     },
+                      getPorkchopColormaps(),
+                      kNumPorkchopColormaps);
+
         ImGui::SetNextItemWidth(250.0f);
         ImGui::SliderFloat("Color maximum", &colorMaxDeltaV, minDeltaV, maxDeltaV, "%.0f m/s");
         colorMaxDeltaV = std::max(colorMaxDeltaV, minDeltaV);
@@ -541,6 +545,11 @@ void PorkchopPlot::render() {
         ImGui::TextUnformatted(maxLabel);
         ImPlot::PopColormap();
     }
+    else {
+        if (progress > 0.0f) {
+            ImGui::ProgressBar(progress, ImVec2(-1, 0));
+        }
+    }
 
     ImGui::End();
     ImGui::PopID();
@@ -583,13 +592,11 @@ void PorkchopPlot::init(Date launchStart) {
 }
 
 void PorkchopPlot::generate() {
+    calculated = false;
     auto startSeconds = launchStart.toSeconds();
     auto endSeconds = launchEnd.toSeconds();
 
-    if (endSeconds <= startSeconds) {
-        calculated = false;
-        return;
-    }
+    if (endSeconds <= startSeconds) { return; }
 
     deltaV.assign(resolution * resolution, std::numeric_limits<float>::infinity());
     minDeltaV = std::numeric_limits<float>::infinity();
@@ -608,6 +615,7 @@ void PorkchopPlot::generate() {
         const float flightFraction = static_cast<float>(flightIndex) / (resolution - 1);
         const float flightDays = flightTimeStartDays + flightFraction * (flightTimeEndDays - flightTimeStartDays);
         const float flightSeconds = flightDays * kKerbalDaySeconds;
+        progress = static_cast<float>(flightIndex) / (resolution - 1);
 
         for (int launchIndex = 0; launchIndex < resolution; ++launchIndex) {
             const float launchFraction = static_cast<float>(launchIndex) / (resolution - 1);
@@ -647,6 +655,7 @@ void PorkchopPlot::generate() {
     calculatedFlightTimeEndDays   = flightTimeEndDays;
     colorMaxDeltaV                = (maxDeltaV - minDeltaV) * 0.2f + minDeltaV;
     calculated = true;
+    progress = -1.0f; // Disable progress bar
 }
 
 bool WindowMission::renderTimeInput() {

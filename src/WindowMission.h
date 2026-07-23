@@ -73,6 +73,7 @@ public:
     int cheapestLaunchIndex = -1;
     int cheapestFlightIndex = -1;
     std::atomic<bool> calculated = false;
+    std::atomic<float> progress = -1.0f;
 };
 
 struct MissionPhase {
