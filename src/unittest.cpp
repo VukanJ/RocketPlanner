@@ -420,7 +420,10 @@ TEST(OrbitTest, LambertElementsReconstructBothEndpoints) {
 
 TEST(LambertSolverTest, ComputesFiniteTransferDeltaV) {
     LambertSolver solver;
-    solver.init(KspSystem::Kerbin.orbit.parent, KspSystem::Kerbin.orbit, KspSystem::Eve.orbit);
+    constexpr float startAltitude = 80.0f;
+    constexpr float targetAltitude = 100.0f;
+    solver.init(KspSystem::Kerbin.orbit.parent, KspSystem::Kerbin.orbit, KspSystem::Eve.orbit,
+                &KspSystem::Kerbin, &KspSystem::Eve, startAltitude, targetAltitude);
 
     constexpr float launchTime = (426 + 123) * 6 * 60 * 60;
     const float transferTime = 0.505f * Orbit::elliptic(
@@ -431,6 +434,8 @@ TEST(LambertSolverTest, ComputesFiniteTransferDeltaV) {
     EXPECT_TRUE(std::isfinite(solver.deltaV1_arrive));
     EXPECT_TRUE(std::isfinite(solver.deltaV2_depart));
     EXPECT_TRUE(std::isfinite(solver.deltaV2_arrive));
+    EXPECT_EQ(solver.startOrbitAltitude, startAltitude);
+    EXPECT_EQ(solver.targetOrbitAltitude, targetAltitude);
 
 }
 

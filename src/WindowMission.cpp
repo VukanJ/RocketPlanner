@@ -117,6 +117,45 @@ namespace {
         date.minute = 0;
         ImGui::PopID();
     }
+
+    std::pair<float, float> transferOrbitAltitudes(const Mission& mission,
+                                                   const std::vector<MissionPhase>& sequence) {
+        const auto transfer = std::find_if(
+            sequence.begin(), sequence.end(),
+            [&](const MissionPhase& phase) {
+                return phase.type == MissionPhaseType::ORBITAL_INSERTION
+                    && phase.refBody == mission.originBody
+                    && phase.refBody2 == mission.destinationBody;
+            });
+        if (transfer != sequence.end()) {
+            return {transfer->alt1, transfer->alt2};
+        }
+        return {mission.initialApoapsis, mission.destinationApoapsis};
+    }
+
+    void updateSelectedTransferCosts(std::vector<MissionPhase>& sequence,
+                                     const Mission& mission,
+                                     const LambertSolver& solver) {
+        const bool firstTransferIsCheaper =
+            solver.deltaV1_depart + solver.deltaV1_arrive
+            <= solver.deltaV2_depart + solver.deltaV2_arrive;
+        const float departureCost = firstTransferIsCheaper
+            ? solver.deltaV1_depart : solver.deltaV2_depart;
+        const float arrivalCost = firstTransferIsCheaper
+            ? solver.deltaV1_arrive : solver.deltaV2_arrive;
+
+        for (MissionPhase& phase : sequence) {
+            if (phase.refBody != mission.originBody || phase.refBody2 != mission.destinationBody) {
+                continue;
+            }
+            if (phase.type == MissionPhaseType::ORBITAL_INSERTION) {
+                phase.dv_range = departureCost;
+            }
+            else if (phase.type == MissionPhaseType::CIRCULARIZE_HYPERBOLIC) {
+                phase.dv_range = arrivalCost;
+            }
+        }
+    }
 }
 
 WindowMission::WindowMission() {
@@ -488,12 +527,15 @@ void WindowMission::renderPorkchopPlot() {
 }
 
 void WindowMission::showTransferOrbit(float launchSeconds, float flightSeconds) {
+    const auto [startAltitude, targetAltitude] = transferOrbitAltitudes(mission, msequence);
     transfer_solver.init(mission.originBody->orbit.parent, mission.originBody->orbit,
-                         mission.destinationBody->orbit);
+                         mission.destinationBody->orbit, mission.originBody,
+                         mission.destinationBody, startAltitude, targetAltitude);
     if (!transfer_solver.solve(launchSeconds, flightSeconds)) {
         systemMap.clearDebugOrbits();
         return;
     }
+    updateSelectedTransferCosts(msequence, mission, transfer_solver);
 
     auto nu1_1 = transfer_solver.transferOrbit1.trueAnomalyAt(transfer_solver.r1);
     auto nu2_1 = transfer_solver.transferOrbit1.trueAnomalyAt(transfer_solver.r2);
@@ -524,8 +566,10 @@ void WindowMission::generatePorkchopPlot() {
     porkchopPlot.cheapestFlightIndex = -1;
 
     LambertSolver solver;
+    const auto [startAltitude, targetAltitude] = transferOrbitAltitudes(mission, msequence);
     solver.init(mission.originBody->orbit.parent, mission.originBody->orbit,
-                mission.destinationBody->orbit);
+                mission.destinationBody->orbit, mission.originBody,
+                mission.destinationBody, startAltitude, targetAltitude);
     for (int flightIndex = 0; flightIndex < porkchopPlot.resolution; ++flightIndex) {
         const float flightFraction = static_cast<float>(flightIndex) / (porkchopPlot.resolution - 1);
         const float flightDays = porkchopPlot.flightTimeStartDays + flightFraction * (porkchopPlot.flightTimeEndDays - porkchopPlot.flightTimeStartDays);
@@ -539,7 +583,7 @@ void WindowMission::generatePorkchopPlot() {
                 continue;
             }
 
-            const float deltaV = 1000.0f * std::min(
+            const float deltaV = std::min(
                 solver.deltaV1_depart + solver.deltaV1_arrive,
                 solver.deltaV2_depart + solver.deltaV2_arrive);
             // ImPlot draws row zero at the top while its Y axis increases upward.

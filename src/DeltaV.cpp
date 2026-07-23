@@ -241,3 +241,27 @@ DeltaVRange orbitalInsertion(const Body* origin, const Body* target, float start
     return dv_range;
 }
 
+float orbitalInsertion(const Body* origin, const vec3f& v_origin, const vec3f& v_oo, float startAltitude) {
+    float dv = 0;
+    float v_circ = unit_mps * std::sqrt(origin->GM_km3s2 / (startAltitude + origin->radius_km));
+    float v_oo_rel = unit_mps * (v_oo - v_origin).norm();
+    dv = std::abs(std::sqrt(v_oo_rel * v_oo_rel + 2.0 * v_circ * v_circ) - v_circ);
+    return dv;
+}
+
+float circularizeHyperbolicCost(const Body* target, const vec3f& v_target, const vec3f& v_oo, float targetAltitudeKm) {
+    float dv = 0;
+    targetAltitudeKm += target->radius_km;
+
+    auto dV_cost_mps = [&](const vec3f& v_rocket, const vec3f& targetVelocity) {
+        float v0 = (targetVelocity - v_rocket).norm(); // Initial relative velocity to target
+        float eps = 0.5f * v0 * v0 - target->GM_km3s2 / target->R_SOI_km;  // Specific energy upon entering SOI of target
+        float v_p = std::sqrt(2.0 * (eps + target->GM_km3s2 / targetAltitudeKm));  // Velocity at periapsis of hyperbolic orbit
+        return unit_mps * (v_p - std::sqrt(target->GM_km3s2 / targetAltitudeKm));
+    };
+
+    // Planet to planet transfer
+    dv = dV_cost_mps(v_oo, v_target);
+
+    return dv;
+}

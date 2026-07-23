@@ -8,7 +8,9 @@
 
 class LambertSolver {
 public:
-    void init(const Body* ref, const Orbit& origin, const Orbit& target);
+    void init(const Body* ref, const Orbit& origin, const Orbit& target,
+              const Body* originBody, const Body* targetBody,
+              float startOrbitAltitude, float targetOrbitAltitude);
 
     bool solve(float t_departure, float dt);
 
@@ -26,8 +28,12 @@ public:
     float deltaV2_arrive = 0;
 
     const Body* refBody = nullptr;
+    const Body* originBody = nullptr;
+    const Body* targetBody = nullptr;
     Orbit originOrbit;
     Orbit targetOrbit;
+    float startOrbitAltitude = 0;
+    float targetOrbitAltitude = 0;
 };
 
 #endif // LAMBER_SOLVER_H

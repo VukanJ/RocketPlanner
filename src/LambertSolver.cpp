@@ -1,11 +1,18 @@
 #include "LambertSolver.h"
+#include "DeltaV.h"
 #include <cmath>
 #include <Eigen/Geometry>
 
-void LambertSolver::init(const Body* ref, const Orbit& origin, const Orbit& target) {
+void LambertSolver::init(const Body* ref, const Orbit& origin, const Orbit& target,
+                         const Body* originBody_, const Body* targetBody_,
+                         float startAltitude, float targetAltitude) {
     refBody = ref;
     originOrbit = origin;
     targetOrbit = target;
+    originBody = originBody_;
+    targetBody = targetBody_;
+    startOrbitAltitude = startAltitude;
+    targetOrbitAltitude = targetAltitude;
 }
 
 float Lambert(float s, float c, float a, float mu) {
@@ -91,9 +98,9 @@ bool LambertSolver::solve(float t_departure, float dt) {
     auto [r1_orig, v1_orig] = get_local_future_position(originOrbit, t_departure);
     auto [r2_orig, v2_orig] = get_local_future_position(targetOrbit, t_departure + dt);
 
-    deltaV1_depart = (v1t1 - v1_orig).norm();
-    deltaV1_arrive = (v2t1 - v2_orig).norm();
-    deltaV2_depart = (v1t2 - v1_orig).norm();
-    deltaV2_arrive = (v2t2 - v2_orig).norm();
+    deltaV1_depart = orbitalInsertion(originBody, v1_orig, v1t1, startOrbitAltitude);
+    deltaV1_arrive = circularizeHyperbolicCost(targetBody, v2_orig, v2t1, targetOrbitAltitude);
+    deltaV2_depart = orbitalInsertion(originBody, v1_orig, v1t2, startOrbitAltitude);
+    deltaV2_arrive = circularizeHyperbolicCost(targetBody, v2_orig, v2t2, targetOrbitAltitude);
     return true;
 }

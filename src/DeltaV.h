@@ -37,4 +37,7 @@ DeltaVRange circularizeHyperbolicCost(const Body* origin, const Body* target, fl
 DeltaVRange inclinationCorrectionCost(const Orbit& origin, const Orbit& target);
 DeltaVRange orbitalInsertion(const Body* origin, const Body* target, float startAltitude);
 
+float orbitalInsertion(const Body* origin, const vec3f& v_origin, const vec3f& v_oo, float startAltitude);
+float circularizeHyperbolicCost(const Body* target, const vec3f& v_target, const vec3f& v_oo, float targetAltitudeKm);
+
 #endif // DELTAV_H
