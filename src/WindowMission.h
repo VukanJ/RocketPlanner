@@ -73,6 +73,8 @@ public:
     float minDeltaV = std::numeric_limits<float>::infinity();
     float maxDeltaV = 0.0f;
     float colorMaxDeltaV = 0.0f;
+    bool useLogColorScale = false;
+    std::vector<float> deltaVLog;
     int cheapestIndex = -1;
     int selectedIndex = -1;
     std::atomic<bool> calculated = false;

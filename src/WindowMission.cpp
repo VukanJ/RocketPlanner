@@ -50,7 +50,8 @@ namespace {
         return {lhs.x - rhs.x, lhs.y - rhs.y};
     }
 
-    void renderInvertedColormapScale(const char* id, float width, float height) {
+    void renderInvertedColormapScale(const char* id, float width, float height,
+                                     float logMax = 0.0f) {
         const ImVec2 position = ImGui::GetCursorScreenPos();
         ImGui::InvisibleButton(id, ImVec2(width, height));
 
@@ -59,8 +60,12 @@ namespace {
         for (int segment = 0; segment < segments; ++segment) {
             const float left = static_cast<float>(segment) / segments;
             const float right = static_cast<float>(segment + 1) / segments;
-            const ImU32 leftColor = ImGui::ColorConvertFloat4ToU32(ImPlot::SampleColormap(1.0f - left));
-            const ImU32 rightColor = ImGui::ColorConvertFloat4ToU32(ImPlot::SampleColormap(1.0f - right));
+            const float tLeft = logMax > 0.0f
+                ? std::log1p(left * (std::expm1(logMax))) / logMax : left;
+            const float tRight = logMax > 0.0f
+                ? std::log1p(right * (std::expm1(logMax))) / logMax : right;
+            const ImU32 leftColor = ImGui::ColorConvertFloat4ToU32(ImPlot::SampleColormap(1.0f - tLeft));
+            const ImU32 rightColor = ImGui::ColorConvertFloat4ToU32(ImPlot::SampleColormap(1.0f - tRight));
             drawList->AddRectFilledMultiColor(
                 ImVec2(position.x + width * left, position.y),
                 ImVec2(position.x + width * right, position.y + height),
@@ -70,14 +75,13 @@ namespace {
                           ImGui::GetColorU32(ImGuiCol_Border));
     }
 
-    constexpr int kNumPorkchopColormaps = 9;
+    constexpr int kNumPorkchopColormaps = 8;
     ColormapOption* getPorkchopColormaps() {
         static ColormapOption colormaps[] = {
             { "CMRmap", ImPlot::AddColormap("CMRmap", cmap_data_CMRmap, 256) },
             { "Viridis", ImPlotColormap_Viridis },
             { "Plasma", ImPlotColormap_Plasma },
             { "Hot", ImPlotColormap_Hot },
-            { "Cool", ImPlotColormap_Cool },
             { "Jet", ImPlotColormap_Jet },
             { "Spectral", ImPlotColormap_Spectral },
             { "Greys", ImPlotColormap_Greys },
@@ -479,8 +483,13 @@ void PorkchopPlot::render() {
                       kNumPorkchopColormaps);
 
         ImGui::SetNextItemWidth(250.0f);
-        ImGui::SliderFloat("Color maximum", &colorMaxDeltaV, minDeltaV, maxDeltaV, "%.0f m/s");
+        ImGui::SliderFloat("Color maximum", &colorMaxDeltaV, minDeltaV, maxDeltaV,
+                           "%.0f m/s", ImGuiSliderFlags_Logarithmic);
         colorMaxDeltaV = std::max(colorMaxDeltaV, minDeltaV);
+        ImGui::SameLine();
+        if (ImGui::Button(useLogColorScale ? "Log" : "Lin")) {
+            useLogColorScale = !useLogColorScale;
+        }
 
         const ImPlotColormap colormap = getPorkchopColormaps()[colormapIndex].value;
         ImPlot::PushColormap(colormap);
@@ -491,11 +500,15 @@ void PorkchopPlot::render() {
             ImPlot::SetupAxes("Launch day (since Y1 D1)", "Flight time (days)");
             ImPlot::SetupAxisLimits(ImAxis_X1, launchStartDay, launchEndDay, ImPlotCond_Always);
             ImPlot::SetupAxisLimits( ImAxis_Y1, calculatedFlightTimeStartDays, calculatedFlightTimeEndDays, ImPlotCond_Always);
-            ImPlot::PlotHeatmap("Total delta-v", deltaV.data(),
+            const bool logScale = useLogColorScale && colorMaxDeltaV > minDeltaV;
+            const float scaleMin = logScale ? 0.0f : minDeltaV;
+            const float scaleMax = logScale ? std::log1p(colorMaxDeltaV - minDeltaV) : colorMaxDeltaV;
+            const float* dataPtr = logScale ? deltaVLog.data() : deltaV.data();
+            ImPlot::PlotHeatmap("Total delta-v", dataPtr,
                                 calculatedResolution,
                                 calculatedResolution,
-                                colorMaxDeltaV,
-                                minDeltaV, nullptr,
+                                scaleMax,
+                                scaleMin, nullptr,
                                 ImPlotPoint(launchStartDay, calculatedFlightTimeStartDays),
                                 ImPlotPoint(launchEndDay, calculatedFlightTimeEndDays));
             if (cheapestIndex >= 0) {
@@ -613,7 +626,9 @@ void PorkchopPlot::render() {
                 - 2.0f * scaleSpacing);
         ImGui::TextUnformatted(minLabel);
         ImGui::SameLine(0.0f, scaleSpacing);
-        renderInvertedColormapScale("##DeltaVScale", scaleWidth, ImGui::GetFrameHeight());
+        const float logMax = (useLogColorScale && colorMaxDeltaV > minDeltaV)
+            ? std::log1p(colorMaxDeltaV - minDeltaV) : 0.0f;
+        renderInvertedColormapScale("##DeltaVScale", scaleWidth, ImGui::GetFrameHeight(), logMax);
         ImGui::SameLine(0.0f, scaleSpacing);
         ImGui::TextUnformatted(maxLabel);
         ImPlot::PopColormap();
@@ -729,6 +744,10 @@ void PorkchopPlot::generate() {
         if (!std::isfinite(dv)) {
             dv = maxDeltaV;
         }
+    }
+    deltaVLog.resize(deltaV.size());
+    for (size_t i = 0; i < deltaV.size(); ++i) {
+        deltaVLog[i] = std::log1p(deltaV[i] - minDeltaV);
     }
     calculatedResolution          = resolution;
     calculatedLaunchStart         = launchStart;
