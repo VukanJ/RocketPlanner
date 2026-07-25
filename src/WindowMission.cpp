@@ -139,6 +139,20 @@ namespace {
         ImGui::PopID();
     }
 
+    void renderDurationInput(const char* label, int& years, int& days) {
+        ImGui::PushID(label);
+        ImGui::TextUnformatted(label);
+        ImGui::SameLine();
+        ImGui::PushItemWidth(150.0f);
+        ImGui::InputInt("Years", &years);
+        ImGui::SameLine();
+        ImGui::InputInt("Days", &days);
+        ImGui::PopItemWidth();
+        years = std::max(years, 0);
+        days = std::max(days, 0);
+        ImGui::PopID();
+    }
+
     void updateSelectedTransferCosts(std::vector<MissionPhase>& sequence,
                                      const Mission& mission,
                                      const LambertSolver& solver) {
@@ -298,6 +312,7 @@ bool WindowMission::render() {
                     ImGui::Indent();
 
                     if (advanced) {
+                        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.6f, 0.6f, 0.1f, 1.0f));
                         if (ImGui::Button("Open Solver")) {
                             step.porkchopPlot->init(currentDate);
                             step.porkchopPlot->winOpen = true;
@@ -305,6 +320,7 @@ bool WindowMission::render() {
                         ImGui::SameLine();
                         if (ImGui::Button("Auto-solve")) {
                         }
+                        ImGui::PopStyleColor();
                     }
                     break;
                 case MissionPhaseType::MINING: 
@@ -405,21 +421,44 @@ void PorkchopPlot::render() {
     std::snprintf(label, sizeof(label), "Transfer optimizer: %s ==> %s", phase->refBody->name, phase->refBody2->name);
     ImGui::Begin(label, &winOpen);
 
+    if (progress >= 0) {
+        ImGui::BeginDisabled();
+    }
     renderDateInput("Launch start", launchStart);
-    renderDateInput("Launch end", launchEnd);
+    renderDurationInput("Launch window", launchWindowDurationYears, launchWindowDurationDays);
+    updateLaunchEnd();
     ImGui::PushItemWidth(150.0f);
     ImGui::Text("Flight time"); ImGui::SameLine();
     ImGui::Text("Min:"); ImGui::SameLine(); ImGui::InputInt("##Min", &flightTimeStartDays); ImGui::SameLine(); 
     ImGui::Text("Max:"); ImGui::SameLine(); ImGui::InputInt("##Max", &flightTimeEndDays);
 
     ImGui::SliderInt("Resolution", &resolution, PorkchopPlot::minResolution, PorkchopPlot::maxResolution);
+    ImGui::SameLine();
+    if (ImGui::Button("Reset search window")) {
+        init(this->launchStart);
+    }
     ImGui::PopItemWidth();
+
+    if (progress >= 0) {
+        ImGui::EndDisabled();
+    }
 
     flightTimeStartDays = std::max(flightTimeStartDays, 1);
     flightTimeEndDays = std::max(flightTimeEndDays, flightTimeStartDays + 1);
 
-    if (ImGui::Button("Generate")) {
-        WindowMission::threadPool.send([this]() { generate(); });
+    if (progress < 0) { // Make sure button is not pressed while calculation is in progress
+        const bool hasLaunchWindow =
+            launchWindowDurationYears > 0 || launchWindowDurationDays > 0;
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.3f, 1.0f, 1.0f));
+        ImGui::BeginDisabled(!hasLaunchWindow);
+        if (ImGui::Button("Generate", ImVec2(-1, 0))) {
+            WindowMission::threadPool.send([this]() { generate(); });
+        }
+        ImGui::EndDisabled();
+        ImGui::PopStyleColor();
+        if (!hasLaunchWindow) {
+            ImGui::TextDisabled("Set a launch window duration greater than zero to generate a plot.");
+        }
     }
 
     if (calculated) {
@@ -445,6 +484,7 @@ void PorkchopPlot::render() {
 
         const ImPlotColormap colormap = getPorkchopColormaps()[colormapIndex].value;
         ImPlot::PushColormap(colormap);
+        ImGui::TextColored({1, 1, 0, 1}, "Select transfer with middle mouse button");
         if (ImPlot::BeginPlot("##PorkchopHeatmap",
                               ImVec2(-1, -(ImGui::GetFrameHeight() + ImGui::GetStyle().ItemSpacing.y)),
                               ImPlotFlags_NoMouseText)) {
@@ -583,12 +623,22 @@ void WindowMission::showTransferOrbit(float launchSeconds, float flightSeconds) 
     systemMap.addDebugOrbit({transfer_solver.transferOrbit2, IM_COL32(255, 100, 200, 200), 2.5f, nu1_2, nu2_2});
 }
 
-void PorkchopPlot::init(Date launchStart) {
-    launchStart = launchStart;
-    launchEnd = Date(default_transfer_window_estimate(phase->refBody, phase->refBody2));
+void PorkchopPlot::init(Date launchDate) {
+    launchStart = launchDate;
+    const int windowDays = std::ceil(
+        default_transfer_window_estimate(phase->refBody, phase->refBody2) / kKerbalDaySeconds);
+    launchWindowDurationYears = windowDays / 426;
+    launchWindowDurationDays = windowDays % 426;
+    updateLaunchEnd();
     float trans = default_transfer_time_estimate(phase->refBody, phase->refBody2) / kKerbalDaySeconds;
     flightTimeStartDays = trans * 0.5f;
     flightTimeEndDays = flightTimeStartDays * 2.0f;
+}
+
+void PorkchopPlot::updateLaunchEnd() {
+    const int64_t durationDays =
+        static_cast<int64_t>(launchWindowDurationYears) * 426 + launchWindowDurationDays;
+    launchEnd = Date(launchStart.toSeconds() + durationDays * kKerbalDaySeconds);
 }
 
 void PorkchopPlot::generate() {

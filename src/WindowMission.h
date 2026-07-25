@@ -51,12 +51,15 @@ public:
     void generate();
     void init(Date launchStart);
     void render();
+    void updateLaunchEnd();
 
     MissionPhase* phase = nullptr;
 
     bool winOpen = false;
     Date launchStart { 0 };
     Date launchEnd { 0 };
+    int launchWindowDurationYears = 0;
+    int launchWindowDurationDays = 0;
     int flightTimeStartDays = 50;
     int flightTimeEndDays = 400;
     int resolution = 96;

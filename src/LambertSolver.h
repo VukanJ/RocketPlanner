@@ -1,5 +1,5 @@
-#ifndef LAMBER_SOLVER_H
-#define LAMBER_SOLVER_H
+#ifndef LAMBERT_SOLVER_H
+#define LAMBERT_SOLVER_H
 
 #include "Orbit.h"
 #include "kspConstants.h"
@@ -35,4 +35,4 @@ public:
     float targetOrbitAltitude = 0;
 };
 
-#endif // LAMBER_SOLVER_H
+#endif // LAMBERTT_SOLVER_H
