@@ -73,8 +73,8 @@ public:
     float minDeltaV = std::numeric_limits<float>::infinity();
     float maxDeltaV = 0.0f;
     float colorMaxDeltaV = 0.0f;
-    int cheapestLaunchIndex = -1;
-    int cheapestFlightIndex = -1;
+    int cheapestIndex = -1;
+    int selectedIndex = -1;
     std::atomic<bool> calculated = false;
     std::atomic<float> progress = -1.0f;
 };

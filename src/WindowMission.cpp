@@ -484,7 +484,7 @@ void PorkchopPlot::render() {
 
         const ImPlotColormap colormap = getPorkchopColormaps()[colormapIndex].value;
         ImPlot::PushColormap(colormap);
-        ImGui::TextColored({1, 1, 0, 1}, "Select transfer with middle mouse button");
+        ImGui::TextColored({1, 1, 0, 1}, "Select transfer with left mouse button");
         if (ImPlot::BeginPlot("##PorkchopHeatmap",
                               ImVec2(-1, -(ImGui::GetFrameHeight() + ImGui::GetStyle().ItemSpacing.y)),
                               ImPlotFlags_NoMouseText)) {
@@ -498,7 +498,10 @@ void PorkchopPlot::render() {
                                 minDeltaV, nullptr,
                                 ImPlotPoint(launchStartDay, calculatedFlightTimeStartDays),
                                 ImPlotPoint(launchEndDay, calculatedFlightTimeEndDays));
-            if (cheapestLaunchIndex >= 0 && cheapestFlightIndex >= 0) {
+            if (cheapestIndex >= 0) {
+                const int cheapestLaunchIndex = cheapestIndex % calculatedResolution;
+                const int cheapestFlightIndex =
+                    calculatedResolution - 1 - cheapestIndex / calculatedResolution;
                 const float launchFraction = static_cast<float>(cheapestLaunchIndex) /
                     (calculatedResolution - 1);
                 const float flightFraction = static_cast<float>(cheapestFlightIndex) /
@@ -520,6 +523,35 @@ void PorkchopPlot::render() {
                     drawList->AddText(add(labelPosition, offset), IM_COL32(0, 0, 0, 255), label);
                 }
                 drawList->AddText(labelPosition, IM_COL32(255, 255, 255, 255), label);
+            }
+
+            if (selectedIndex >= 0) {
+                const int selectedLaunchIndex = selectedIndex % calculatedResolution;
+                const int selectedFlightIndex =
+                    calculatedResolution - 1 - selectedIndex / calculatedResolution;
+                const float launchFraction = static_cast<float>(selectedLaunchIndex) /
+                    (calculatedResolution - 1);
+                const float flightFraction = static_cast<float>(selectedFlightIndex) /
+                    (calculatedResolution - 1);
+                const double selectedLaunchDay =
+                    launchStartDay + launchFraction * (launchEndDay - launchStartDay);
+                const double selectedFlightDays = calculatedFlightTimeStartDays +
+                    flightFraction * (calculatedFlightTimeEndDays - calculatedFlightTimeStartDays);
+                const float selectedDeltaV = deltaV[selectedIndex];
+
+                ImPlot::SetNextMarkerStyle(ImPlotMarker_Circle, 9.0f, ImVec4(1, 1, 0, 1),
+                                           2.0f, ImVec4(0, 0, 0, 1));
+                ImPlot::PlotScatter("Selected transfer", &selectedLaunchDay, &selectedFlightDays, 1);
+
+                char selectedLabel[32];
+                std::snprintf(selectedLabel, sizeof(selectedLabel), "%.0f m/s", selectedDeltaV);
+                const ImVec2 labelPosition =
+                    add(ImPlot::PlotToPixels(selectedLaunchDay, selectedFlightDays), ImVec2(8, 8));
+                ImDrawList* drawList = ImGui::GetWindowDrawList();
+                for (const ImVec2 offset : {ImVec2(-1, 0), ImVec2(1, 0), ImVec2(0, -1), ImVec2(0, 1)}) {
+                    drawList->AddText(add(labelPosition, offset), IM_COL32(0, 0, 0, 255), selectedLabel);
+                }
+                drawList->AddText(labelPosition, IM_COL32(255, 255, 0, 255), selectedLabel);
             }
 
             if (ImPlot::IsPlotHovered()) {
@@ -549,6 +581,7 @@ void PorkchopPlot::render() {
                 drawList->AddText(textPosition, IM_COL32(255, 255, 255, 255), hoverText);
 
                 if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+                    selectedIndex = plotRow * calculatedResolution + launchIndex;
                     const float selectedLaunchFraction = static_cast<float>(launchIndex) /
                         (calculatedResolution - 1);
                     const float selectedFlightFraction = static_cast<float>(flightIndex) /
@@ -651,8 +684,8 @@ void PorkchopPlot::generate() {
     deltaV.assign(resolution * resolution, std::numeric_limits<float>::infinity());
     minDeltaV = std::numeric_limits<float>::infinity();
     maxDeltaV = 0.0f;
-    cheapestLaunchIndex = -1;
-    cheapestFlightIndex = -1;
+    cheapestIndex = -1;
+    selectedIndex = -1;
 
     auto* origin = phase->refBody;
     auto* target = phase->refBody2;
@@ -682,8 +715,7 @@ void PorkchopPlot::generate() {
             deltaV[plotRow * resolution + launchIndex] = min_dv;
             if (min_dv < minDeltaV) {
                 minDeltaV = min_dv;
-                cheapestLaunchIndex = launchIndex;
-                cheapestFlightIndex = flightIndex;
+                cheapestIndex = plotRow * resolution + launchIndex;
             }
             maxDeltaV = std::max(maxDeltaV, min_dv);
         }
