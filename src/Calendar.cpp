@@ -1,7 +1,7 @@
 #include "Calendar.h"
 #include <format>
 
-void DateFormat::normalize() {
+void DateFormat::normalize(bool KerbalCalendar) {
     if (second >= kKerbalMinuteSeconds) {
         minute += second / kKerbalMinuteSeconds;
         second %= kKerbalMinuteSeconds;
@@ -26,17 +26,21 @@ void DateFormat::normalize() {
         day -= (-hour + kKerbalDayHours - 1) / kKerbalDayHours;
         hour = (hour % kKerbalDayHours + kKerbalDayHours) % kKerbalDayHours;
     }
-    if (day > kKerbalYearDays) {
-        year += (day - 1) / kKerbalYearDays;
-        day = ((day - 1) % kKerbalYearDays) + 1;
+    int startDay = KerbalCalendar ? kKerbalEpochDay : 0;
+    if (day >= kKerbalYearDays) {
+        year += (day - startDay) / kKerbalYearDays;
+        day = ((day - startDay) % kKerbalYearDays) + startDay;
     }
-    else if (day < 1) {
+    else if (day < startDay) {
         year -= (-day + kKerbalYearDays) / kKerbalYearDays;
-        day = ((day - 1) % kKerbalYearDays + kKerbalYearDays) % kKerbalYearDays + 1;
+        day = ((day - startDay) % kKerbalYearDays + kKerbalYearDays) % kKerbalYearDays + startDay;
     }
 }
 
-DateFormat Date::getYDHMS() const {
+DateFormat Date::getYDHMS(bool asDuration) const {
+    if (asDuration) {
+        return { year() - 1, day() - 1, hour(), minute(), second() };
+    }
     return { year(), day(), hour(), minute(), second() };
 }
 

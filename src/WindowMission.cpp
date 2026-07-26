@@ -116,7 +116,7 @@ namespace {
         ImGui::InputInt("Min ", &date.minute); ImGui::SameLine();
         ImGui::InputInt("Sec ", &date.second);
         ImGui::PopItemWidth();
-        date.normalize();
+        date.normalize(true);
         ImGui::PopID();
     }
 
@@ -131,7 +131,7 @@ namespace {
         ImGui::InputInt("Mins", &duration.minute); ImGui::SameLine();
         ImGui::InputInt("Secs", &duration.second);
         ImGui::PopItemWidth();
-        duration.normalize();
+        duration.normalize(false);
         ImGui::PopID();
     }
 
@@ -664,7 +664,7 @@ void PorkchopPlot::init(KerbalDate launchDate) {
     float startAlt = isPlanetToMoon(phase->refBody, phase->refBody2) ? phase->alt1 : -1;
     const auto duration = KerbalDate(default_transfer_window_estimate(phase->refBody, phase->refBody2, startAlt));
 
-    launchWindowDuration = duration.getYDHMS();
+    launchWindowDuration = duration.getYDHMS(true);
     updateLaunchEnd();
     float trans = default_transfer_time_estimate(phase->refBody, phase->refBody2, startAlt) / kKerbalDaySeconds;
     flightTimeMinDays = trans * 0.5f;
@@ -672,8 +672,8 @@ void PorkchopPlot::init(KerbalDate launchDate) {
 }
 
 void PorkchopPlot::updateLaunchEnd() {
-    const int64_t durationSeconds = KerbalDate(launchWindowDuration.year, 
-                                               launchWindowDuration.day, 
+    const int64_t durationSeconds = KerbalDate(launchWindowDuration.year + kKerbalEpochYear,
+                                               launchWindowDuration.day + kKerbalEpochDay,
                                                launchWindowDuration.hour, 
                                                launchWindowDuration.minute, 
                                                launchWindowDuration.second).toSeconds();

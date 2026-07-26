@@ -2,6 +2,7 @@
 #include <filesystem>
 #include <fstream>
 
+#include "Calendar.h"
 #include "WindowSimulator.h"
 #include "gui.h"
 #include "kspConstants.h"

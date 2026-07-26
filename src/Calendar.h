@@ -15,6 +15,10 @@ constexpr int64_t kKerbalHourSeconds = kKerbalHourMinutes * kKerbalMinuteSeconds
 constexpr int64_t kKerbalDaySeconds  = kKerbalDayHours * kKerbalHourSeconds;
 constexpr int64_t kKerbalYearSeconds = kKerbalYearDays * kKerbalDaySeconds;
 
+constexpr int64_t kKerbalEpochDay = 1;
+constexpr int64_t kKerbalEpochYear = 1;
+
+
 struct DateFormat {
     int year = 1;
     int day = 1;
@@ -22,7 +26,7 @@ struct DateFormat {
     int minute = 0;
     int second = 0;
 
-    void normalize();
+    void normalize(bool KerbalCalendar = true);
 };
 
 class Date {
@@ -38,7 +42,7 @@ public:
     virtual int minute() const = 0;
     virtual int second() const = 0;
 
-    virtual DateFormat getYDHMS() const;
+    virtual DateFormat getYDHMS(bool asDuration) const;
 
     virtual void set(int y, int d, int h, int m, int s) = 0;
 

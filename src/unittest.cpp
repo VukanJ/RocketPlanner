@@ -10,6 +10,7 @@
 #include "LambertSolver.h"
 #include "utils.h"
 #include "Orbit.h"
+#include "Calendar.h"
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -585,5 +586,137 @@ TEST(DeltaV, hohmannTransferCost) {
             EXPECT_NEAR(dvtrans.max, std::max(dv1, dv2), 1e-3);
             EXPECT_NEAR(dvtrans.min, std::min(dv1, dv2), 1e-3);
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DateFormat::normalize
+// ---------------------------------------------------------------------------
+
+TEST(DateFormatNormalize, AllCases) {
+    // Already normalized: no change
+    {
+        DateFormat d{1, 1, 0, 0, 0};
+        d.normalize();
+        EXPECT_EQ(d.year, 1); EXPECT_EQ(d.day, 1);
+        EXPECT_EQ(d.hour, 0); EXPECT_EQ(d.minute, 0); EXPECT_EQ(d.second, 0);
+    }
+    // Seconds carry into minutes
+    {
+        DateFormat d{1, 1, 0, 0, 90};
+        d.normalize();
+        EXPECT_EQ(d.second, 30); EXPECT_EQ(d.minute, 1);
+    }
+    // Minutes carry into hours
+    {
+        DateFormat d{1, 1, 0, 75, 0};
+        d.normalize();
+        EXPECT_EQ(d.minute, 15); EXPECT_EQ(d.hour, 1);
+    }
+    // Hours carry into days
+    {
+        DateFormat d{1, 1, 8, 0, 0};
+        d.normalize();
+        EXPECT_EQ(d.hour, 2); EXPECT_EQ(d.day, 2);
+    }
+    // Days carry into year
+    {
+        DateFormat d{1, 427, 0, 0, 0};
+        d.normalize();
+        EXPECT_EQ(d.year, 2); EXPECT_EQ(d.day, 1);
+    }
+    // Seconds borrow from minutes
+    {
+        DateFormat d{1, 1, 0, 1, -10};
+        d.normalize();
+        EXPECT_EQ(d.second, 50); EXPECT_EQ(d.minute, 0);
+    }
+    // Minutes borrow from hours
+    {
+        DateFormat d{1, 1, 1, 0, -30};
+        d.normalize();
+        EXPECT_EQ(d.minute, 59); EXPECT_EQ(d.hour, 0);
+    }
+    // Hours borrow from days
+    {
+        DateFormat d{1, 2, 0, 0, -1};
+        d.normalize();
+        EXPECT_EQ(d.hour, 5); EXPECT_EQ(d.day, 1);
+    }
+    // Day zero borrows from year
+    {
+        DateFormat d{2, 1, 0, 0, 0};
+        d.day = 0;
+        d.normalize();
+        EXPECT_EQ(d.year, 1); EXPECT_EQ(d.day, 426);
+    }
+    // Day -1 borrows from year
+    {
+        DateFormat d{2, -1, 0, 0, 0};
+        d.normalize();
+        EXPECT_EQ(d.year, 1); EXPECT_EQ(d.day, 425);
+    }
+    // Large seconds overflow cascades through all fields
+    {
+        DateFormat d{1, 1, 0, 0, 3661};
+        d.normalize();
+        EXPECT_EQ(d.hour, 1); EXPECT_EQ(d.minute, 1); EXPECT_EQ(d.second, 1);
+    }
+    // Large seconds underflow cascades through all fields
+    {
+        DateFormat d{1, 1, 1, 1, -3661};
+        d.normalize();
+        EXPECT_EQ(d.year, 0); EXPECT_EQ(d.day, 426);
+        EXPECT_EQ(d.hour, 5); EXPECT_EQ(d.minute, 59); EXPECT_EQ(d.second, 59);
+    }
+    // Multi-year carry from large day overflow
+    {
+        DateFormat d{1, 853, 0, 0, 0};
+        d.normalize();
+        EXPECT_EQ(d.year, 3); EXPECT_EQ(d.day, 1);
+    }
+    // Multi-year borrow from large negative day
+    {
+        DateFormat d{3, -425, 0, 0, 0};
+        d.normalize();
+        EXPECT_EQ(d.year, 2); EXPECT_EQ(d.day, 1);
+    }
+    // Mixed: seconds overflow cascades through minutes, hours, days, year
+    {
+        DateFormat d{1, 426, 5, 59, 65};
+        d.normalize();
+        EXPECT_EQ(d.second, 5); EXPECT_EQ(d.minute, 0);
+        EXPECT_EQ(d.hour, 0); EXPECT_EQ(d.day, 1); EXPECT_EQ(d.year, 2);
+    }
+    // Hour borrows across day boundary
+    {
+        DateFormat d{1, 3, 0, 0, -1};
+        d.normalize();
+        EXPECT_EQ(d.hour, 5); EXPECT_EQ(d.day, 2);
+    }
+    // Max valid day stays in range
+    {
+        DateFormat d{1, 426, 5, 59, 59};
+        d.normalize();
+        EXPECT_EQ(d.year, 1); EXPECT_EQ(d.day, 426);
+        EXPECT_EQ(d.hour, 5); EXPECT_EQ(d.minute, 59); EXPECT_EQ(d.second, 59);
+    }
+    // Exact minute boundary wraps
+    {
+        DateFormat d{1, 1, 0, 0, 60};
+        d.normalize();
+        EXPECT_EQ(d.second, 0); EXPECT_EQ(d.minute, 1);
+    }
+    // Exact hour boundary wraps
+    {
+        DateFormat d{1, 1, 0, 60, 0};
+        d.normalize();
+        EXPECT_EQ(d.minute, 0); EXPECT_EQ(d.hour, 1);
+    }
+    // Exact day boundary wraps
+    {
+        DateFormat d{1, 1, 6, 0, 0};
+        d.normalize();
+        EXPECT_EQ(d.hour, 0); EXPECT_EQ(d.day, 2);
     }
 }
