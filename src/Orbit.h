@@ -35,7 +35,7 @@ struct Orbit {
 std::pair<vec3f, vec3f> get_local_position(const Orbit& o);
 std::pair<vec3f, vec3f> get_local_future_position(const Orbit& o, std::uint64_t seconds);
 
-float default_transfer_time_estimate(const Body* from, const Body* to);
-float default_transfer_window_estimate(const Body* from, const Body* to);
+float default_transfer_time_estimate(const Body* from, const Body* to, float startAltitude = 0);
+float default_transfer_window_estimate(const Body* from, const Body* to, float startAltitude = 0);
 
 #endif // ORBIT_H

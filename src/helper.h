@@ -23,8 +23,16 @@ void println(Args... args) {
     }
 }
 
-static inline bool isEngine(PartType type) {
+constexpr bool isEngine(PartType type) {
     return type == PartType::LFEngine || type == PartType::LOXEngine || type == PartType::MPEngine || type == PartType::XenonEngine || type == PartType::SolidBooster || type == PartType::JetEngine;
+}
+
+struct Body;
+constexpr bool isPlanetToMoon(const Body* from, const Body* to) {
+    return to->orbit.parent == from;
+}
+constexpr bool isPlanetToPlanet(const Body* from, const Body* to) {
+    return to->orbit.parent == from->orbit.parent;
 }
 
 inline constexpr ImU32 cmap_data_CMRmap[256] = {

@@ -1,6 +1,7 @@
 #ifndef WINDOW_MISSION
 #define WINDOW_MISSION
 
+#include "Calendar.h"
 #include "DeltaV.h"
 #include "LambertSolver.h"
 #include "SystemMap.h"
@@ -11,7 +12,7 @@
 
 struct Mission {
     const Body* originBody = &KspSystem::Kerbin;
-    const Body* destinationBody = &KspSystem::Duna;
+    const Body* destinationBody = &KspSystem::Mun;
     bool oneWayTrip = false;
     bool apolloStyle = true;
 };
@@ -30,16 +31,6 @@ enum class MissionPhaseType {
     ORBITAL_REFUELING,
 };
 
-struct Date {
-    int year = 0;
-    int day = 0;
-    int hour = 0;
-    int minute = 0;
-
-    Date(int64_t seconds);
-    int64_t toSeconds() const;
-};
-
 struct MissionPhase;
 
 class PorkchopPlot {
@@ -49,23 +40,26 @@ public:
     static constexpr int minResolution = 16;
     static constexpr int maxResolution = 512;
     void generate();
-    void init(Date launchStart);
+    void init(KerbalDate launchStart);
     void render();
     void updateLaunchEnd();
 
     MissionPhase* phase = nullptr;
 
     bool winOpen = false;
-    Date launchStart { 0 };
-    Date launchEnd { 0 };
+    KerbalDate launchStart { 0 };
+    KerbalDate launchEnd { 0 };
     int launchWindowDurationYears = 0;
     int launchWindowDurationDays = 0;
+    int launchWindowDurationHours = 0;
+    int launchWindowDurationMinutes = 0;
+    int launchWindowDurationSeconds = 0;
     int flightTimeStartDays = 50;
     int flightTimeEndDays = 400;
     int resolution = 96;
     int calculatedResolution = 0;
-    Date calculatedLaunchStart { 0 };
-    Date calculatedLaunchEnd { 0 };
+    KerbalDate calculatedLaunchStart { 0 };
+    KerbalDate calculatedLaunchEnd { 0 };
     int calculatedFlightTimeStartDays = 0;
     int calculatedFlightTimeEndDays = 0;
     int colormapIndex = 0;
@@ -73,7 +67,7 @@ public:
     float minDeltaV = std::numeric_limits<float>::infinity();
     float maxDeltaV = 0.0f;
     float colorMaxDeltaV = 0.0f;
-    bool useLogColorScale = false;
+    bool useLogColorScale = true;
     std::vector<float> deltaVLog;
     int cheapestIndex = -1;
     int selectedIndex = -1;
@@ -87,7 +81,7 @@ struct MissionPhase {
     const Body* refBody2 = nullptr;
     float alt1 = 0;
     float alt2 = 0;
-    DeltaVRange dv_range;
+    DeltaVRange dv_range {};
 
     bool optional = true;
     bool prograde = true;
@@ -126,7 +120,7 @@ public:
     bool launchDateOptim = false;
     SystemMap systemMap;
 
-    Date currentDate { 0 };
+    KerbalDate currentDate { 0 };
     LambertSolver transfer_solver;
     bool update_solver = false;
 

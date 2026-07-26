@@ -16,24 +16,6 @@
 
 ThreadPool WindowMission::threadPool = ThreadPool(2);
 
-Date::Date(int64_t seconds) {
-    // Convert seconds to KSP date
-    int64_t totalMinutes = seconds / 60;
-    minute = totalMinutes % 60;
-    int64_t totalHours = totalMinutes / 60;
-    hour = totalHours % 6;
-    int64_t totalDays = totalHours / 6;
-    day = (totalDays % 426) + 1;
-    year = (totalDays / 426) + 1;
-}
-
-int64_t Date::toSeconds() const {
-    return static_cast<int64_t>(year - 1) * 426 * 6 * 60 * 60 +
-           static_cast<int64_t>(day - 1) * 6 * 60 * 60 +
-           static_cast<int64_t>(hour) * 60 * 60 +
-           static_cast<int64_t>(minute) * 60;
-}
-
 namespace {
     constexpr int64_t kKerbalDaySeconds = 6 * 60 * 60;
 
@@ -60,10 +42,8 @@ namespace {
         for (int segment = 0; segment < segments; ++segment) {
             const float left = static_cast<float>(segment) / segments;
             const float right = static_cast<float>(segment + 1) / segments;
-            const float tLeft = logMax > 0.0f
-                ? std::log1p(left * (std::expm1(logMax))) / logMax : left;
-            const float tRight = logMax > 0.0f
-                ? std::log1p(right * (std::expm1(logMax))) / logMax : right;
+            const float tLeft = logMax > 0.0f ? std::log1p(left * (std::expm1(logMax))) / logMax : left;
+            const float tRight = logMax > 0.0f ? std::log1p(right * (std::expm1(logMax))) / logMax : right;
             const ImU32 leftColor = ImGui::ColorConvertFloat4ToU32(ImPlot::SampleColormap(1.0f - tLeft));
             const ImU32 rightColor = ImGui::ColorConvertFloat4ToU32(ImPlot::SampleColormap(1.0f - tRight));
             drawList->AddRectFilledMultiColor(
@@ -127,19 +107,22 @@ namespace {
         return changed;
     }
 
-    void renderDateInput(const char* label, Date& date) {
+    void renderDateInput(const char* label, KerbalDate& date) {
         ImGui::PushID(label);
         ImGui::TextUnformatted(label);
         ImGui::SameLine();
+        int y = date.year(), d = date.day(), h = date.hour(), m = date.minute(), s = date.second();
         ImGui::PushItemWidth(150.0f);
-        ImGui::InputInt("Year", &date.year);
+        ImGui::InputInt("Year", &y);
         ImGui::SameLine();
-        ImGui::InputInt("Day", &date.day);
+        ImGui::InputInt("Day", &d);
         ImGui::PopItemWidth();
-        date.year = std::max(date.year, 1);
-        date.day = std::clamp(date.day, 1, 426);
-        date.hour = 0;
-        date.minute = 0;
+        ImGui::PushItemWidth(90.0f);
+        ImGui::InputInt("Hour", &h); ImGui::SameLine();
+        ImGui::InputInt("Min", &m); ImGui::SameLine();
+        ImGui::InputInt("Sec", &s);
+        ImGui::PopItemWidth();
+        date.set(y, d, h, m, s);
         ImGui::PopID();
     }
 
@@ -325,6 +308,9 @@ bool WindowMission::render() {
                         if (ImGui::Button("Auto-solve")) {
                         }
                         ImGui::PopStyleColor();
+                        if (step.porkchopPlot->progress >= 0) {
+                            ImGui::ProgressBar(step.porkchopPlot->progress, ImVec2(-1, 0));
+                        }
                     }
                     break;
                 case MissionPhaseType::MINING: 
@@ -430,6 +416,28 @@ void PorkchopPlot::render() {
     }
     renderDateInput("Launch start", launchStart);
     renderDurationInput("Launch window", launchWindowDurationYears, launchWindowDurationDays);
+    ImGui::PushID("##hms");
+    ImGui::PushItemWidth(90.0f);
+    ImGui::InputInt("Hours", &launchWindowDurationHours); ImGui::SameLine();
+    ImGui::InputInt("Mins", &launchWindowDurationMinutes); ImGui::SameLine();
+    ImGui::InputInt("Secs", &launchWindowDurationSeconds);
+    ImGui::PopItemWidth();
+    if (launchWindowDurationSeconds < 0) { launchWindowDurationSeconds = 0; }
+    if (launchWindowDurationSeconds >= 60) {
+        launchWindowDurationMinutes += launchWindowDurationSeconds / 60;
+        launchWindowDurationSeconds %= 60;
+    }
+    if (launchWindowDurationMinutes < 0) { launchWindowDurationMinutes = 0; }
+    if (launchWindowDurationMinutes >= 60) {
+        launchWindowDurationHours += launchWindowDurationMinutes / 60;
+        launchWindowDurationMinutes %= 60;
+    }
+    if (launchWindowDurationHours < 0) { launchWindowDurationHours = 0; }
+    if (launchWindowDurationHours >= 6) {
+        launchWindowDurationDays += launchWindowDurationHours / 6;
+        launchWindowDurationHours %= 6;
+    }
+    ImGui::PopID();
     updateLaunchEnd();
     ImGui::PushItemWidth(150.0f);
     ImGui::Text("Flight time"); ImGui::SameLine();
@@ -452,7 +460,9 @@ void PorkchopPlot::render() {
 
     if (progress < 0) { // Make sure button is not pressed while calculation is in progress
         const bool hasLaunchWindow =
-            launchWindowDurationYears > 0 || launchWindowDurationDays > 0;
+            launchWindowDurationYears > 0 || launchWindowDurationDays > 0
+            || launchWindowDurationHours > 0 || launchWindowDurationMinutes > 0
+            || launchWindowDurationSeconds > 0;
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.3f, 1.0f, 1.0f));
         ImGui::BeginDisabled(!hasLaunchWindow);
         if (ImGui::Button("Generate", ImVec2(-1, 0))) {
@@ -483,13 +493,12 @@ void PorkchopPlot::render() {
                       kNumPorkchopColormaps);
 
         ImGui::SetNextItemWidth(250.0f);
+        ImGui::SameLine();
         ImGui::SliderFloat("Color maximum", &colorMaxDeltaV, minDeltaV, maxDeltaV,
                            "%.0f m/s", ImGuiSliderFlags_Logarithmic);
         colorMaxDeltaV = std::max(colorMaxDeltaV, minDeltaV);
-        ImGui::SameLine();
-        if (ImGui::Button(useLogColorScale ? "Log" : "Lin")) {
-            useLogColorScale = !useLogColorScale;
-        }
+        ImGui::Text("Scale:"); ImGui::SameLine();
+        if (ImGui::Button(useLogColorScale ? "Log" : "Lin")) { useLogColorScale = !useLogColorScale; }
 
         const ImPlotColormap colormap = getPorkchopColormaps()[colormapIndex].value;
         ImPlot::PushColormap(colormap);
@@ -671,22 +680,32 @@ void WindowMission::showTransferOrbit(float launchSeconds, float flightSeconds) 
     systemMap.addDebugOrbit({transfer_solver.transferOrbit2, IM_COL32(255, 100, 200, 200), 2.5f, nu1_2, nu2_2});
 }
 
-void PorkchopPlot::init(Date launchDate) {
+void PorkchopPlot::init(KerbalDate launchDate) {
     launchStart = launchDate;
-    const int windowDays = std::ceil(
-        default_transfer_window_estimate(phase->refBody, phase->refBody2) / kKerbalDaySeconds);
-    launchWindowDurationYears = windowDays / 426;
-    launchWindowDurationDays = windowDays % 426;
+    float startAlt = isPlanetToMoon(phase->refBody, phase->refBody2) ? phase->alt1 : 0;
+    const int64_t windowSeconds = std::llround(
+        default_transfer_window_estimate(phase->refBody, phase->refBody2, startAlt));
+    launchWindowDurationYears = windowSeconds / (426 * kKerbalDaySeconds);
+    int64_t rem = windowSeconds % (426 * kKerbalDaySeconds);
+    launchWindowDurationDays = rem / kKerbalDaySeconds;
+    rem %= kKerbalDaySeconds;
+    launchWindowDurationHours = rem / 3600;
+    rem %= 3600;
+    launchWindowDurationMinutes = rem / 60;
+    launchWindowDurationSeconds = rem % 60;
     updateLaunchEnd();
-    float trans = default_transfer_time_estimate(phase->refBody, phase->refBody2) / kKerbalDaySeconds;
+    float trans = default_transfer_time_estimate(phase->refBody, phase->refBody2, startAlt) / kKerbalDaySeconds;
     flightTimeStartDays = trans * 0.5f;
     flightTimeEndDays = flightTimeStartDays * 2.0f;
 }
 
 void PorkchopPlot::updateLaunchEnd() {
-    const int64_t durationDays =
-        static_cast<int64_t>(launchWindowDurationYears) * 426 + launchWindowDurationDays;
-    launchEnd = Date(launchStart.toSeconds() + durationDays * kKerbalDaySeconds);
+    const int64_t durationSeconds =
+        (static_cast<int64_t>(launchWindowDurationYears) * 426 + launchWindowDurationDays) * kKerbalDaySeconds
+        + static_cast<int64_t>(launchWindowDurationHours) * 3600
+        + static_cast<int64_t>(launchWindowDurationMinutes) * 60
+        + static_cast<int64_t>(launchWindowDurationSeconds);
+    launchEnd = KerbalDate(launchStart.toSeconds() + durationSeconds);
 }
 
 void PorkchopPlot::generate() {
@@ -706,9 +725,15 @@ void PorkchopPlot::generate() {
     auto* target = phase->refBody2;
 
     LambertSolver solver;
-    solver.init(origin->orbit.parent, origin->orbit,
-                target->orbit, origin,
-                target, phase->alt1, phase->alt2);
+    if (isPlanetToMoon(origin, target)) {
+        Orbit originOrbit = Orbit::circular(origin, phase->alt1 + origin->radius_km);
+        solver.init(origin, originOrbit, target->orbit,
+                    origin, target, phase->alt1, phase->alt2);
+    } else {
+        solver.init(origin->orbit.parent, origin->orbit,
+                    target->orbit, origin,
+                    target, phase->alt1, phase->alt2);
+    }
     for (int flightIndex = 0; flightIndex < resolution; ++flightIndex) {
         const float flightFraction = static_cast<float>(flightIndex) / (resolution - 1);
         const float flightDays = flightTimeStartDays + flightFraction * (flightTimeEndDays - flightTimeStartDays);
@@ -738,6 +763,7 @@ void PorkchopPlot::generate() {
 
     if (!std::isfinite(minDeltaV)) {
         calculated = false;
+        progress = -1.0f; // Disable progress bar
         return;
     }
     for (float& dv : deltaV) {
@@ -765,27 +791,15 @@ bool WindowMission::renderTimeInput() {
     ImGui::Begin("Mission Time", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
 
     ImGui::PushItemWidth(110);
-    if (ImGui::InputInt("Year", &currentDate.year)) {
-        if (currentDate.year < 1) { currentDate.year = 1; }
-        update = true;
-    }
-    if (ImGui::InputInt("Day", &currentDate.day)) {
-        if (currentDate.day < 1) { currentDate.day = 426; }
-        if (currentDate.day > 426) { currentDate.day = 1; }
-        update = true;
-    }
-    if (ImGui::InputInt("Hour", &currentDate.hour)) {
-        if (currentDate.hour < 0) { currentDate.hour = 5; }
-        if (currentDate.hour > 5) { currentDate.hour = 0; }
-        update = true;
-    }
-    if (ImGui::InputInt("Minute", &currentDate.minute)) {
-        if (currentDate.minute < 0) { currentDate.minute = 59; }
-        if (currentDate.minute > 59) { currentDate.minute = 0; }
-        update = true;
-    }
-
+    int y = currentDate.year(), d = currentDate.day(), h = currentDate.hour(), m = currentDate.minute(), s = currentDate.second();
+    if (ImGui::InputInt("Year", &y)) { update = true; }
+    if (ImGui::InputInt("Day", &d)) { update = true; }
+    if (ImGui::InputInt("Hour", &h)) { update = true; }
+    if (ImGui::InputInt("Minute", &m)) { update = true; }
+    if (ImGui::InputInt("Second", &s)) { update = true; }
     ImGui::PopItemWidth();
+    currentDate.set(y, d, h, m, s);
+
     ImGui::End();
     return update;
 }
@@ -829,14 +843,17 @@ void WindowMission::updateMissionSequence() {
                 // Return from natural satellite. Need to escape first
                 msequence.push_back(MissionPhase { MissionPhaseType::ESCAPE, from, to, startOrbit, reentryPE });
             }
-            if (to->orbit.parent == from) {
+            else if (to->orbit.parent == from) {
                 // Parent to moon — inclination correction w.r.t. parent's equator
                 if (to->orbit.inclination != 0) { // origin orbit is in parents ecliptic
                     msequence.push_back(MissionPhase { MissionPhaseType::INCLINATION_CORRECTION, from, to, startOrbit });
                 }
-            }
-            if (!advanced) {
-                msequence.push_back(MissionPhase::hohmann(from, to, startOrbit, destOrbit));
+                if (advanced) {
+                    msequence.push_back(MissionPhase { MissionPhaseType::ORBITAL_INSERTION, from, to, startOrbit, destOrbit });
+                }
+                else {
+                    msequence.push_back(MissionPhase::hohmann(from, to, startOrbit, destOrbit));
+                }
             }
         }
         if (to->atmHeight_km > 0) {

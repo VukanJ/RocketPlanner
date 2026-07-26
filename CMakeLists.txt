@@ -28,6 +28,7 @@ set(ROCKET_SOURCES
   src/SystemMap.cpp
   src/LambertSolver.cpp
   src/ThreadPool.cpp
+  src/Calendar.cpp
 )
 
 # ---- Agave Font ----

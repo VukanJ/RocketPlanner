@@ -186,25 +186,43 @@ std::pair<vec3f, vec3f> get_local_future_position(const Orbit& o, std::uint64_t 
     return {r_t, v_t};
 }
 
-float default_transfer_time_estimate(const Body* from, const Body* to) {
+float default_transfer_time_estimate(const Body* from, const Body* to, float startAltitude) {
     // Calculate the default transfer time between two bodies using Hohmann transfer assumption
     // Used to estimate the time window for interplanetary transfers
-    assert(from->orbit.parent == to->orbit.parent);
-    auto o = getHohmannOrbit(from->orbit.parent, from->orbit.AP, to->orbit.PE);
+    if (to->orbit.parent == from) {
+        // Planet to moon
+        auto o = getHohmannOrbit(from, startAltitude + from->radius_km, to->orbit.PE);
 
-    auto t1 = o.period() / 2.0f;
-    o = getHohmannOrbit(from->orbit.parent, from->orbit.PE, to->orbit.AP);
-    auto t2 = o.period() / 2.0f;
+        auto t1 = o.period() / 2.0f;
+        o = getHohmannOrbit(from, startAltitude + from->radius_km, to->orbit.AP);
+        auto t2 = o.period() / 2.0f;
 
-    return 0.5f * (t1 + t2);
+        return 0.5f * (t1 + t2);
+    }
+    else {
+        auto o = getHohmannOrbit(from->orbit.parent, from->orbit.AP, to->orbit.PE);
+
+        auto t1 = o.period() / 2.0f;
+        o = getHohmannOrbit(from->orbit.parent, from->orbit.PE, to->orbit.AP);
+        auto t2 = o.period() / 2.0f;
+
+        return 0.5f * (t1 + t2);
+    }
 }
 
-float default_transfer_window_estimate(const Body* from, const Body* to) {
+float default_transfer_window_estimate(const Body* from, const Body* to, float startAltitude) {
     // Compute minimum time window estimate for hohmann transfer
-    float T1 = from->orbit.period(unit_day);
-    float T2 = to->orbit.period(unit_day);
+    float T1, T2;
+    if (isPlanetToMoon(from, to)) {
+        float a = startAltitude + from->radius_km;
+        T1 = std::sqrt(a * a * a / from->GM_km3s2) * 2.0f * M_PI * unit_day;
+        T2 = to->orbit.period(unit_day);
+    }
+    else {
+        T1 = from->orbit.period(unit_day);
+        T2 = to->orbit.period(unit_day);
+    }
 
     float dTheta = std::abs(2.0f * M_PI * (1.0f / T2 - 1.0f / T1));
-
     return 2.0f * M_PI / dTheta / unit_day;
 }
