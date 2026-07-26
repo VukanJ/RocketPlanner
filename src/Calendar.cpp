@@ -1,19 +1,44 @@
 #include "Calendar.h"
-#include <algorithm>
 #include <format>
 
-std::tuple<int, int, int, int, int> Date::getYDHMS() const {
-    return std::make_tuple(year(), day(), hour(), minute(), second());
+void DateFormat::normalize() {
+    if (second >= kKerbalMinuteSeconds) {
+        minute += second / kKerbalMinuteSeconds;
+        second %= kKerbalMinuteSeconds;
+    }
+    else if (second < 0) {
+        minute -= (-second + kKerbalMinuteSeconds - 1) / kKerbalMinuteSeconds;
+        second = (second % kKerbalMinuteSeconds + kKerbalMinuteSeconds) % kKerbalMinuteSeconds;
+    }
+    if (minute >= kKerbalHourMinutes) {
+        hour += minute / kKerbalHourMinutes;
+        minute %= kKerbalHourMinutes;
+    }
+    else if (minute < 0) {
+        hour -= (-minute + kKerbalHourMinutes - 1) / kKerbalHourMinutes;
+        minute = (minute % kKerbalHourMinutes + kKerbalHourMinutes) % kKerbalHourMinutes;
+    }
+    if (hour >= kKerbalDayHours) {
+        day += hour / kKerbalDayHours;
+        hour %= kKerbalDayHours;
+    }
+    else if (hour < 0) {
+        day -= (-hour + kKerbalDayHours - 1) / kKerbalDayHours;
+        hour = (hour % kKerbalDayHours + kKerbalDayHours) % kKerbalDayHours;
+    }
+    if (day > kKerbalYearDays) {
+        year += (day - 1) / kKerbalYearDays;
+        day = ((day - 1) % kKerbalYearDays) + 1;
+    }
+    else if (day < 1) {
+        year -= (-day + kKerbalYearDays) / kKerbalYearDays;
+        day = ((day - 1) % kKerbalYearDays + kKerbalYearDays) % kKerbalYearDays + 1;
+    }
 }
 
-constexpr int64_t kKerbalYearDays = 426;
-constexpr int64_t kKerbalDayHours = 6;
-constexpr int64_t kKerbalHourMinutes = 60;
-constexpr int64_t kKerbalMinuteSeconds = 60;
-
-constexpr int64_t kKerbalHourSeconds = kKerbalHourMinutes * kKerbalMinuteSeconds;
-constexpr int64_t kKerbalDaySeconds  = kKerbalDayHours * kKerbalHourSeconds;
-constexpr int64_t kKerbalYearSeconds = kKerbalYearDays * kKerbalDaySeconds;
+DateFormat Date::getYDHMS() const {
+    return { year(), day(), hour(), minute(), second() };
+}
 
 int KerbalDate::year()   const { return static_cast<int>(totalSeconds / kKerbalYearSeconds) + 1; }
 int KerbalDate::day()    const { return static_cast<int>((totalSeconds / kKerbalDaySeconds) % kKerbalYearDays) + 1; }
@@ -22,12 +47,11 @@ int KerbalDate::minute() const { return static_cast<int>((totalSeconds / kKerbal
 int KerbalDate::second() const { return static_cast<int>(totalSeconds % kKerbalMinuteSeconds); }
 
 void KerbalDate::set(int y, int d, int h, int m, int s) {
-    totalSeconds = static_cast<int64_t>(std::max(y, 1) - 1) * kKerbalYearSeconds
+    totalSeconds = static_cast<int64_t>(y - 1) * kKerbalYearSeconds
                  + static_cast<int64_t>(d - 1) * kKerbalDaySeconds
                  + h * kKerbalHourSeconds + m * kKerbalMinuteSeconds + s;
 }
 
 std::string Date::toString() const {
-    return std::format("{:04d}-{:03d} {:02d}:{:02d}:{:02d}",
-                       year(), day(), hour(), minute(), second());
+    return std::format("{:04d}-{:03d} {:02d}:{:02d}:{:02d}", year(), day(), hour(), minute(), second());
 }

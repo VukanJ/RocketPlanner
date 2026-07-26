@@ -35,10 +35,12 @@ struct MissionPhase;
 
 class PorkchopPlot {
 public:
-    PorkchopPlot() = delete;
-    PorkchopPlot(MissionPhase* phase = nullptr) : phase(phase) { }
     static constexpr int minResolution = 16;
     static constexpr int maxResolution = 512;
+
+    PorkchopPlot() = delete;
+    PorkchopPlot(MissionPhase* phase = nullptr) : phase(phase) { }
+
     void generate();
     void init(KerbalDate launchStart);
     void render();
@@ -47,32 +49,36 @@ public:
     MissionPhase* phase = nullptr;
 
     bool winOpen = false;
-    KerbalDate launchStart { 0 };
-    KerbalDate launchEnd { 0 };
-    int launchWindowDurationYears = 0;
-    int launchWindowDurationDays = 0;
-    int launchWindowDurationHours = 0;
-    int launchWindowDurationMinutes = 0;
-    int launchWindowDurationSeconds = 0;
-    int flightTimeStartDays = 50;
-    int flightTimeEndDays = 400;
-    int resolution = 96;
-    int calculatedResolution = 0;
-    KerbalDate calculatedLaunchStart { 0 };
-    KerbalDate calculatedLaunchEnd { 0 };
-    int calculatedFlightTimeStartDays = 0;
-    int calculatedFlightTimeEndDays = 0;
-    int colormapIndex = 0;
-    std::vector<float> deltaV;
-    float minDeltaV = std::numeric_limits<float>::infinity();
-    float maxDeltaV = 0.0f;
-    float colorMaxDeltaV = 0.0f;
-    bool useLogColorScale = true;
-    std::vector<float> deltaVLog;
-    int cheapestIndex = -1;
+
+    DateFormat launchStartInput { 0 };
+    KerbalDate launchEndInput { 0 };
+    DateFormat launchWindowDuration { 0, 0, 0, 0, 0 };
+    int flightTimeMinDays = 50;
+    int flightTimeMaxDays = 400;
+
+    KerbalDate activeLaunchStart { 0 };
+    KerbalDate activeLaunchEnd { 0 };
+    int activeFlightTimeStartDays = 0;
+    int activeFlightTimeEndDays = 0;
+
+    int minDeltaVIndex = -1;
     int selectedIndex = -1;
+
     std::atomic<bool> calculated = false;
     std::atomic<float> progress = -1.0f;
+
+    // Plot opt
+    int colormapIndex = 0;
+    int resolution = 96;
+    int activeResolution = 0;
+    float colorMaxDeltaV = 0.0f;
+    bool useLogColorScale = true;
+    float minDeltaV = std::numeric_limits<float>::infinity();
+    float maxDeltaV = 0.0f;
+
+    // Heatmap data
+    std::vector<float> deltaV;
+    std::vector<float> deltaVLog;
 };
 
 struct MissionPhase {

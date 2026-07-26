@@ -17,8 +17,6 @@
 ThreadPool WindowMission::threadPool = ThreadPool(2);
 
 namespace {
-    constexpr int64_t kKerbalDaySeconds = 6 * 60 * 60;
-
     struct ColormapOption {
         const char* name;
         ImPlotColormap value;
@@ -107,36 +105,33 @@ namespace {
         return changed;
     }
 
-    void renderDateInput(const char* label, KerbalDate& date) {
+    void renderDateInput(const char* label, DateFormat& date) {
         ImGui::PushID(label);
         ImGui::TextUnformatted(label);
         ImGui::SameLine();
-        int y = date.year(), d = date.day(), h = date.hour(), m = date.minute(), s = date.second();
-        ImGui::PushItemWidth(150.0f);
-        ImGui::InputInt("Year", &y);
-        ImGui::SameLine();
-        ImGui::InputInt("Day", &d);
-        ImGui::PopItemWidth();
         ImGui::PushItemWidth(90.0f);
-        ImGui::InputInt("Hour", &h); ImGui::SameLine();
-        ImGui::InputInt("Min", &m); ImGui::SameLine();
-        ImGui::InputInt("Sec", &s);
+        ImGui::InputInt("Year ", &date.year); ImGui::SameLine();
+        ImGui::InputInt("Day ", &date.day); ImGui::SameLine();
+        ImGui::InputInt("Hour ", &date.hour); ImGui::SameLine();
+        ImGui::InputInt("Min ", &date.minute); ImGui::SameLine();
+        ImGui::InputInt("Sec ", &date.second);
         ImGui::PopItemWidth();
-        date.set(y, d, h, m, s);
+        date.normalize();
         ImGui::PopID();
     }
 
-    void renderDurationInput(const char* label, int& years, int& days) {
+    void renderDurationInput(const char* label, DateFormat& duration) {
         ImGui::PushID(label);
         ImGui::TextUnformatted(label);
         ImGui::SameLine();
-        ImGui::PushItemWidth(150.0f);
-        ImGui::InputInt("Years", &years);
-        ImGui::SameLine();
-        ImGui::InputInt("Days", &days);
+        ImGui::PushItemWidth(90.0f);
+        ImGui::InputInt("Years", &duration.year); ImGui::SameLine();
+        ImGui::InputInt("Days", &duration.day); ImGui::SameLine();
+        ImGui::InputInt("Hours", &duration.hour); ImGui::SameLine();
+        ImGui::InputInt("Mins", &duration.minute); ImGui::SameLine();
+        ImGui::InputInt("Secs", &duration.second);
         ImGui::PopItemWidth();
-        years = std::max(years, 0);
-        days = std::max(days, 0);
+        duration.normalize();
         ImGui::PopID();
     }
 
@@ -412,42 +407,21 @@ void PorkchopPlot::render() {
     ImGui::Begin(label, &winOpen);
 
     if (progress >= 0) {
+        // Disable inputs while calculation is in progress
         ImGui::BeginDisabled();
     }
-    renderDateInput("Launch start", launchStart);
-    renderDurationInput("Launch window", launchWindowDurationYears, launchWindowDurationDays);
-    ImGui::PushID("##hms");
-    ImGui::PushItemWidth(90.0f);
-    ImGui::InputInt("Hours", &launchWindowDurationHours); ImGui::SameLine();
-    ImGui::InputInt("Mins", &launchWindowDurationMinutes); ImGui::SameLine();
-    ImGui::InputInt("Secs", &launchWindowDurationSeconds);
-    ImGui::PopItemWidth();
-    if (launchWindowDurationSeconds < 0) { launchWindowDurationSeconds = 0; }
-    if (launchWindowDurationSeconds >= 60) {
-        launchWindowDurationMinutes += launchWindowDurationSeconds / 60;
-        launchWindowDurationSeconds %= 60;
-    }
-    if (launchWindowDurationMinutes < 0) { launchWindowDurationMinutes = 0; }
-    if (launchWindowDurationMinutes >= 60) {
-        launchWindowDurationHours += launchWindowDurationMinutes / 60;
-        launchWindowDurationMinutes %= 60;
-    }
-    if (launchWindowDurationHours < 0) { launchWindowDurationHours = 0; }
-    if (launchWindowDurationHours >= 6) {
-        launchWindowDurationDays += launchWindowDurationHours / 6;
-        launchWindowDurationHours %= 6;
-    }
-    ImGui::PopID();
+    renderDateInput(    "Launch start ", launchStartInput);
+    renderDurationInput("Search window", launchWindowDuration);
     updateLaunchEnd();
-    ImGui::PushItemWidth(150.0f);
-    ImGui::Text("Flight time"); ImGui::SameLine();
-    ImGui::Text("Min:"); ImGui::SameLine(); ImGui::InputInt("##Min", &flightTimeStartDays); ImGui::SameLine(); 
-    ImGui::Text("Max:"); ImGui::SameLine(); ImGui::InputInt("##Max", &flightTimeEndDays);
+    ImGui::PushItemWidth(110.0f);
+    ImGui::Text("Travel duration [days]"); ImGui::SameLine();
+    ImGui::Text("Min:"); ImGui::SameLine(); ImGui::InputInt("##Min", &flightTimeMinDays); ImGui::SameLine(); 
+    ImGui::Text("Max:"); ImGui::SameLine(); ImGui::InputInt("##Max", &flightTimeMaxDays);
 
     ImGui::SliderInt("Resolution", &resolution, PorkchopPlot::minResolution, PorkchopPlot::maxResolution);
     ImGui::SameLine();
     if (ImGui::Button("Reset search window")) {
-        init(this->launchStart);
+        init(KerbalDate(this->launchStartInput));
     }
     ImGui::PopItemWidth();
 
@@ -455,14 +429,14 @@ void PorkchopPlot::render() {
         ImGui::EndDisabled();
     }
 
-    flightTimeStartDays = std::max(flightTimeStartDays, 1);
-    flightTimeEndDays = std::max(flightTimeEndDays, flightTimeStartDays + 1);
+    flightTimeMinDays = std::max(flightTimeMinDays, 1);
+    flightTimeMaxDays = std::max(flightTimeMaxDays, flightTimeMinDays + 1);
 
     if (progress < 0) { // Make sure button is not pressed while calculation is in progress
         const bool hasLaunchWindow =
-            launchWindowDurationYears > 0 || launchWindowDurationDays > 0
-            || launchWindowDurationHours > 0 || launchWindowDurationMinutes > 0
-            || launchWindowDurationSeconds > 0;
+            launchWindowDuration.year > 0 || launchWindowDuration.day > 0
+            || launchWindowDuration.hour > 0 || launchWindowDuration.minute > 0
+            || launchWindowDuration.second > 0;
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.3f, 1.0f, 1.0f));
         ImGui::BeginDisabled(!hasLaunchWindow);
         if (ImGui::Button("Generate", ImVec2(-1, 0))) {
@@ -476,8 +450,8 @@ void PorkchopPlot::render() {
     }
 
     if (calculated) {
-        const double launchStartDay = static_cast<double>(calculatedLaunchStart.toSeconds()) / kKerbalDaySeconds;
-        const double launchEndDay = static_cast<double>(calculatedLaunchEnd.toSeconds()) / kKerbalDaySeconds;
+        const double launchStartDay = static_cast<double>(activeLaunchStart.toSeconds()) / kKerbalDaySeconds;
+        const double launchEndDay = static_cast<double>(activeLaunchEnd.toSeconds()) / kKerbalDaySeconds;
 
         ImGui::Separator();
         ImGui::Text("Total heliocentric transfer delta-v (m/s)");
@@ -508,29 +482,29 @@ void PorkchopPlot::render() {
                               ImPlotFlags_NoMouseText)) {
             ImPlot::SetupAxes("Launch day (since Y1 D1)", "Flight time (days)");
             ImPlot::SetupAxisLimits(ImAxis_X1, launchStartDay, launchEndDay, ImPlotCond_Always);
-            ImPlot::SetupAxisLimits( ImAxis_Y1, calculatedFlightTimeStartDays, calculatedFlightTimeEndDays, ImPlotCond_Always);
+            ImPlot::SetupAxisLimits( ImAxis_Y1, activeFlightTimeStartDays, activeFlightTimeEndDays, ImPlotCond_Always);
             const bool logScale = useLogColorScale && colorMaxDeltaV > minDeltaV;
             const float scaleMin = logScale ? 0.0f : minDeltaV;
             const float scaleMax = logScale ? std::log1p(colorMaxDeltaV - minDeltaV) : colorMaxDeltaV;
             const float* dataPtr = logScale ? deltaVLog.data() : deltaV.data();
             ImPlot::PlotHeatmap("Total delta-v", dataPtr,
-                                calculatedResolution,
-                                calculatedResolution,
+                                activeResolution,
+                                activeResolution,
                                 scaleMax,
                                 scaleMin, nullptr,
-                                ImPlotPoint(launchStartDay, calculatedFlightTimeStartDays),
-                                ImPlotPoint(launchEndDay, calculatedFlightTimeEndDays));
-            if (cheapestIndex >= 0) {
-                const int cheapestLaunchIndex = cheapestIndex % calculatedResolution;
+                                ImPlotPoint(launchStartDay, activeFlightTimeStartDays),
+                                ImPlotPoint(launchEndDay, activeFlightTimeEndDays));
+            if (minDeltaVIndex >= 0) {
+                const int cheapestLaunchIndex = minDeltaVIndex % activeResolution;
                 const int cheapestFlightIndex =
-                    calculatedResolution - 1 - cheapestIndex / calculatedResolution;
+                    activeResolution - 1 - minDeltaVIndex / activeResolution;
                 const float launchFraction = static_cast<float>(cheapestLaunchIndex) /
-                    (calculatedResolution - 1);
+                    (activeResolution - 1);
                 const float flightFraction = static_cast<float>(cheapestFlightIndex) /
-                    (calculatedResolution - 1);
+                    (activeResolution - 1);
                 const double cheapestLaunchDay = launchStartDay + launchFraction * (launchEndDay - launchStartDay);
-                const double cheapestFlightDays = calculatedFlightTimeStartDays +
-                    flightFraction * (calculatedFlightTimeEndDays - calculatedFlightTimeStartDays);
+                const double cheapestFlightDays = activeFlightTimeStartDays +
+                    flightFraction * (activeFlightTimeEndDays - activeFlightTimeStartDays);
 
                 ImPlot::SetNextMarkerStyle(ImPlotMarker_Cross, 10.0f, ImVec4(1, 1, 1, 1),
                                            2.0f, ImVec4(0, 0, 0, 1));
@@ -548,17 +522,17 @@ void PorkchopPlot::render() {
             }
 
             if (selectedIndex >= 0) {
-                const int selectedLaunchIndex = selectedIndex % calculatedResolution;
+                const int selectedLaunchIndex = selectedIndex % activeResolution;
                 const int selectedFlightIndex =
-                    calculatedResolution - 1 - selectedIndex / calculatedResolution;
+                    activeResolution - 1 - selectedIndex / activeResolution;
                 const float launchFraction = static_cast<float>(selectedLaunchIndex) /
-                    (calculatedResolution - 1);
+                    (activeResolution - 1);
                 const float flightFraction = static_cast<float>(selectedFlightIndex) /
-                    (calculatedResolution - 1);
+                    (activeResolution - 1);
                 const double selectedLaunchDay =
                     launchStartDay + launchFraction * (launchEndDay - launchStartDay);
-                const double selectedFlightDays = calculatedFlightTimeStartDays +
-                    flightFraction * (calculatedFlightTimeEndDays - calculatedFlightTimeStartDays);
+                const double selectedFlightDays = activeFlightTimeStartDays +
+                    flightFraction * (activeFlightTimeEndDays - activeFlightTimeStartDays);
                 const float selectedDeltaV = deltaV[selectedIndex];
 
                 ImPlot::SetNextMarkerStyle(ImPlotMarker_Circle, 9.0f, ImVec4(1, 1, 0, 1),
@@ -582,13 +556,13 @@ void PorkchopPlot::render() {
                     static_cast<float>((mouse.x - launchStartDay) / (launchEndDay - launchStartDay)),
                     0.0f, 1.0f);
                 const float flightFraction = std::clamp(
-                    static_cast<float>((mouse.y - calculatedFlightTimeStartDays) /
-                                       (calculatedFlightTimeEndDays - calculatedFlightTimeStartDays)),
+                    static_cast<float>((mouse.y - activeFlightTimeStartDays) /
+                                       (activeFlightTimeEndDays - activeFlightTimeStartDays)),
                     0.0f, 1.0f);
-                const int launchIndex = std::lround(launchFraction * (calculatedResolution - 1));
-                const int flightIndex = std::lround(flightFraction * (calculatedResolution - 1));
-                const int plotRow = calculatedResolution - 1 - flightIndex;
-                const float deltaV_pixel = deltaV[plotRow * calculatedResolution + launchIndex];
+                const int launchIndex = std::lround(launchFraction * (activeResolution - 1));
+                const int flightIndex = std::lround(flightFraction * (activeResolution - 1));
+                const int plotRow = activeResolution - 1 - flightIndex;
+                const float deltaV_pixel = deltaV[plotRow * activeResolution + launchIndex];
 
                 char hoverText[96];
                 std::snprintf(hoverText, sizeof(hoverText), "Launch: %.1f\nFlight: %.1f d\nDelta-v: %.0f m/s",
@@ -603,18 +577,18 @@ void PorkchopPlot::render() {
                 drawList->AddText(textPosition, IM_COL32(255, 255, 255, 255), hoverText);
 
                 if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-                    selectedIndex = plotRow * calculatedResolution + launchIndex;
+                    selectedIndex = plotRow * activeResolution + launchIndex;
                     const float selectedLaunchFraction = static_cast<float>(launchIndex) /
-                        (calculatedResolution - 1);
+                        (activeResolution - 1);
                     const float selectedFlightFraction = static_cast<float>(flightIndex) /
-                        (calculatedResolution - 1);
+                        (activeResolution - 1);
                     const float selectedLaunchSeconds = static_cast<float>(
-                        calculatedLaunchStart.toSeconds()) +
-                        selectedLaunchFraction * (calculatedLaunchEnd.toSeconds() -
-                                                  calculatedLaunchStart.toSeconds());
-                    const float selectedFlightDays = calculatedFlightTimeStartDays +
-                        selectedFlightFraction * (calculatedFlightTimeEndDays -
-                                                  calculatedFlightTimeStartDays);
+                        activeLaunchStart.toSeconds()) +
+                        selectedLaunchFraction * (activeLaunchEnd.toSeconds() -
+                                                  activeLaunchStart.toSeconds());
+                    const float selectedFlightDays = activeFlightTimeStartDays +
+                        selectedFlightFraction * (activeFlightTimeEndDays -
+                                                  activeFlightTimeStartDays);
                     //currentDate = Date(std::llround(selectedLaunchSeconds));
                     //showTransferOrbit(selectedLaunchSeconds, selectedFlightDays * kKerbalDaySeconds);
                 }
@@ -681,44 +655,42 @@ void WindowMission::showTransferOrbit(float launchSeconds, float flightSeconds) 
 }
 
 void PorkchopPlot::init(KerbalDate launchDate) {
-    launchStart = launchDate;
-    float startAlt = isPlanetToMoon(phase->refBody, phase->refBody2) ? phase->alt1 : 0;
-    const int64_t windowSeconds = std::llround(
-        default_transfer_window_estimate(phase->refBody, phase->refBody2, startAlt));
-    launchWindowDurationYears = windowSeconds / (426 * kKerbalDaySeconds);
-    int64_t rem = windowSeconds % (426 * kKerbalDaySeconds);
-    launchWindowDurationDays = rem / kKerbalDaySeconds;
-    rem %= kKerbalDaySeconds;
-    launchWindowDurationHours = rem / 3600;
-    rem %= 3600;
-    launchWindowDurationMinutes = rem / 60;
-    launchWindowDurationSeconds = rem % 60;
+    launchStartInput.year   = launchDate.year();
+    launchStartInput.day    = launchDate.day();
+    launchStartInput.hour   = launchDate.hour();
+    launchStartInput.minute = launchDate.minute();
+    launchStartInput.second = launchDate.second();
+
+    float startAlt = isPlanetToMoon(phase->refBody, phase->refBody2) ? phase->alt1 : -1;
+    const auto duration = KerbalDate(default_transfer_window_estimate(phase->refBody, phase->refBody2, startAlt));
+
+    launchWindowDuration = duration.getYDHMS();
     updateLaunchEnd();
     float trans = default_transfer_time_estimate(phase->refBody, phase->refBody2, startAlt) / kKerbalDaySeconds;
-    flightTimeStartDays = trans * 0.5f;
-    flightTimeEndDays = flightTimeStartDays * 2.0f;
+    flightTimeMinDays = trans * 0.5f;
+    flightTimeMaxDays = flightTimeMinDays * 2.0f;
 }
 
 void PorkchopPlot::updateLaunchEnd() {
-    const int64_t durationSeconds =
-        (static_cast<int64_t>(launchWindowDurationYears) * 426 + launchWindowDurationDays) * kKerbalDaySeconds
-        + static_cast<int64_t>(launchWindowDurationHours) * 3600
-        + static_cast<int64_t>(launchWindowDurationMinutes) * 60
-        + static_cast<int64_t>(launchWindowDurationSeconds);
-    launchEnd = KerbalDate(launchStart.toSeconds() + durationSeconds);
+    const int64_t durationSeconds = KerbalDate(launchWindowDuration.year, 
+                                               launchWindowDuration.day, 
+                                               launchWindowDuration.hour, 
+                                               launchWindowDuration.minute, 
+                                               launchWindowDuration.second).toSeconds();
+    launchEndInput = KerbalDate(launchStartInput).toSeconds() + durationSeconds;
 }
 
 void PorkchopPlot::generate() {
     calculated = false;
-    auto startSeconds = launchStart.toSeconds();
-    auto endSeconds = launchEnd.toSeconds();
+    auto startSeconds = KerbalDate(launchStartInput).toSeconds();
+    auto endSeconds = launchEndInput.toSeconds();
 
     if (endSeconds <= startSeconds) { return; }
 
     deltaV.assign(resolution * resolution, std::numeric_limits<float>::infinity());
     minDeltaV = std::numeric_limits<float>::infinity();
     maxDeltaV = 0.0f;
-    cheapestIndex = -1;
+    minDeltaVIndex = -1;
     selectedIndex = -1;
 
     auto* origin = phase->refBody;
@@ -729,14 +701,15 @@ void PorkchopPlot::generate() {
         Orbit originOrbit = Orbit::circular(origin, phase->alt1 + origin->radius_km);
         solver.init(origin, originOrbit, target->orbit,
                     origin, target, phase->alt1, phase->alt2);
-    } else {
+    }
+    else {
         solver.init(origin->orbit.parent, origin->orbit,
                     target->orbit, origin,
                     target, phase->alt1, phase->alt2);
     }
     for (int flightIndex = 0; flightIndex < resolution; ++flightIndex) {
         const float flightFraction = static_cast<float>(flightIndex) / (resolution - 1);
-        const float flightDays = flightTimeStartDays + flightFraction * (flightTimeEndDays - flightTimeStartDays);
+        const float flightDays = flightTimeMinDays + flightFraction * (flightTimeMaxDays - flightTimeMinDays);
         const float flightSeconds = flightDays * kKerbalDaySeconds;
         progress = static_cast<float>(flightIndex) / (resolution - 1);
 
@@ -755,7 +728,7 @@ void PorkchopPlot::generate() {
             deltaV[plotRow * resolution + launchIndex] = min_dv;
             if (min_dv < minDeltaV) {
                 minDeltaV = min_dv;
-                cheapestIndex = plotRow * resolution + launchIndex;
+                minDeltaVIndex = plotRow * resolution + launchIndex;
             }
             maxDeltaV = std::max(maxDeltaV, min_dv);
         }
@@ -775,11 +748,12 @@ void PorkchopPlot::generate() {
     for (size_t i = 0; i < deltaV.size(); ++i) {
         deltaVLog[i] = std::log1p(deltaV[i] - minDeltaV);
     }
-    calculatedResolution          = resolution;
-    calculatedLaunchStart         = launchStart;
-    calculatedLaunchEnd           = launchEnd;
-    calculatedFlightTimeStartDays = flightTimeStartDays;
-    calculatedFlightTimeEndDays   = flightTimeEndDays;
+    // Save parameters so plot can be redrawn while user changes values
+    activeResolution          = resolution;
+    activeLaunchStart         = launchStartInput;
+    activeLaunchEnd           = launchEndInput;
+    activeFlightTimeStartDays = flightTimeMinDays;
+    activeFlightTimeEndDays   = flightTimeMaxDays;
     colorMaxDeltaV                = (maxDeltaV - minDeltaV) * 0.2f + minDeltaV;
     calculated = true;
     progress = -1.0f; // Disable progress bar
