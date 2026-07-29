@@ -29,10 +29,19 @@ constexpr bool isEngine(PartType type) {
 
 struct Body;
 constexpr bool isPlanetToMoon(const Body* from, const Body* to) {
-    return to->orbit.parent == from;
+    return from->type == Body::Type::PLANET && to->type == Body::Type::MOON ;
 }
+
+constexpr bool isPlanetToForeignMoon(const Body* from, const Body* to) {
+    return from->type == Body::Type::PLANET && to->type == Body::Type::MOON && to->orbit.parent != from;
+}
+
+constexpr bool isMoonToForeignMoon(const Body* from, const Body* to) {
+    return from->type == Body::Type::MOON && to->type == Body::Type::MOON && from->orbit.parent != to->orbit.parent;
+}
+
 constexpr bool isPlanetToPlanet(const Body* from, const Body* to) {
-    return to->orbit.parent == from->orbit.parent;
+    return to->type == Body::Type::PLANET && from->type == Body::Type::PLANET;
 }
 
 inline constexpr ImU32 cmap_data_CMRmap[256] = {

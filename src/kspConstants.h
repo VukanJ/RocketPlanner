@@ -23,6 +23,14 @@ namespace Constants {
 
 struct Body {
     const char* name;
+    enum class Type : int8_t {
+        INVALID = -1,
+        STAR,
+        PLANET, // Orbits STAR
+        MOON, // Orbits PLANET
+        ASTEROID // Orbits STAR
+    } type = Type::INVALID;
+    const bool solidSurface = true;
     const float radius_km;
     const float R_SOI_km; // sphere of influence in km
     const double surfaceGravity;
@@ -51,6 +59,8 @@ namespace KspSystem {
     
     constexpr inline Body Kerbol  {
         .name                    = "Kerbol",
+        .type                    = Body::Type::STAR,
+        .solidSurface            = false,
         .radius_km               = 261600.0,
         .R_SOI_km                = INFINITY,
         .surfaceGravity          = 17.1307128274441,
@@ -64,6 +74,8 @@ namespace KspSystem {
 
     constexpr inline Body Moho  {
         .name                    = "Moho",
+        .type                    = Body::Type::PLANET,
+        .solidSurface            = true,
         .radius_km               = 250.0,
         .R_SOI_km                = 9646.66302332811,
         .surfaceGravity          = 2.69775005847215,
@@ -88,6 +100,8 @@ namespace KspSystem {
 
     constexpr inline Body Eve  {
         .name                    = "Eve",
+        .type                    = Body::Type::PLANET,
+        .solidSurface            = true,
         .radius_km               = 700.0,
         .R_SOI_km                = 85109.3647382441,
         .surfaceGravity          = 16.6770004677773,
@@ -112,6 +126,8 @@ namespace KspSystem {
 
     constexpr inline Body Gilly  {
         .name                    = "Gilly",
+        .type                    = Body::Type::MOON,
+        .solidSurface            = true,
         .radius_km               = 13.0,
         .R_SOI_km                = 126.123271704568,
         .surfaceGravity          = 0.0490499989036471,
@@ -136,6 +152,8 @@ namespace KspSystem {
 
     constexpr inline Body Kerbin  {
         .name                    = "Kerbin",
+        .type                    = Body::Type::PLANET,
+        .solidSurface            = true,
         .radius_km               = 600.0,
         .R_SOI_km                = 84159.2864796305,
         .surfaceGravity          = 9.81000000000002,
@@ -160,6 +178,8 @@ namespace KspSystem {
 
     constexpr inline Body Mun  {
         .name                    = "Mun",
+        .type                    = Body::Type::MOON,
+        .solidSurface            = true,
         .radius_km               = 200.0,
         .R_SOI_km                = 2429.55911656475,
         .surfaceGravity          = 1.62845993801951,
@@ -184,6 +204,8 @@ namespace KspSystem {
 
     constexpr inline Body Minmus  {
         .name                    = "Minmus",
+        .type                    = Body::Type::MOON,
+        .solidSurface            = true,
         .radius_km               = 60.0,
         .R_SOI_km                = 2247.4283879023,
         .surfaceGravity          = 0.49050000730902,
@@ -208,6 +230,8 @@ namespace KspSystem {
 
     constexpr inline Body Duna  {
         .name                    = "Duna",
+        .type                    = Body::Type::PLANET,
+        .solidSurface            = true,
         .radius_km               = 320.0,
         .R_SOI_km                = 47921.949369738,
         .surfaceGravity          = 2.94300011694432,
@@ -232,6 +256,8 @@ namespace KspSystem {
 
     constexpr inline Body Ike  {
         .name                    = "Ike",
+        .type                    = Body::Type::MOON,
+        .solidSurface            = true,
         .radius_km               = 130.0,
         .R_SOI_km                = 1049.59893931162,
         .surfaceGravity          = 1.09872003391385,
@@ -256,6 +282,8 @@ namespace KspSystem {
 
     constexpr inline Body Dres  {
         .name                    = "Dres",
+        .type                    = Body::Type::PLANET,
+        .solidSurface            = true,
         .radius_km               = 138.0,
         .R_SOI_km                = 32832.8395767762,
         .surfaceGravity          = 1.12815,
@@ -280,6 +308,8 @@ namespace KspSystem {
 
     constexpr inline Body Jool  {
         .name                    = "Jool",
+        .type                    = Body::Type::PLANET,
+        .solidSurface            = false,
         .radius_km               = 6000.0,
         .R_SOI_km                = 2455985.18542347,
         .surfaceGravity          = 7.84800011694431,
@@ -304,6 +334,8 @@ namespace KspSystem {
 
     constexpr inline Body Laythe  {
         .name                    = "Laythe",
+        .type                    = Body::Type::MOON,
+        .solidSurface            = true,
         .radius_km               = 500.0,
         .R_SOI_km                = 3723.64581113302,
         .surfaceGravity          = 7.84800011694431,
@@ -328,6 +360,8 @@ namespace KspSystem {
 
     constexpr inline Body Vall  {
         .name                    = "Vall",
+        .type                    = Body::Type::MOON,
+        .solidSurface            = true,
         .radius_km               = 300.0,
         .R_SOI_km                = 2406.40144479404,
         .surfaceGravity          = 2.30534999415279,
@@ -352,6 +386,8 @@ namespace KspSystem {
 
     constexpr inline Body Tylo  {
         .name                    = "Tylo",
+        .type                    = Body::Type::MOON,
+        .solidSurface            = true,
         .radius_km               = 600.0,
         .R_SOI_km                = 10856.5183683586,
         .surfaceGravity          = 7.84800011694431,
@@ -376,6 +412,8 @@ namespace KspSystem {
 
     constexpr inline Body Bop  {
         .name                    = "Bop",
+        .type                    = Body::Type::MOON,
+        .solidSurface            = true,
         .radius_km               = 65.0,
         .R_SOI_km                = 1221.06086284253,
         .surfaceGravity          = 0.588599986843765,
@@ -400,6 +438,8 @@ namespace KspSystem {
 
     constexpr inline Body Pol  {
         .name                    = "Pol",
+        .type                    = Body::Type::MOON,
+        .solidSurface            = true,
         .radius_km               = 44.0,
         .R_SOI_km                = 1042.13889230178,
         .surfaceGravity          = 0.37278,
@@ -424,6 +464,8 @@ namespace KspSystem {
 
     constexpr inline Body Eeloo  {
         .name                    = "Eeloo",
+        .type                    = Body::Type::PLANET,
+        .solidSurface            = true,
         .radius_km               = 210.0,
         .R_SOI_km                = 119082.941647812,
         .surfaceGravity          = 1.68732005730271,

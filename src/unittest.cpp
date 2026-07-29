@@ -4,14 +4,45 @@
 
 #include "DeltaV.h"
 #include "RocketSolver.h"
-#include "imgui.h"
+#include "SystemMap.h"
 #include "parts.h"
 #include "kspConstants.h"
 #include "LambertSolver.h"
 #include "utils.h"
+#include "helper.h"
 #include "Orbit.h"
 #include "Calendar.h"
+#include "Mission.h"
 
+
+const Body* allBodies[] = {
+    &KspSystem::Mun,
+    &KspSystem::Minmus,
+    &KspSystem::Kerbin,
+    &KspSystem::Dres,
+    &KspSystem::Kerbol,
+    &KspSystem::Duna,
+    &KspSystem::Ike,
+    &KspSystem::Jool,
+    &KspSystem::Bop,
+    &KspSystem::Tylo,
+    &KspSystem::Pol,
+    &KspSystem::Laythe,
+    &KspSystem::Vall,
+    &KspSystem::Moho,
+    &KspSystem::Eeloo,
+    &KspSystem::Gilly,
+    &KspSystem::Eve
+};
+const Body* allPlanets[] = {
+    &KspSystem::Kerbin,
+    &KspSystem::Duna,
+    &KspSystem::Jool,
+    &KspSystem::Moho,
+    &KspSystem::Eeloo,
+    &KspSystem::Eve,
+    &KspSystem::Dres,
+};
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -441,38 +472,198 @@ TEST(LambertSolverTest, ComputesFiniteTransferDeltaV) {
 }
 
 // ---------------------------------------------------------------------------
+// Mission steps
+// ---------------------------------------------------------------------------
+//
+TEST(Mission, PlanetToChildMoon_simple) {
+    for (const Body* planet : allPlanets) {
+        for (const Body* moon : allBodies) {
+            if (moon->orbit.parent != planet || !planet->solidSurface) { continue; }
+            Mission mission {
+                .originBody      = planet,
+                .destinationBody = moon,
+                .oneWayTrip      = false,
+                .apolloStyle     = false};
+            std::vector<MissionPhase> mseq;
+
+            Mission::updateMissionSequence(mseq, mission, false);
+
+            int i = 0;
+            auto checkPhase = [&](MissionPhase::Type type, const Body* from, const Body* to) {
+                EXPECT_EQ(mseq[i].type, type);
+                EXPECT_EQ(from, mseq[i].refBody);
+                EXPECT_EQ(to, mseq[i].refBody2);
+                i++;
+            };
+
+            checkPhase(MissionPhase::Type::TAKEOFF, planet, nullptr);
+            if (planet->orbit.inclination != moon->orbit.inclination) {
+                checkPhase(MissionPhase::Type::INCLINATION_CORRECTION, planet, moon);
+            }
+            checkPhase(MissionPhase::Type::HOHMANN_TRANSFER, planet, moon);
+            checkPhase(MissionPhase::Type::CIRCULARIZE_HYPERBOLIC, planet, moon);
+            checkPhase(MissionPhase::Type::LANDING, moon, nullptr);
+            checkPhase(MissionPhase::Type::TAKEOFF, moon, nullptr);
+            checkPhase(MissionPhase::Type::ESCAPE, moon, planet);
+            if (planet->hasAtmosphere()) {
+                checkPhase(MissionPhase::Type::ATMOSPHERIC_BREAKING, planet, nullptr);
+                checkPhase(MissionPhase::Type::LANDING_PARACHUTES, planet, nullptr);
+            }
+            else {
+                checkPhase(MissionPhase::Type::CIRCULARIZE_HYPERBOLIC, moon, planet);
+                checkPhase(MissionPhase::Type::LANDING, planet, nullptr);
+            }
+        }
+    }
+}
+
+TEST(Mission, PlanetToChildMoon_advanced) {
+    for (const Body* planet : allPlanets) {
+        for (const Body* moon : allBodies) {
+            if (moon->orbit.parent != planet || !planet->solidSurface) { continue; }
+            Mission mission {
+                .originBody      = planet,
+                .destinationBody = moon,
+                .oneWayTrip      = false,
+                .apolloStyle     = false};
+            std::vector<MissionPhase> mseq;
+
+            //println("Testing advanced mission sequence for ", planet->name, " -> ", moon->name);
+
+            Mission::updateMissionSequence(mseq, mission, true);
+
+            int i = 0;
+            auto checkPhase = [&](MissionPhase::Type type, const Body* from, const Body* to) {
+                EXPECT_EQ(mseq[i].type, type);
+                EXPECT_EQ(from, mseq[i].refBody);
+                EXPECT_EQ(to, mseq[i].refBody2);
+                i++;
+            };
+
+            checkPhase(MissionPhase::Type::TAKEOFF, planet, nullptr);
+            checkPhase(MissionPhase::Type::ORBITAL_INSERTION, planet, moon);
+            checkPhase(MissionPhase::Type::CIRCULARIZE_HYPERBOLIC, planet, moon);
+            checkPhase(MissionPhase::Type::LANDING, moon, nullptr);
+            checkPhase(MissionPhase::Type::TAKEOFF, moon, nullptr);
+            checkPhase(MissionPhase::Type::ESCAPE, moon, planet);
+            if (planet->hasAtmosphere()) {
+                checkPhase(MissionPhase::Type::ATMOSPHERIC_BREAKING, planet, nullptr);
+                checkPhase(MissionPhase::Type::LANDING_PARACHUTES, planet, nullptr);
+            }
+            else {
+                checkPhase(MissionPhase::Type::CIRCULARIZE_HYPERBOLIC, moon, planet);
+                checkPhase(MissionPhase::Type::LANDING, planet, nullptr);
+            }
+        }
+    }
+}
+
+TEST(Mission, PlanetToPlanet_simple) {
+    for (const Body* planetA : allPlanets) {
+        for (const Body* planetB : allPlanets) {
+            if (planetA == planetB) { continue; }
+            if (!(planetA->solidSurface && planetB->solidSurface)) { continue; } 
+
+            Mission mission {
+                .originBody      = planetA,
+                .destinationBody = planetB,
+                .oneWayTrip      = false,
+                .apolloStyle     = false};
+            std::vector<MissionPhase> mseq;
+
+            Mission::updateMissionSequence(mseq, mission, false);
+
+            int i = 0;
+            auto checkPhase = [&](MissionPhase::Type type, const Body* from, const Body* to) {
+                EXPECT_EQ(mseq[i].type, type);
+                EXPECT_EQ(from, mseq[i].refBody);
+                EXPECT_EQ(to, mseq[i].refBody2);
+                i++;
+            };
+
+            checkPhase(MissionPhase::Type::TAKEOFF, planetA, nullptr);
+            checkPhase(MissionPhase::Type::ESCAPE, planetA, planetB);
+            if (planetA->orbit.inclination != planetB->orbit.inclination) {
+                checkPhase(MissionPhase::Type::INCLINATION_CORRECTION, planetA, planetB);
+            }
+            checkPhase(MissionPhase::Type::HOHMANN_TRANSFER, planetA, planetB);
+            if (planetB->hasAtmosphere()) {
+                checkPhase(MissionPhase::Type::ATMOSPHERIC_BREAKING, planetB, nullptr);
+                checkPhase(MissionPhase::Type::LANDING_PARACHUTES, planetB, nullptr);
+            }
+            else {
+                checkPhase(MissionPhase::Type::CIRCULARIZE_HYPERBOLIC, planetA, planetB);
+                checkPhase(MissionPhase::Type::LANDING, planetB, nullptr);
+            }
+            checkPhase(MissionPhase::Type::TAKEOFF, planetB, nullptr);
+            checkPhase(MissionPhase::Type::ESCAPE, planetB, planetA);
+            if (planetA->orbit.inclination != planetB->orbit.inclination) {
+                checkPhase(MissionPhase::Type::INCLINATION_CORRECTION, planetB, planetA);
+            }
+            checkPhase(MissionPhase::Type::HOHMANN_TRANSFER, planetB, planetA);
+            if (planetA->hasAtmosphere()) {
+                checkPhase(MissionPhase::Type::ATMOSPHERIC_BREAKING, planetA, nullptr);
+                checkPhase(MissionPhase::Type::LANDING_PARACHUTES, planetA, nullptr);
+            }
+            else {
+                checkPhase(MissionPhase::Type::CIRCULARIZE_HYPERBOLIC, planetB, planetA);
+                checkPhase(MissionPhase::Type::LANDING, planetA, nullptr);
+            }
+        }
+    }
+}
+
+TEST(Mission, PlanetToPlanet_advanced) {
+    for (const Body* planetA : allPlanets) {
+        for (const Body* planetB : allPlanets) {
+            if (planetA == planetB) { continue; }
+            if (!(planetA->solidSurface && planetB->solidSurface)) { continue; } 
+
+            Mission mission {
+                .originBody      = planetA,
+                .destinationBody = planetB,
+                .oneWayTrip      = false,
+                .apolloStyle     = false};
+            std::vector<MissionPhase> mseq;
+
+            Mission::updateMissionSequence(mseq, mission, true);
+            //println("Testing advanced mission sequence for ", planetA->name, " -> ", planetB->name);
+
+            int i = 0;
+            auto checkPhase = [&](MissionPhase::Type type, const Body* from, const Body* to) {
+                EXPECT_EQ(mseq[i].type, type);
+                EXPECT_EQ(from, mseq[i].refBody);
+                EXPECT_EQ(to, mseq[i].refBody2);
+                i++;
+            };
+
+            checkPhase(MissionPhase::Type::TAKEOFF, planetA, nullptr);
+            checkPhase(MissionPhase::Type::ORBITAL_INSERTION, planetA, planetB);
+            if (planetB->hasAtmosphere()) {
+                checkPhase(MissionPhase::Type::ATMOSPHERIC_BREAKING, planetB, nullptr);
+                checkPhase(MissionPhase::Type::LANDING_PARACHUTES, planetB, nullptr);
+            }
+            else {
+                checkPhase(MissionPhase::Type::CIRCULARIZE_HYPERBOLIC, planetA, planetB);
+                checkPhase(MissionPhase::Type::LANDING, planetB, nullptr);
+            }
+            checkPhase(MissionPhase::Type::TAKEOFF, planetB, nullptr);
+            checkPhase(MissionPhase::Type::ORBITAL_INSERTION, planetB, planetA);
+            if (planetA->hasAtmosphere()) {
+                checkPhase(MissionPhase::Type::ATMOSPHERIC_BREAKING, planetA, nullptr);
+                checkPhase(MissionPhase::Type::LANDING_PARACHUTES, planetA, nullptr);
+            }
+            else {
+                checkPhase(MissionPhase::Type::CIRCULARIZE_HYPERBOLIC, planetB, planetA);
+                checkPhase(MissionPhase::Type::LANDING, planetA, nullptr);
+            }
+        }
+    }
+}
+// ---------------------------------------------------------------------------
 // DeltaV calculators
 // ---------------------------------------------------------------------------
 //
-
-const Body* allBodies[] = {
-    &KspSystem::Mun,
-    &KspSystem::Minmus,
-    &KspSystem::Kerbin,
-    &KspSystem::Dres,
-    &KspSystem::Kerbol,
-    &KspSystem::Duna,
-    &KspSystem::Ike,
-    &KspSystem::Jool,
-    &KspSystem::Bop,
-    &KspSystem::Tylo,
-    &KspSystem::Pol,
-    &KspSystem::Laythe,
-    &KspSystem::Vall,
-    &KspSystem::Moho,
-    &KspSystem::Eeloo,
-    &KspSystem::Gilly,
-    &KspSystem::Eve
-};
-const Body* allPlanets[] = {
-    &KspSystem::Kerbin,
-    &KspSystem::Duna,
-    &KspSystem::Jool,
-    &KspSystem::Moho,
-    &KspSystem::Eeloo,
-    &KspSystem::Eve,
-    &KspSystem::Dres,
-};
 
 TEST(DeltaV, naiveTakeoffLanding) {
     float orbit = 100;

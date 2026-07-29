@@ -3,8 +3,6 @@
 
 #include <cstdint>
 #include <string>
-#include <tuple>
-#include <string>
 
 constexpr int64_t kKerbalYearDays = 426;
 constexpr int64_t kKerbalDayHours = 6;

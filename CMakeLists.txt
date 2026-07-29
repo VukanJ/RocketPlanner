@@ -29,6 +29,7 @@ set(ROCKET_SOURCES
   src/LambertSolver.cpp
   src/ThreadPool.cpp
   src/Calendar.cpp
+  src/Mission.cpp
 )
 
 # ---- Agave Font ----
@@ -108,11 +109,11 @@ set(UNITTEST_SOURCES
   src/unittest.cpp src/rocket.cpp src/parts.cpp src/PartSerializer.cpp
   src/stage.cpp src/LoadKspParts.cpp src/NelderMead.cpp
   src/RocketSolver.cpp src/RocketConfig.cpp src/DeltaV.cpp src/Orbit.cpp
-  src/LambertSolver.cpp src/Calendar.cpp
+  src/LambertSolver.cpp src/Calendar.cpp src/Mission.cpp
 )
 
 add_executable(unittest ${UNITTEST_SOURCES})
 target_include_directories(unittest PRIVATE ext src /usr/include /usr/include/eigen3)
-target_compile_options(unittest PRIVATE -march=native -Wall -Wunused-value -Wshadow -pedantic -g -O0)
+target_compile_options(unittest PRIVATE -march=native -Wall -Wunused-value -Wshadow -pedantic -g -O0 -gdwarf-4)
 target_link_libraries(unittest GTest::gtest_main)
 add_test(NAME unittest COMMAND unittest)

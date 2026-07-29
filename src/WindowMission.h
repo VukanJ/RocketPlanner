@@ -4,109 +4,14 @@
 #include "Calendar.h"
 #include "DeltaV.h"
 #include "LambertSolver.h"
+#include "Mission.h"
 #include "SystemMap.h"
 #include "ThreadPool.h"
 #include "kspConstants.h"
-#include <limits>
-#include <vector>
 
-struct Mission {
-    const Body* originBody = &KspSystem::Kerbin;
-    const Body* destinationBody = &KspSystem::Mun;
-    bool oneWayTrip = false;
-    bool apolloStyle = true;
-};
-
-enum class MissionPhaseType {
-    TAKEOFF,  // Implied circularization
-    CIRCULARIZE_HYPERBOLIC,
-    ESCAPE,
-    HOHMANN_TRANSFER, // includes inclination correction
-    ATMOSPHERIC_BREAKING,
-    LANDING_PARACHUTES,
-    INCLINATION_CORRECTION,
-    ORBITAL_INSERTION, // Combines ESCAPE, INCLINATION_CORRECTION and HOHMANN_TRANSFER using Oberth effect
-    LANDING,
-    MINING,
-    ORBITAL_REFUELING,
-};
-
-struct MissionPhase;
-
-class PorkchopPlot {
-public:
-    static constexpr int minResolution = 16;
-    static constexpr int maxResolution = 512;
-
-    PorkchopPlot() = delete;
-    PorkchopPlot(MissionPhase* phase = nullptr) : phase(phase) { }
-
-    void generate();
-    void init(KerbalDate launchStart);
-    void render();
-    void updateLaunchEnd();
-
-    MissionPhase* phase = nullptr;
-
-    bool winOpen = false;
-
-    DateFormat launchStartInput { 0 };
-    KerbalDate launchEndInput { 0 };
-    DateFormat launchWindowDuration { 0, 0, 0, 0, 0 };
-    int flightTimeMinDays = 50;
-    int flightTimeMaxDays = 400;
-
-    KerbalDate activeLaunchStart { 0 };
-    KerbalDate activeLaunchEnd { 0 };
-    int activeFlightTimeStartDays = 0;
-    int activeFlightTimeEndDays = 0;
-
-    int minDeltaVIndex = -1;
-    int selectedIndex = -1;
-
-    std::atomic<bool> calculated = false;
-    std::atomic<float> progress = -1.0f;
-
-    // Plot opt
-    int colormapIndex = 0;
-    int resolution = 96;
-    int activeResolution = 0;
-    float colorMaxDeltaV = 0.0f;
-    bool useLogColorScale = true;
-    float minDeltaV = std::numeric_limits<float>::infinity();
-    float maxDeltaV = 0.0f;
-
-    // Heatmap data
-    std::vector<float> deltaV;
-    std::vector<float> deltaVLog;
-};
-
-struct MissionPhase {
-    MissionPhaseType type = MissionPhaseType::TAKEOFF;
-    const Body* refBody = nullptr;
-    const Body* refBody2 = nullptr;
-    float alt1 = 0;
-    float alt2 = 0;
-    DeltaVRange dv_range {};
-
-    bool optional = true;
-    bool prograde = true;
-
-    std::unique_ptr<PorkchopPlot> porkchopPlot = nullptr;
-
-    static MissionPhase takeoff(const Body* body, float alt) {
-        return { MissionPhaseType::TAKEOFF, body, nullptr, alt, 0, false};
-    }
-    static MissionPhase hohmann(const Body* from, const Body* to, float fromAlt, float toAlt) {
-        return { MissionPhaseType::HOHMANN_TRANSFER, from, to, fromAlt, toAlt, false};
-    }
-    static MissionPhase circularize_hyperbolic(const Body* from, const Body* to, float fromAlt, float toAlt) {
-        return { MissionPhaseType::CIRCULARIZE_HYPERBOLIC, from, to, fromAlt, toAlt, false};
-    }
-
-    void updateDeltaV();
-};
-
+// TODO
+// Moon to Foreign Moon
+// Planet to Foreign Moon
 
 class WindowMission {
 public:
@@ -114,15 +19,13 @@ public:
     Mission mission;
 
     bool render();
-    void updateMissionSequence();
-    void calcLaunchWindow();
     void showTransferOrbit(float launchSeconds, float flightSeconds);
     bool renderTimeInput();
 
     enum class InputPhase { FromTo, Sequence } input_phase = WindowMission::InputPhase::FromTo;
 
     std::vector<MissionPhase> msequence;
-    bool advanced = true;
+    bool advanced = false;
     bool launchDateOptim = false;
     SystemMap systemMap;
 

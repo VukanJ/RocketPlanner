@@ -148,10 +148,10 @@ namespace {
             if (phase.refBody != mission.originBody || phase.refBody2 != mission.destinationBody) {
                 continue;
             }
-            if (phase.type == MissionPhaseType::ORBITAL_INSERTION) {
+            if (phase.type == MissionPhase::Type::ORBITAL_INSERTION) {
                 phase.dv_range = departureCost;
             }
-            else if (phase.type == MissionPhaseType::CIRCULARIZE_HYPERBOLIC) {
+            else if (phase.type == MissionPhase::Type::CIRCULARIZE_HYPERBOLIC) {
                 phase.dv_range = arrivalCost;
             }
         }
@@ -186,7 +186,7 @@ bool WindowMission::render() {
         ImGui::EndDisabled();
 
         if (ImGui::Button("Next: Edit Mission Sequence")) {
-            updateMissionSequence();
+            Mission::updateMissionSequence(msequence, mission, advanced);
             input_phase = InputPhase::Sequence;
         }
 
@@ -210,7 +210,7 @@ bool WindowMission::render() {
         ImGui::PushStyleColor(ImGuiCol_FrameBgActive, ImVec4(0.4f, 0.2f, 0.0f, 1.0f));
         ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, ImVec4(0.4f, 0.2f, 0.0f, 1.0f));
         if (ImGui::Checkbox("Advanced navigation", &advanced)) {
-            updateMissionSequence();
+            Mission::updateMissionSequence(msequence, mission, advanced);
         }
         ImGui::SameLine();
         ImGui::TextDisabled("(?)");
@@ -231,7 +231,7 @@ bool WindowMission::render() {
                 dvTotal_max += step.dv_range.max;
             }
             switch (step.type) {
-                case MissionPhaseType::TAKEOFF:
+                case MissionPhase::Type::TAKEOFF:
                     ImGui::Text("%i. Takeoff from %s", i, step.refBody->name);
                     ImGui::Indent();
                     if (ImGui::SliderFloat("##orbit", &step.alt1, step.refBody->atmHeight_km, 300, "Orbit: %.2f km", ImGuiSliderFlags_Logarithmic)) {
@@ -239,7 +239,7 @@ bool WindowMission::render() {
                         updateCostFrom = i;
                     }
                     break;
-                case MissionPhaseType::CIRCULARIZE_HYPERBOLIC:
+                case MissionPhase::Type::CIRCULARIZE_HYPERBOLIC:
                     ImGui::Text("%i. Circularize hyperbolic orbit around %s", i, step.refBody2->name);
                     ImGui::Indent();
                     if (ImGui::SliderFloat("##orbit2", &step.alt2, step.refBody2->atmHeight_km, 300, "Target Orbit: %.2f km", ImGuiSliderFlags_Logarithmic)) {
@@ -247,7 +247,7 @@ bool WindowMission::render() {
                         updateCostFrom = i;
                     }
                     break;
-                case MissionPhaseType::HOHMANN_TRANSFER: 
+                case MissionPhase::Type::HOHMANN_TRANSFER: 
                     {
                         ImGui::Text("%i Transfer %s --> %s", i, step.refBody->name, step.refBody2->name);
                         ImGui::Indent();
@@ -256,19 +256,19 @@ bool WindowMission::render() {
                         }
                     }
                     break;
-                case MissionPhaseType::INCLINATION_CORRECTION: 
+                case MissionPhase::Type::INCLINATION_CORRECTION: 
                     {
                         ImGui::Text("%i Inclination correction for %s", i, step.refBody2->name);
                         ImGui::Indent();
                     }
                     break;
-                case MissionPhaseType::ATMOSPHERIC_BREAKING: 
+                case MissionPhase::Type::ATMOSPHERIC_BREAKING: 
                     ImGui::Text("%i. Atmospheric reentry at %s", i, step.refBody->name);
                     ImGui::Indent();
                     if (ImGui::SliderFloat("##reentryPE", &step.alt1, 0, step.refBody->atmHeight_km, "Reentry PE: %.1f km")) {
                         step.updateDeltaV();
                         for (int k = i - 1; k >= 0; --k) {
-                            if (msequence[k].type == MissionPhaseType::ESCAPE) {
+                            if (msequence[k].type == MissionPhase::Type::ESCAPE) {
                                 msequence[k].alt2 = step.alt1;
                                 msequence[k].updateDeltaV();
                                 break;
@@ -277,19 +277,19 @@ bool WindowMission::render() {
                         updateCostFrom = i;
                     }
                     break;
-                case MissionPhaseType::LANDING_PARACHUTES: 
+                case MissionPhase::Type::LANDING_PARACHUTES: 
                     ImGui::Text("%i. Landing on %s with parachutes", i, step.refBody->name);
                     ImGui::Indent();
                     break;
-                case MissionPhaseType::LANDING: 
+                case MissionPhase::Type::LANDING: 
                     ImGui::Text("%i. Landing on %s", i, step.refBody->name);
                     ImGui::Indent();
                     break;
-                case MissionPhaseType::ESCAPE: 
+                case MissionPhase::Type::ESCAPE: 
                     ImGui::Text("%i. Escape from %s", i, step.refBody->name);
                     ImGui::Indent();
                     break;
-                case MissionPhaseType::ORBITAL_INSERTION: 
+                case MissionPhase::Type::ORBITAL_INSERTION: 
                     ImGui::Text("%i. Direct orbital transfer to %s", i, step.refBody2->name);
                     ImGui::Indent();
 
@@ -301,6 +301,8 @@ bool WindowMission::render() {
                         }
                         ImGui::SameLine();
                         if (ImGui::Button("Auto-solve")) {
+                            step.porkchopPlot->init(currentDate);
+                            WindowMission::threadPool.send([&step]() { step.porkchopPlot->generate(); });
                         }
                         ImGui::PopStyleColor();
                         if (step.porkchopPlot->progress >= 0) {
@@ -308,11 +310,11 @@ bool WindowMission::render() {
                         }
                     }
                     break;
-                case MissionPhaseType::MINING: 
+                case MissionPhase::Type::MINING: 
                     ImGui::Text("%i. Mining fuel at %s", i, step.refBody->name);
                     ImGui::Indent();
                     break;
-                case MissionPhaseType::ORBITAL_REFUELING: 
+                case MissionPhase::Type::ORBITAL_REFUELING: 
                     ImGui::Text("%i. Orbital refuelling %s", i, step.refBody->name);
                     ImGui::Indent();
                     break;
@@ -359,7 +361,7 @@ bool WindowMission::render() {
                 }
 
                 step.updateDeltaV();
-                if (step.type == MissionPhaseType::LANDING || step.type == MissionPhaseType::LANDING_PARACHUTES) {
+                if (step.type == MissionPhase::Type::LANDING || step.type == MissionPhase::Type::LANDING_PARACHUTES) {
                     // No more propagation
                     break;
                 }
@@ -778,131 +780,3 @@ bool WindowMission::renderTimeInput() {
     return update;
 }
 
-void WindowMission::updateMissionSequence() {
-    msequence.clear();
-
-    auto fromTo = [this](const Body* from, const Body* to) {
-        float startOrbit = from->atmHeight_km > 0 ? from->atmHeight_km + 10.0 : 30;
-        float destOrbit  = to->atmHeight_km > 0 ? to->atmHeight_km + 10.0 : 30;
-        float reentryPE  = destOrbit;
-
-        if (to == from->orbit.parent) {
-            reentryPE = 30;  // guarantee atmospheric capture
-        }
-
-        msequence.push_back(MissionPhase::takeoff(from, startOrbit));
-
-        if (from == to) {
-            if (to->atmHeight_km > 0) {
-                msequence.push_back(MissionPhase { MissionPhaseType::LANDING_PARACHUTES, from, nullptr, startOrbit });
-            }
-            else {
-                msequence.push_back(MissionPhase { MissionPhaseType::LANDING, from, nullptr, destOrbit });
-            }
-        }
-        else {
-            if (to->orbit.parent == from->orbit.parent) {
-                // Planet to planet — both orbit the same parent body
-                if (advanced) {
-                    msequence.push_back(MissionPhase { MissionPhaseType::ORBITAL_INSERTION, from, to, startOrbit, destOrbit });
-                }
-                else {
-                    msequence.push_back(MissionPhase { MissionPhaseType::ESCAPE, from, to, startOrbit, destOrbit });
-                    if (to->orbit.inclination != from->orbit.inclination) {
-                        msequence.push_back(MissionPhase { MissionPhaseType::INCLINATION_CORRECTION, from, to, startOrbit });
-                    }
-                }
-            }
-            if (to == from->orbit.parent) {
-                // Return from natural satellite. Need to escape first
-                msequence.push_back(MissionPhase { MissionPhaseType::ESCAPE, from, to, startOrbit, reentryPE });
-            }
-            else if (to->orbit.parent == from) {
-                // Parent to moon — inclination correction w.r.t. parent's equator
-                if (to->orbit.inclination != 0) { // origin orbit is in parents ecliptic
-                    msequence.push_back(MissionPhase { MissionPhaseType::INCLINATION_CORRECTION, from, to, startOrbit });
-                }
-                if (advanced) {
-                    msequence.push_back(MissionPhase { MissionPhaseType::ORBITAL_INSERTION, from, to, startOrbit, destOrbit });
-                }
-                else {
-                    msequence.push_back(MissionPhase::hohmann(from, to, startOrbit, destOrbit));
-                }
-            }
-        }
-        if (to->atmHeight_km > 0) {
-            msequence.push_back(MissionPhase { MissionPhaseType::ATMOSPHERIC_BREAKING, to, nullptr, reentryPE });
-            msequence.push_back(MissionPhase { MissionPhaseType::LANDING_PARACHUTES, to, nullptr, destOrbit });
-        }
-        else {
-            msequence.push_back(MissionPhase::circularize_hyperbolic(from, to, startOrbit, destOrbit));
-            msequence.push_back(MissionPhase { MissionPhaseType::LANDING, to, nullptr, destOrbit });
-        }
-    };
-    fromTo(mission.originBody, mission.destinationBody);
-    if (!mission.oneWayTrip) {
-        fromTo(mission.destinationBody, mission.originBody);
-    }
-
-    for (auto& step : msequence) {
-        step.updateDeltaV();
-    }
-
-    // Initialize porkchop plots
-    for (auto& step : msequence) {
-        if (step.type == MissionPhaseType::ORBITAL_INSERTION) {
-            step.porkchopPlot = std::make_unique<PorkchopPlot>(&step);
-        }
-    }
-}
-
-void MissionPhase::updateDeltaV() {
-    switch (type) {
-        case MissionPhaseType::LANDING: 
-            dv_range = naiveTakeoffLandingCost(refBody, alt1); 
-            break;
-        case MissionPhaseType::TAKEOFF: 
-            dv_range = naiveTakeoffLandingCost(refBody, alt1); 
-            break;
-        case MissionPhaseType::ESCAPE:
-            if (refBody->orbit.parent == refBody2->orbit.parent) {
-                // Planet to planet, or Moon to Moon
-                // No direct maneuver, since inclination correction might be needed.
-                dv_range = escapeBurnCost(refBody, alt1);
-            }
-            else {
-                // Combine Escape and Hohmann return into a single maneuver
-                // Cost should be the same as for circularizing hyperbolic orbit 
-                // after a Hohmann transfer, just in reverse. (Time-reversal symmetry)
-                dv_range = circularizeHyperbolicCost(refBody->orbit.parent, refBody, alt2, alt1, true);
-            }
-            break;
-        case MissionPhaseType::CIRCULARIZE_HYPERBOLIC:
-            if (refBody2 && refBody2 == refBody->orbit.parent) {
-                dv_range = circularizeHyperbolicCost(refBody2, refBody, alt2, alt1, true);
-            } else if (refBody2 && refBody2->orbit.parent == refBody->orbit.parent) {
-                // Planet -> planet
-                dv_range = circularizeHyperbolicCost(refBody, refBody2, alt1, alt2, true);
-            } else {
-                dv_range = circularizeHyperbolicCost(refBody, refBody2, alt1, alt2, true);
-            }
-            break;
-        case MissionPhaseType::HOHMANN_TRANSFER:
-            dv_range = hohmannTransferCost(refBody, refBody2, alt1);
-            break;
-        case MissionPhaseType::ORBITAL_INSERTION:
-            dv_range = orbitalInsertion(refBody, refBody2, alt1);
-            break;
-        case MissionPhaseType::INCLINATION_CORRECTION:
-            if (refBody2 && refBody2->orbit.parent == refBody) {
-                // Planet → moon: ship's parking orbit vs moon's orbit around planet
-                Orbit shipOrbit = Orbit::circular(refBody, alt1 + refBody->radius_km);
-                dv_range = inclinationCorrectionCost(shipOrbit, refBody2->orbit);
-            } else {
-                // Planet → planet: orbits around shared parent
-                dv_range = inclinationCorrectionCost(refBody->orbit, refBody2->orbit);
-            }
-            break;
-        default: dv_range = 0;
-    }
-}
